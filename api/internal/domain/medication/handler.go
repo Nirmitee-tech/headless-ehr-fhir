@@ -9,17 +9,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/ehr/ehr/internal/domain/diagnostics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/ehr/ehr/pkg/pagination"
 )
 
 type Handler struct {
-	svc *Service
+	svc     *Service
+	diagSvc *diagnostics.Service
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, diagSvc ...*diagnostics.Service) *Handler {
+	h := &Handler{svc: svc}
+	if len(diagSvc) > 0 {
+		h.diagSvc = diagSvc[0]
+	}
+	return h
 }
 
 func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
@@ -30,6 +36,7 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	readGroup.GET("/medications/:id/ingredients", h.GetIngredients)
 	readGroup.GET("/medication-requests", h.ListMedicationRequests)
 	readGroup.GET("/medication-requests/:id", h.GetMedicationRequest)
+	readGroup.GET("/medication-requests/:id/status-history", h.GetMedicationRequestStatusHistory)
 	readGroup.GET("/medication-administrations", h.ListMedicationAdministrations)
 	readGroup.GET("/medication-administrations/:id", h.GetMedicationAdministration)
 	readGroup.GET("/medication-dispenses", h.ListMedicationDispenses)
@@ -280,6 +287,23 @@ func (h *Handler) DeleteMedicationRequest(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// -- MedicationRequest Status History Handler --
+
+func (h *Handler) GetMedicationRequestStatusHistory(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	if h.diagSvc == nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "status history not configured")
+	}
+	history, err := h.diagSvc.GetStatusHistory(c.Request().Context(), "MedicationRequest", id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, history)
 }
 
 // -- MedicationAdministration Handlers --

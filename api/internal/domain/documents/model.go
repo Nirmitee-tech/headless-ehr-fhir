@@ -285,6 +285,44 @@ type CompositionSection struct {
 	SortOrder       *int       `db:"sort_order" json:"sort_order,omitempty"`
 }
 
+// DocumentTemplate maps to the document_template table.
+type DocumentTemplate struct {
+	ID          uuid.UUID         `db:"id" json:"id"`
+	Name        string            `db:"name" json:"name"`
+	Description *string           `db:"description" json:"description,omitempty"`
+	Status      string            `db:"status" json:"status"`
+	TypeCode    *string           `db:"type_code" json:"type_code,omitempty"`
+	TypeDisplay *string           `db:"type_display" json:"type_display,omitempty"`
+	Sections    []TemplateSection `json:"sections,omitempty"` // populated from separate table
+	CreatedAt   time.Time         `db:"created_at" json:"created_at"`
+	UpdatedAt   time.Time         `db:"updated_at" json:"updated_at"`
+	CreatedBy   string            `db:"created_by" json:"created_by"`
+}
+
+// TemplateSection maps to the template_section table.
+type TemplateSection struct {
+	ID              uuid.UUID `db:"id" json:"id"`
+	TemplateID      uuid.UUID `db:"template_id" json:"template_id"`
+	Title           string    `db:"title" json:"title"`
+	SortOrder       int       `db:"sort_order" json:"sort_order"`
+	ContentTemplate string    `db:"content_template" json:"content_template"`
+	Required        bool      `db:"required" json:"required"`
+}
+
+// RenderedDocument represents a template rendered with variable substitution.
+type RenderedDocument struct {
+	TemplateID   uuid.UUID         `json:"template_id"`
+	TemplateName string            `json:"template_name"`
+	Sections     []RenderedSection `json:"sections"`
+	RenderedAt   time.Time         `json:"rendered_at"`
+}
+
+// RenderedSection represents a single section after template rendering.
+type RenderedSection struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
 func strVal(s *string) string {
 	if s == nil {
 		return ""

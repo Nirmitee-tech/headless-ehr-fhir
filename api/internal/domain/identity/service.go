@@ -3,6 +3,8 @@ package identity
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -10,10 +12,11 @@ import (
 type Service struct {
 	patients      PatientRepository
 	practitioners PractitionerRepository
+	links         PatientLinkRepository
 }
 
-func NewService(patients PatientRepository, practitioners PractitionerRepository) *Service {
-	return &Service{patients: patients, practitioners: practitioners}
+func NewService(patients PatientRepository, practitioners PractitionerRepository, links PatientLinkRepository) *Service {
+	return &Service{patients: patients, practitioners: practitioners, links: links}
 }
 
 // -- Patient --
@@ -94,6 +97,102 @@ func (s *Service) GetPatientIdentifiers(ctx context.Context, patientID uuid.UUID
 
 func (s *Service) RemovePatientIdentifier(ctx context.Context, id uuid.UUID) error {
 	return s.patients.RemoveIdentifier(ctx, id)
+}
+
+// -- Patient Matching / MPI --
+
+// MatchPatient performs deterministic matching on name, DOB, and gender.
+func (s *Service) MatchPatient(ctx context.Context, patientID uuid.UUID) ([]*PatientMatchResult, error) {
+	source, err := s.patients.GetByID(ctx, patientID)
+	if err != nil {
+		return nil, fmt.Errorf("patient not found: %w", err)
+	}
+
+	// Search for candidates by name
+	params := map[string]string{
+		"family": source.LastName,
+	}
+	candidates, _, err := s.patients.Search(ctx, params, 100, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*PatientMatchResult
+	for _, candidate := range candidates {
+		if candidate.ID == source.ID {
+			continue
+		}
+		score := 0.0
+		var matchFields []string
+
+		// Name matching
+		if strings.EqualFold(candidate.LastName, source.LastName) {
+			score += 0.3
+			matchFields = append(matchFields, "last_name")
+		}
+		if strings.EqualFold(candidate.FirstName, source.FirstName) {
+			score += 0.3
+			matchFields = append(matchFields, "first_name")
+		}
+
+		// DOB matching
+		if source.BirthDate != nil && candidate.BirthDate != nil {
+			if source.BirthDate.Format("2006-01-02") == candidate.BirthDate.Format("2006-01-02") {
+				score += 0.25
+				matchFields = append(matchFields, "birth_date")
+			}
+		}
+
+		// Gender matching
+		if source.Gender != nil && candidate.Gender != nil {
+			if *source.Gender == *candidate.Gender {
+				score += 0.15
+				matchFields = append(matchFields, "gender")
+			}
+		}
+
+		if score >= 0.5 {
+			results = append(results, &PatientMatchResult{
+				Patient:     candidate,
+				Score:       score,
+				MatchFields: matchFields,
+			})
+		}
+	}
+	return results, nil
+}
+
+// LinkPatients creates a link between two patients.
+func (s *Service) LinkPatients(ctx context.Context, link *PatientLink) error {
+	if link.PatientID == uuid.Nil {
+		return fmt.Errorf("patient_id is required")
+	}
+	if link.LinkedPatientID == uuid.Nil {
+		return fmt.Errorf("linked_patient_id is required")
+	}
+	if link.PatientID == link.LinkedPatientID {
+		return fmt.Errorf("cannot link a patient to themselves")
+	}
+	validLinkTypes := map[string]bool{
+		"replaced-by": true, "replaces": true, "refer": true, "seealso": true,
+	}
+	if !validLinkTypes[link.LinkType] {
+		return fmt.Errorf("invalid link_type: %s", link.LinkType)
+	}
+	if link.CreatedAt.IsZero() {
+		link.CreatedAt = time.Now()
+	}
+	return s.links.Create(ctx, link)
+}
+
+// GetPatientLinks returns all links for a patient.
+func (s *Service) GetPatientLinks(ctx context.Context, patientID uuid.UUID) ([]*PatientLink, error) {
+	return s.links.GetByPatientID(ctx, patientID)
+}
+
+// UnlinkPatients removes a patient link by ID.
+func (s *Service) UnlinkPatients(ctx context.Context, linkID uuid.UUID) error {
+	return s.links.Delete(ctx, linkID)
 }
 
 // -- Practitioner --

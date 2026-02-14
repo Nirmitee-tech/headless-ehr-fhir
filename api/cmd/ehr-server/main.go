@@ -18,19 +18,24 @@ import (
 	"github.com/ehr/ehr/internal/domain/admin"
 	"github.com/ehr/ehr/internal/domain/behavioral"
 	"github.com/ehr/ehr/internal/domain/billing"
+	"github.com/ehr/ehr/internal/domain/careplan"
 	"github.com/ehr/ehr/internal/domain/cds"
 	"github.com/ehr/ehr/internal/domain/clinical"
 	"github.com/ehr/ehr/internal/domain/diagnostics"
 	"github.com/ehr/ehr/internal/domain/documents"
 	"github.com/ehr/ehr/internal/domain/emergency"
 	"github.com/ehr/ehr/internal/domain/encounter"
+	"github.com/ehr/ehr/internal/domain/familyhistory"
 	"github.com/ehr/ehr/internal/domain/identity"
+	"github.com/ehr/ehr/internal/domain/immunization"
 	"github.com/ehr/ehr/internal/domain/inbox"
 	"github.com/ehr/ehr/internal/domain/medication"
 	"github.com/ehr/ehr/internal/domain/nursing"
 	"github.com/ehr/ehr/internal/domain/obstetrics"
 	"github.com/ehr/ehr/internal/domain/oncology"
 	"github.com/ehr/ehr/internal/domain/portal"
+	"github.com/ehr/ehr/internal/domain/provenance"
+	"github.com/ehr/ehr/internal/domain/relatedperson"
 	"github.com/ehr/ehr/internal/domain/research"
 	"github.com/ehr/ehr/internal/domain/scheduling"
 	"github.com/ehr/ehr/internal/domain/surgery"
@@ -39,6 +44,8 @@ import (
 	"github.com/ehr/ehr/internal/platform/db"
 	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/ehr/ehr/internal/platform/middleware"
+	"github.com/ehr/ehr/internal/platform/openapi"
+	"github.com/ehr/ehr/internal/platform/reporting"
 )
 
 func main() {
@@ -460,6 +467,49 @@ func runServer() error {
 		{Name: "status", Type: "token"},
 	})
 
+	// Immunization domain
+	capBuilder.AddResource("Immunization", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+		{Name: "vaccine-code", Type: "token"},
+		{Name: "date", Type: "date"},
+	})
+	capBuilder.AddResource("ImmunizationRecommendation", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "vaccine-type", Type: "token"},
+		{Name: "status", Type: "token"},
+	})
+
+	// CarePlan domain
+	capBuilder.AddResource("CarePlan", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+		{Name: "category", Type: "token"},
+	})
+	capBuilder.AddResource("Goal", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "lifecycle-status", Type: "token"},
+	})
+
+	// FamilyHistory domain
+	capBuilder.AddResource("FamilyMemberHistory", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+		{Name: "relationship", Type: "token"},
+	})
+
+	// RelatedPerson domain
+	capBuilder.AddResource("RelatedPerson", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "relationship", Type: "token"},
+	})
+
+	// Provenance domain
+	capBuilder.AddResource("Provenance", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "target", Type: "reference"},
+		{Name: "agent", Type: "reference"},
+	})
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
@@ -473,6 +523,11 @@ func runServer() error {
 		"Communication",
 		"ResearchStudy",
 		"Questionnaire", "QuestionnaireResponse",
+		"Immunization", "ImmunizationRecommendation",
+		"CarePlan", "Goal",
+		"FamilyMemberHistory",
+		"RelatedPerson",
+		"Provenance",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -489,15 +544,19 @@ func runServer() error {
 		"MedicationRequest", "MedicationAdministration", "MedicationDispense",
 		"ServiceRequest", "DiagnosticReport", "Encounter", "Appointment",
 		"Claim", "Coverage", "Consent", "DocumentReference", "Composition",
-		"Communication", "QuestionnaireResponse", "Specimen", "ImagingStudy"} {
+		"Communication", "QuestionnaireResponse", "Specimen", "ImagingStudy",
+		"Immunization", "ImmunizationRecommendation", "CarePlan", "Goal",
+		"FamilyMemberHistory", "RelatedPerson"} {
 		includeRegistry.RegisterReference(rt, "patient", "Patient")
 		includeRegistry.RegisterReference(rt, "subject", "Patient")
 	}
 	for _, rt := range []string{"Condition", "Observation", "Procedure",
 		"MedicationRequest", "MedicationAdministration", "ServiceRequest",
-		"DiagnosticReport"} {
+		"DiagnosticReport", "Immunization", "CarePlan"} {
 		includeRegistry.RegisterReference(rt, "encounter", "Encounter")
 	}
+	includeRegistry.RegisterReference("Provenance", "target", "Patient")
+	includeRegistry.RegisterReference("Provenance", "agent", "Practitioner")
 
 	_ = includeRegistry // Used by domain handlers
 
@@ -528,7 +587,8 @@ func runServer() error {
 	// Identity domain
 	patientRepo := identity.NewPatientRepo(pool)
 	practRepo := identity.NewPractitionerRepo(pool)
-	identitySvc := identity.NewService(patientRepo, practRepo)
+	patientLinkRepo := identity.NewPatientLinkRepo(pool)
+	identitySvc := identity.NewService(patientRepo, practRepo, patientLinkRepo)
 	identityHandler := identity.NewHandler(identitySvc)
 	identityHandler.RegisterRoutes(apiV1, fhirGroup)
 
@@ -547,6 +607,16 @@ func runServer() error {
 	clinicalHandler := clinical.NewHandler(clinicalSvc)
 	clinicalHandler.RegisterRoutes(apiV1, fhirGroup)
 
+	// Diagnostics domain
+	srRepo := diagnostics.NewServiceRequestRepoPG(pool)
+	specRepo := diagnostics.NewSpecimenRepoPG(pool)
+	dxReportRepo := diagnostics.NewDiagnosticReportRepoPG(pool)
+	imgRepo := diagnostics.NewImagingStudyRepoPG(pool)
+	orderHistRepo := diagnostics.NewOrderStatusHistoryRepoPG(pool)
+	dxSvc := diagnostics.NewService(srRepo, specRepo, dxReportRepo, imgRepo, orderHistRepo)
+	dxHandler := diagnostics.NewHandler(dxSvc)
+	dxHandler.RegisterRoutes(apiV1, fhirGroup)
+
 	// Medication domain
 	medRepo := medication.NewMedicationRepoPG(pool)
 	medReqRepo := medication.NewMedicationRequestRepoPG(pool)
@@ -554,17 +624,8 @@ func runServer() error {
 	medDispRepo := medication.NewMedicationDispenseRepoPG(pool)
 	medStmtRepo := medication.NewMedicationStatementRepoPG(pool)
 	medSvc := medication.NewService(medRepo, medReqRepo, medAdminRepo, medDispRepo, medStmtRepo)
-	medHandler := medication.NewHandler(medSvc)
+	medHandler := medication.NewHandler(medSvc, dxSvc)
 	medHandler.RegisterRoutes(apiV1, fhirGroup)
-
-	// Diagnostics domain
-	srRepo := diagnostics.NewServiceRequestRepoPG(pool)
-	specRepo := diagnostics.NewSpecimenRepoPG(pool)
-	dxReportRepo := diagnostics.NewDiagnosticReportRepoPG(pool)
-	imgRepo := diagnostics.NewImagingStudyRepoPG(pool)
-	dxSvc := diagnostics.NewService(srRepo, specRepo, dxReportRepo, imgRepo)
-	dxHandler := diagnostics.NewHandler(dxSvc)
-	dxHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Scheduling domain
 	schedRepo := scheduling.NewScheduleRepoPG(pool)
@@ -589,7 +650,8 @@ func runServer() error {
 	docRefRepo := documents.NewDocumentReferenceRepoPG(pool)
 	noteRepo := documents.NewClinicalNoteRepoPG(pool)
 	compRepo := documents.NewCompositionRepoPG(pool)
-	docSvc := documents.NewService(consentRepo, docRefRepo, noteRepo, compRepo)
+	docTemplateRepo := documents.NewDocumentTemplateRepoPG(pool)
+	docSvc := documents.NewService(consentRepo, docRefRepo, noteRepo, compRepo, docTemplateRepo)
 	docHandler := documents.NewHandler(docSvc)
 	docHandler.RegisterRoutes(apiV1, fhirGroup)
 
@@ -707,6 +769,54 @@ func runServer() error {
 	cdsSvc := cds.NewService(cdsRuleRepo, cdsAlertRepo, drugIntRepo, orderSetRepo, pathwayRepo, pathwayEnrollRepo, formularyRepo, medReconcRepo)
 	cdsHandler := cds.NewHandler(cdsSvc)
 	cdsHandler.RegisterRoutes(apiV1)
+
+	// Immunization domain
+	immRepo := immunization.NewImmunizationRepoPG(pool)
+	immRecRepo := immunization.NewRecommendationRepoPG(pool)
+	immSvc := immunization.NewService(immRepo, immRecRepo)
+	immHandler := immunization.NewHandler(immSvc)
+	immHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// CarePlan domain
+	cpRepo := careplan.NewCarePlanRepoPG(pool)
+	goalRepo := careplan.NewGoalRepoPG(pool)
+	cpSvc := careplan.NewService(cpRepo, goalRepo)
+	cpHandler := careplan.NewHandler(cpSvc)
+	cpHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// FamilyHistory domain
+	fmhRepo := familyhistory.NewFamilyMemberHistoryRepoPG(pool)
+	fmhSvc := familyhistory.NewService(fmhRepo)
+	fmhHandler := familyhistory.NewHandler(fmhSvc)
+	fmhHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// RelatedPerson domain
+	rpRepo := relatedperson.NewRelatedPersonRepoPG(pool)
+	rpSvc := relatedperson.NewService(rpRepo)
+	rpHandler := relatedperson.NewHandler(rpSvc)
+	rpHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Provenance domain
+	provRepo := provenance.NewProvenanceRepoPG(pool)
+	provSvc := provenance.NewService(provRepo)
+	provHandler := provenance.NewHandler(provSvc)
+	provHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Reporting framework
+	reportHandler := reporting.NewHandler(pool)
+	reportHandler.RegisterRoutes(apiV1)
+
+	// OpenAPI spec
+	openAPIGen := openapi.NewGenerator(capBuilder, "0.1.0", baseURL)
+	openAPIGen.RegisterRoutes(apiV1)
+
+	// FHIR $export
+	exportManager := fhir.NewExportManager()
+	exportHandler := fhir.NewExportHandler(exportManager)
+	exportHandler.RegisterRoutes(fhirGroup)
+
+	// DB health check endpoint
+	e.GET("/health/db", db.HealthHandler(pool))
 
 	// Graceful shutdown
 	go func() {

@@ -176,6 +176,22 @@ func (p *Patient) ToFHIR() map[string]interface{} {
 	return result
 }
 
+// ToFHIRWithLinks returns FHIR representation including link[] from PatientLink data.
+func (p *Patient) ToFHIRWithLinks(links []*PatientLink) map[string]interface{} {
+	result := p.ToFHIR()
+	if len(links) > 0 {
+		fhirLinks := make([]map[string]interface{}, len(links))
+		for i, link := range links {
+			fhirLinks[i] = map[string]interface{}{
+				"other": fhir.Reference{Reference: fhir.FormatReference("Patient", link.LinkedPatientID.String())},
+				"type":  link.LinkType,
+			}
+		}
+		result["link"] = fhirLinks
+	}
+	return result
+}
+
 // PatientContact maps to the patient_contact table.
 type PatientContact struct {
 	ID             uuid.UUID  `db:"id" json:"id"`
@@ -320,6 +336,26 @@ func (p *Practitioner) ToFHIR() map[string]interface{} {
 	}
 
 	return result
+}
+
+// PatientLink maps to the patient_link table (FHIR Patient.link).
+type PatientLink struct {
+	ID              uuid.UUID `db:"id" json:"id"`
+	PatientID       uuid.UUID `db:"patient_id" json:"patient_id"`
+	LinkedPatientID uuid.UUID `db:"linked_patient_id" json:"linked_patient_id"`
+	LinkType        string    `db:"link_type" json:"link_type"` // replaced-by, replaces, refer, seealso
+	Confidence      float64   `db:"confidence" json:"confidence"`
+	MatchMethod     string    `db:"match_method" json:"match_method"`
+	MatchDetails    *string   `db:"match_details" json:"match_details,omitempty"`
+	CreatedAt       time.Time `db:"created_at" json:"created_at"`
+	CreatedBy       string    `db:"created_by" json:"created_by"`
+}
+
+// PatientMatchResult represents a candidate match returned by the MPI matching algorithm.
+type PatientMatchResult struct {
+	Patient     *Patient `json:"patient"`
+	Score       float64  `json:"score"`
+	MatchFields []string `json:"match_fields"`
 }
 
 // PractitionerRole maps to the practitioner_role table.

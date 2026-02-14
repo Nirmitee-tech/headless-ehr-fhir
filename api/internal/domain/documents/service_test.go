@@ -269,10 +269,78 @@ func (m *mockCompositionRepo) GetSections(_ context.Context, compositionID uuid.
 	return result, nil
 }
 
+// -- Mock DocumentTemplate Repository --
+
+type mockDocTemplateRepo struct {
+	items    map[uuid.UUID]*DocumentTemplate
+	sections map[uuid.UUID]*TemplateSection
+}
+
+func newMockDocTemplateRepo() *mockDocTemplateRepo {
+	return &mockDocTemplateRepo{
+		items:    make(map[uuid.UUID]*DocumentTemplate),
+		sections: make(map[uuid.UUID]*TemplateSection),
+	}
+}
+
+func (m *mockDocTemplateRepo) Create(_ context.Context, t *DocumentTemplate) error {
+	t.ID = uuid.New()
+	t.CreatedAt = time.Now()
+	t.UpdatedAt = time.Now()
+	// Store a copy without Sections to avoid double-counting when GetTemplate
+	// appends sections from GetSections.
+	stored := *t
+	stored.Sections = nil
+	m.items[t.ID] = &stored
+	return nil
+}
+
+func (m *mockDocTemplateRepo) GetByID(_ context.Context, id uuid.UUID) (*DocumentTemplate, error) {
+	t, ok := m.items[id]
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	return t, nil
+}
+
+func (m *mockDocTemplateRepo) Update(_ context.Context, t *DocumentTemplate) error {
+	m.items[t.ID] = t
+	return nil
+}
+
+func (m *mockDocTemplateRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.items, id)
+	return nil
+}
+
+func (m *mockDocTemplateRepo) List(_ context.Context, limit, offset int) ([]*DocumentTemplate, int, error) {
+	var result []*DocumentTemplate
+	for _, t := range m.items {
+		result = append(result, t)
+	}
+	return result, len(result), nil
+}
+
+func (m *mockDocTemplateRepo) AddSection(_ context.Context, s *TemplateSection) error {
+	s.ID = uuid.New()
+	m.sections[s.ID] = s
+	return nil
+}
+
+func (m *mockDocTemplateRepo) GetSections(_ context.Context, templateID uuid.UUID) ([]*TemplateSection, error) {
+	var result []*TemplateSection
+	for _, s := range m.sections {
+		if s.TemplateID == templateID {
+			result = append(result, s)
+		}
+	}
+	return result, nil
+}
+
 // -- Tests --
 
 func newTestService() *Service {
-	return NewService(newMockConsentRepo(), newMockDocRefRepo(), newMockClinicalNoteRepo(), newMockCompositionRepo())
+	return NewService(newMockConsentRepo(), newMockDocRefRepo(), newMockClinicalNoteRepo(), newMockCompositionRepo(), newMockDocTemplateRepo())
 }
 
 // -- Consent Tests --
@@ -867,5 +935,224 @@ func TestCompositionToFHIR(t *testing.T) {
 	}
 	if fhirRes["status"] != "final" {
 		t.Errorf("expected final, got %v", fhirRes["status"])
+	}
+}
+
+// -- DocumentTemplate Tests --
+
+func TestCreateTemplate(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{Name: "Discharge Summary"}
+	err := svc.CreateTemplate(context.Background(), tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tmpl.ID == uuid.Nil {
+		t.Error("expected ID to be set")
+	}
+	if tmpl.Status != "draft" {
+		t.Errorf("expected default status 'draft', got %s", tmpl.Status)
+	}
+}
+
+func TestCreateTemplate_NameRequired(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{}
+	err := svc.CreateTemplate(context.Background(), tmpl)
+	if err == nil {
+		t.Error("expected error for missing name")
+	}
+}
+
+func TestCreateTemplate_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{Name: "Test", Status: "bogus"}
+	err := svc.CreateTemplate(context.Background(), tmpl)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestCreateTemplate_WithSections(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{
+		Name: "Discharge Summary",
+		Sections: []TemplateSection{
+			{Title: "Chief Complaint", ContentTemplate: "Patient presented with {{complaint}}.", SortOrder: 1},
+			{Title: "Assessment", ContentTemplate: "Assessment: {{assessment}}", SortOrder: 2},
+		},
+	}
+	err := svc.CreateTemplate(context.Background(), tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tmpl.ID == uuid.Nil {
+		t.Error("expected ID to be set")
+	}
+}
+
+func TestGetTemplate(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{Name: "History and Physical"}
+	svc.CreateTemplate(context.Background(), tmpl)
+
+	fetched, err := svc.GetTemplate(context.Background(), tmpl.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.Name != "History and Physical" {
+		t.Errorf("expected 'History and Physical', got %s", fetched.Name)
+	}
+}
+
+func TestGetTemplate_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetTemplate(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateTemplate(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{Name: "Progress Note"}
+	svc.CreateTemplate(context.Background(), tmpl)
+
+	tmpl.Status = "active"
+	err := svc.UpdateTemplate(context.Background(), tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateTemplate_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{Name: "Progress Note"}
+	svc.CreateTemplate(context.Background(), tmpl)
+
+	tmpl.Status = "bogus"
+	err := svc.UpdateTemplate(context.Background(), tmpl)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteTemplate(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{Name: "Old Template"}
+	svc.CreateTemplate(context.Background(), tmpl)
+
+	err := svc.DeleteTemplate(context.Background(), tmpl.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = svc.GetTemplate(context.Background(), tmpl.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListTemplates(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTemplate(context.Background(), &DocumentTemplate{Name: "Template A"})
+	svc.CreateTemplate(context.Background(), &DocumentTemplate{Name: "Template B"})
+
+	result, total, err := svc.ListTemplates(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestRenderTemplate(t *testing.T) {
+	svc := newTestService()
+
+	// Create template with sections containing placeholders
+	tmpl := &DocumentTemplate{
+		Name: "Discharge Summary",
+		Sections: []TemplateSection{
+			{Title: "Patient Info", ContentTemplate: "Patient: {{patient_name}}, DOB: {{dob}}", SortOrder: 1},
+			{Title: "Diagnosis", ContentTemplate: "Primary Diagnosis: {{diagnosis}}", SortOrder: 2},
+		},
+	}
+	err := svc.CreateTemplate(context.Background(), tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error creating template: %v", err)
+	}
+
+	variables := map[string]string{
+		"patient_name": "John Doe",
+		"dob":          "1990-05-15",
+		"diagnosis":    "Pneumonia",
+	}
+
+	rendered, err := svc.RenderTemplate(context.Background(), tmpl.ID, variables)
+	if err != nil {
+		t.Fatalf("unexpected error rendering: %v", err)
+	}
+
+	if rendered.TemplateID != tmpl.ID {
+		t.Error("expected template ID to match")
+	}
+	if rendered.TemplateName != "Discharge Summary" {
+		t.Errorf("expected 'Discharge Summary', got %s", rendered.TemplateName)
+	}
+	if len(rendered.Sections) != 2 {
+		t.Fatalf("expected 2 rendered sections, got %d", len(rendered.Sections))
+	}
+	if rendered.Sections[0].Content != "Patient: John Doe, DOB: 1990-05-15" {
+		t.Errorf("unexpected rendered content: %s", rendered.Sections[0].Content)
+	}
+	if rendered.Sections[1].Content != "Primary Diagnosis: Pneumonia" {
+		t.Errorf("unexpected rendered content: %s", rendered.Sections[1].Content)
+	}
+	if rendered.RenderedAt.IsZero() {
+		t.Error("expected RenderedAt to be set")
+	}
+}
+
+func TestRenderTemplate_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.RenderTemplate(context.Background(), uuid.New(), map[string]string{})
+	if err == nil {
+		t.Error("expected error for non-existent template")
+	}
+}
+
+func TestRenderTemplate_NoVariables(t *testing.T) {
+	svc := newTestService()
+	tmpl := &DocumentTemplate{
+		Name: "Simple Template",
+		Sections: []TemplateSection{
+			{Title: "Body", ContentTemplate: "This has {{placeholder}} in it.", SortOrder: 1},
+		},
+	}
+	svc.CreateTemplate(context.Background(), tmpl)
+
+	rendered, err := svc.RenderTemplate(context.Background(), tmpl.ID, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Without variable substitution, placeholder stays
+	if rendered.Sections[0].Content != "This has {{placeholder}} in it." {
+		t.Errorf("unexpected content: %s", rendered.Sections[0].Content)
+	}
+}
+
+func TestCreateTemplate_ValidStatuses(t *testing.T) {
+	validStatuses := []string{"draft", "active", "retired"}
+	for _, status := range validStatuses {
+		svc := newTestService()
+		tmpl := &DocumentTemplate{Name: "Test " + status, Status: status}
+		err := svc.CreateTemplate(context.Background(), tmpl)
+		if err != nil {
+			t.Errorf("expected no error for valid status %s, got: %v", status, err)
+		}
 	}
 }

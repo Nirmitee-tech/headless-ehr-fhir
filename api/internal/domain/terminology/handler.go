@@ -3,7 +3,10 @@ package terminology
 import (
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/platform/auth"
@@ -34,6 +37,8 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirTerm := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse", "pharmacist", "lab-tech"))
 	fhirTerm.POST("/CodeSystem/$lookup", h.FHIRLookup)
 	fhirTerm.POST("/CodeSystem/$validate-code", h.FHIRValidateCode)
+	fhirTerm.GET("/ValueSet/$expand", h.ExpandValueSet)
+	fhirTerm.POST("/ValueSet/$expand", h.ExpandValueSet)
 }
 
 func getLimit(c echo.Context) int {
@@ -139,4 +144,72 @@ func (h *Handler) FHIRValidateCode(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
 	return c.JSON(http.StatusOK, resp)
+}
+
+// ExpandValueSet handles GET/POST /fhir/ValueSet/$expand
+func (h *Handler) ExpandValueSet(c echo.Context) error {
+	url := c.QueryParam("url")
+	filter := c.QueryParam("filter")
+	countStr := c.QueryParam("count")
+	offsetStr := c.QueryParam("offset")
+
+	count := 100
+	if countStr != "" {
+		if v, err := strconv.Atoi(countStr); err == nil && v > 0 {
+			count = v
+		}
+	}
+	offset := 0
+	if offsetStr != "" {
+		if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	// Map well-known ValueSet URLs to code system lookups
+	var systemURI string
+	switch {
+	case strings.Contains(url, "loinc"):
+		systemURI = SystemLOINC
+	case strings.Contains(url, "icd10") || strings.Contains(url, "icd-10"):
+		systemURI = SystemICD10
+	case strings.Contains(url, "snomed") || strings.Contains(url, "sct"):
+		systemURI = SystemSNOMED
+	case strings.Contains(url, "rxnorm"):
+		systemURI = SystemRxNorm
+	case strings.Contains(url, "cpt"):
+		systemURI = SystemCPT
+	}
+
+	var contains []map[string]interface{}
+
+	if systemURI != "" && filter != "" {
+		results, err := h.svc.SearchCodes(c.Request().Context(), systemURI, filter, count, offset)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+		}
+		for _, r := range results {
+			contains = append(contains, map[string]interface{}{
+				"system":  r.SystemURI,
+				"code":    r.Code,
+				"display": r.Display,
+			})
+		}
+	}
+
+	if contains == nil {
+		contains = []map[string]interface{}{}
+	}
+
+	result := map[string]interface{}{
+		"resourceType": "ValueSet",
+		"expansion": map[string]interface{}{
+			"identifier": uuid.New().String(),
+			"timestamp":  time.Now().UTC().Format(time.RFC3339),
+			"total":      len(contains),
+			"offset":     offset,
+			"contains":   contains,
+		},
+	}
+	return c.JSON(http.StatusOK, result)
 }

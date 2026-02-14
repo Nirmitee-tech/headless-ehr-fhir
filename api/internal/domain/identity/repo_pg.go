@@ -332,6 +332,63 @@ func scanPatientRows(rows pgx.Rows) (*Patient, error) {
 	return &p, nil
 }
 
+// -- PatientLink Repository --
+
+type patientLinkRepoPG struct {
+	pool *pgxpool.Pool
+}
+
+func NewPatientLinkRepo(pool *pgxpool.Pool) PatientLinkRepository {
+	return &patientLinkRepoPG{pool: pool}
+}
+
+func (r *patientLinkRepoPG) conn(ctx context.Context) querier {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+func (r *patientLinkRepoPG) Create(ctx context.Context, link *PatientLink) error {
+	link.ID = uuid.New()
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO patient_link (id, patient_id, linked_patient_id, link_type, confidence, match_method, match_details, created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		link.ID, link.PatientID, link.LinkedPatientID, link.LinkType,
+		link.Confidence, link.MatchMethod, link.MatchDetails, link.CreatedBy,
+	)
+	return err
+}
+
+func (r *patientLinkRepoPG) GetByPatientID(ctx context.Context, patientID uuid.UUID) ([]*PatientLink, error) {
+	rows, err := r.conn(ctx).Query(ctx, `
+		SELECT id, patient_id, linked_patient_id, link_type, confidence, match_method, match_details, created_at, created_by
+		FROM patient_link WHERE patient_id = $1 ORDER BY created_at DESC`, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var links []*PatientLink
+	for rows.Next() {
+		var l PatientLink
+		if err := rows.Scan(&l.ID, &l.PatientID, &l.LinkedPatientID, &l.LinkType,
+			&l.Confidence, &l.MatchMethod, &l.MatchDetails, &l.CreatedAt, &l.CreatedBy); err != nil {
+			return nil, err
+		}
+		links = append(links, &l)
+	}
+	return links, nil
+}
+
+func (r *patientLinkRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM patient_link WHERE id = $1`, id)
+	return err
+}
+
 // -- Practitioner Repository --
 
 type practRepoPG struct {

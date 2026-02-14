@@ -32,6 +32,7 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	readGroup.GET("/diagnostic-reports", h.ListDiagnosticReports)
 	readGroup.GET("/diagnostic-reports/:id", h.GetDiagnosticReport)
 	readGroup.GET("/diagnostic-reports/:id/results", h.GetResults)
+	readGroup.GET("/service-requests/:id/status-history", h.GetServiceRequestStatusHistory)
 	readGroup.GET("/imaging-studies", h.ListImagingStudies)
 	readGroup.GET("/imaging-studies/:id", h.GetImagingStudy)
 
@@ -169,6 +170,20 @@ func (h *Handler) DeleteServiceRequest(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// -- Status History Handlers --
+
+func (h *Handler) GetServiceRequestStatusHistory(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	history, err := h.svc.GetStatusHistory(c.Request().Context(), "ServiceRequest", id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, history)
 }
 
 // -- Specimen Handlers --

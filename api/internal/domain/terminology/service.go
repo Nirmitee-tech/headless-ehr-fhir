@@ -124,6 +124,76 @@ func (s *Service) LookupCPT(ctx context.Context, code string) (*CPTCode, error) 
 	return s.cpt.GetByCode(ctx, code)
 }
 
+// -- Generic Search (for ValueSet $expand) --
+
+// SearchCodes searches across all code systems based on the system URI.
+// It returns generic SearchResult entries suitable for ValueSet expansion.
+func (s *Service) SearchCodes(ctx context.Context, systemURI, filter string, count, offset int) ([]*SearchResult, error) {
+	if count <= 0 {
+		count = 100
+	}
+	// Fetch more than needed to handle offset in-memory
+	fetchLimit := count + offset
+
+	var results []*SearchResult
+
+	switch systemURI {
+	case SystemLOINC:
+		codes, err := s.loinc.Search(ctx, filter, fetchLimit)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range codes {
+			results = append(results, &SearchResult{Code: c.Code, Display: c.Display, SystemURI: c.SystemURI})
+		}
+	case SystemICD10:
+		codes, err := s.icd10.Search(ctx, filter, fetchLimit)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range codes {
+			results = append(results, &SearchResult{Code: c.Code, Display: c.Display, SystemURI: c.SystemURI})
+		}
+	case SystemSNOMED:
+		codes, err := s.snomed.Search(ctx, filter, fetchLimit)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range codes {
+			results = append(results, &SearchResult{Code: c.Code, Display: c.Display, SystemURI: c.SystemURI})
+		}
+	case SystemRxNorm:
+		codes, err := s.rxnorm.Search(ctx, filter, fetchLimit)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range codes {
+			results = append(results, &SearchResult{Code: c.RxNormCode, Display: c.Display, SystemURI: c.SystemURI})
+		}
+	case SystemCPT:
+		codes, err := s.cpt.Search(ctx, filter, fetchLimit)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range codes {
+			results = append(results, &SearchResult{Code: c.Code, Display: c.Display, SystemURI: c.SystemURI})
+		}
+	default:
+		return nil, nil
+	}
+
+	// Apply offset
+	if offset >= len(results) {
+		return nil, nil
+	}
+	results = results[offset:]
+	if len(results) > count {
+		results = results[:count]
+	}
+
+	return results, nil
+}
+
 // -- FHIR Operations --
 
 // Lookup implements the FHIR CodeSystem $lookup operation.

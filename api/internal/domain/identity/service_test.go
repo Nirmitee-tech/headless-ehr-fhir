@@ -223,10 +223,41 @@ func (m *mockPractRepo) RemoveRole(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// -- Mock Patient Link Repository --
+
+type mockPatientLinkRepo struct {
+	links map[uuid.UUID]*PatientLink
+}
+
+func newMockPatientLinkRepo() *mockPatientLinkRepo {
+	return &mockPatientLinkRepo{links: make(map[uuid.UUID]*PatientLink)}
+}
+
+func (m *mockPatientLinkRepo) Create(_ context.Context, link *PatientLink) error {
+	link.ID = uuid.New()
+	m.links[link.ID] = link
+	return nil
+}
+
+func (m *mockPatientLinkRepo) GetByPatientID(_ context.Context, patientID uuid.UUID) ([]*PatientLink, error) {
+	var result []*PatientLink
+	for _, l := range m.links {
+		if l.PatientID == patientID {
+			result = append(result, l)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockPatientLinkRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.links, id)
+	return nil
+}
+
 // -- Tests --
 
 func newTestService() *Service {
-	return NewService(newMockPatientRepo(), newMockPractRepo())
+	return NewService(newMockPatientRepo(), newMockPractRepo(), newMockPatientLinkRepo())
 }
 
 func TestCreatePatient(t *testing.T) {
@@ -792,5 +823,284 @@ func TestPractitionerToFHIR(t *testing.T) {
 	}
 	if fhir["identifier"] == nil {
 		t.Error("expected identifier with NPI")
+	}
+}
+
+// -- Patient Matching / MPI Tests --
+
+func TestMatchPatient_FindsMatches(t *testing.T) {
+	svc := newTestService()
+	gender := "male"
+	bd := time.Date(1990, 5, 15, 0, 0, 0, 0, time.UTC)
+
+	// Create source patient
+	source := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-MATCH1", Gender: &gender, BirthDate: &bd}
+	svc.CreatePatient(context.Background(), source)
+
+	// Create matching candidate (same last name, first name, DOB, gender)
+	candidate := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-MATCH2", Gender: &gender, BirthDate: &bd}
+	svc.CreatePatient(context.Background(), candidate)
+
+	// Create non-matching candidate (different name)
+	nonMatch := &Patient{FirstName: "Jane", LastName: "Smith", MRN: "MRN-MATCH3"}
+	svc.CreatePatient(context.Background(), nonMatch)
+
+	results, err := svc.MatchPatient(context.Background(), source.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) < 1 {
+		t.Fatal("expected at least 1 match result")
+	}
+	// The candidate with same name+DOB+gender should have a high score
+	found := false
+	for _, r := range results {
+		if r.Patient.ID == candidate.ID {
+			found = true
+			if r.Score < 0.5 {
+				t.Errorf("expected score >= 0.5, got %f", r.Score)
+			}
+			if len(r.MatchFields) == 0 {
+				t.Error("expected match fields to be populated")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected to find matching candidate in results")
+	}
+}
+
+func TestMatchPatient_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.MatchPatient(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for non-existent patient")
+	}
+}
+
+func TestMatchPatient_NoMatches(t *testing.T) {
+	svc := newTestService()
+
+	// Create source patient with a unique last name
+	source := &Patient{FirstName: "Unique", LastName: "Xyzzy", MRN: "MRN-NOMATCH1"}
+	svc.CreatePatient(context.Background(), source)
+
+	results, err := svc.MatchPatient(context.Background(), source.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 matches, got %d", len(results))
+	}
+}
+
+func TestLinkPatients(t *testing.T) {
+	svc := newTestService()
+
+	p1 := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-L1"}
+	svc.CreatePatient(context.Background(), p1)
+	p2 := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-L2"}
+	svc.CreatePatient(context.Background(), p2)
+
+	link := &PatientLink{
+		PatientID:       p1.ID,
+		LinkedPatientID: p2.ID,
+		LinkType:        "seealso",
+		Confidence:      0.95,
+		MatchMethod:     "deterministic",
+		CreatedBy:       "admin",
+	}
+	err := svc.LinkPatients(context.Background(), link)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if link.ID == uuid.Nil {
+		t.Error("expected link ID to be set")
+	}
+}
+
+func TestLinkPatients_InvalidType(t *testing.T) {
+	svc := newTestService()
+	p1 := &Patient{FirstName: "A", LastName: "B", MRN: "MRN-LT1"}
+	svc.CreatePatient(context.Background(), p1)
+	p2 := &Patient{FirstName: "C", LastName: "D", MRN: "MRN-LT2"}
+	svc.CreatePatient(context.Background(), p2)
+
+	link := &PatientLink{
+		PatientID:       p1.ID,
+		LinkedPatientID: p2.ID,
+		LinkType:        "invalid-type",
+	}
+	err := svc.LinkPatients(context.Background(), link)
+	if err == nil {
+		t.Error("expected error for invalid link type")
+	}
+}
+
+func TestLinkPatients_SelfLink(t *testing.T) {
+	svc := newTestService()
+	p := &Patient{FirstName: "A", LastName: "B", MRN: "MRN-SL"}
+	svc.CreatePatient(context.Background(), p)
+
+	link := &PatientLink{
+		PatientID:       p.ID,
+		LinkedPatientID: p.ID,
+		LinkType:        "seealso",
+	}
+	err := svc.LinkPatients(context.Background(), link)
+	if err == nil {
+		t.Error("expected error for self-link")
+	}
+}
+
+func TestLinkPatients_MissingPatientID(t *testing.T) {
+	svc := newTestService()
+	link := &PatientLink{
+		LinkedPatientID: uuid.New(),
+		LinkType:        "seealso",
+	}
+	err := svc.LinkPatients(context.Background(), link)
+	if err == nil {
+		t.Error("expected error for missing patient_id")
+	}
+}
+
+func TestLinkPatients_MissingLinkedPatientID(t *testing.T) {
+	svc := newTestService()
+	link := &PatientLink{
+		PatientID: uuid.New(),
+		LinkType:  "seealso",
+	}
+	err := svc.LinkPatients(context.Background(), link)
+	if err == nil {
+		t.Error("expected error for missing linked_patient_id")
+	}
+}
+
+func TestGetPatientLinks(t *testing.T) {
+	svc := newTestService()
+	p1 := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-GL1"}
+	svc.CreatePatient(context.Background(), p1)
+	p2 := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-GL2"}
+	svc.CreatePatient(context.Background(), p2)
+
+	link := &PatientLink{
+		PatientID:       p1.ID,
+		LinkedPatientID: p2.ID,
+		LinkType:        "seealso",
+		CreatedBy:       "admin",
+	}
+	svc.LinkPatients(context.Background(), link)
+
+	links, err := svc.GetPatientLinks(context.Background(), p1.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("expected 1 link, got %d", len(links))
+	}
+	if links[0].LinkedPatientID != p2.ID {
+		t.Error("expected linked patient ID to match")
+	}
+}
+
+func TestUnlinkPatients(t *testing.T) {
+	svc := newTestService()
+	p1 := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-UL1"}
+	svc.CreatePatient(context.Background(), p1)
+	p2 := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-UL2"}
+	svc.CreatePatient(context.Background(), p2)
+
+	link := &PatientLink{
+		PatientID:       p1.ID,
+		LinkedPatientID: p2.ID,
+		LinkType:        "seealso",
+		CreatedBy:       "admin",
+	}
+	svc.LinkPatients(context.Background(), link)
+
+	err := svc.UnlinkPatients(context.Background(), link.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	links, _ := svc.GetPatientLinks(context.Background(), p1.ID)
+	if len(links) != 0 {
+		t.Errorf("expected 0 links after unlink, got %d", len(links))
+	}
+}
+
+func TestToFHIRWithLinks(t *testing.T) {
+	p := &Patient{
+		FHIRID:    "pat-fhir-link",
+		Active:    true,
+		FirstName: "John",
+		LastName:  "Doe",
+		MRN:       "MRN-FHIR-LINK",
+		UpdatedAt: time.Now(),
+	}
+
+	linkedID := uuid.New()
+	links := []*PatientLink{
+		{
+			ID:              uuid.New(),
+			PatientID:       uuid.New(),
+			LinkedPatientID: linkedID,
+			LinkType:        "seealso",
+		},
+	}
+
+	fhirResult := p.ToFHIRWithLinks(links)
+	if fhirResult["resourceType"] != "Patient" {
+		t.Error("expected Patient resourceType")
+	}
+	if fhirResult["link"] == nil {
+		t.Fatal("expected link array in FHIR output")
+	}
+	fhirLinks, ok := fhirResult["link"].([]map[string]interface{})
+	if !ok || len(fhirLinks) != 1 {
+		t.Fatalf("expected 1 FHIR link, got %v", fhirResult["link"])
+	}
+	if fhirLinks[0]["type"] != "seealso" {
+		t.Errorf("expected seealso, got %v", fhirLinks[0]["type"])
+	}
+}
+
+func TestToFHIRWithLinks_Empty(t *testing.T) {
+	p := &Patient{
+		FHIRID:    "pat-no-links",
+		Active:    true,
+		FirstName: "Jane",
+		LastName:  "Smith",
+		MRN:       "MRN-NL",
+		UpdatedAt: time.Now(),
+	}
+
+	fhirResult := p.ToFHIRWithLinks(nil)
+	if fhirResult["link"] != nil {
+		t.Error("expected no link array for empty links")
+	}
+}
+
+func TestLinkPatients_AllValidTypes(t *testing.T) {
+	svc := newTestService()
+	validTypes := []string{"replaced-by", "replaces", "refer", "seealso"}
+
+	for _, lt := range validTypes {
+		p1 := &Patient{FirstName: "A", LastName: "B", MRN: "MRN-VT-" + lt + "-1"}
+		svc.CreatePatient(context.Background(), p1)
+		p2 := &Patient{FirstName: "C", LastName: "D", MRN: "MRN-VT-" + lt + "-2"}
+		svc.CreatePatient(context.Background(), p2)
+
+		link := &PatientLink{
+			PatientID:       p1.ID,
+			LinkedPatientID: p2.ID,
+			LinkType:        lt,
+			CreatedBy:       "test",
+		}
+		err := svc.LinkPatients(context.Background(), link)
+		if err != nil {
+			t.Errorf("expected no error for valid link type %s, got: %v", lt, err)
+		}
 	}
 }

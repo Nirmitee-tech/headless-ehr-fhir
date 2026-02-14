@@ -51,6 +51,14 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	writeGroup.DELETE("/compositions/:id", h.DeleteComposition)
 	writeGroup.POST("/compositions/:id/sections", h.AddSection)
 
+	// Document template endpoints
+	readGroup.GET("/document-templates", h.ListTemplates)
+	readGroup.GET("/document-templates/:id", h.GetTemplate)
+	writeGroup.POST("/document-templates", h.CreateTemplate)
+	writeGroup.PUT("/document-templates/:id", h.UpdateTemplate)
+	writeGroup.DELETE("/document-templates/:id", h.DeleteTemplate)
+	writeGroup.POST("/document-templates/:id/render", h.RenderTemplate)
+
 	// FHIR read endpoints
 	fhirRead := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
 	fhirRead.GET("/Consent", h.SearchConsentsFHIR)
@@ -406,6 +414,85 @@ func (h *Handler) GetSections(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, sections)
+}
+
+// -- DocumentTemplate Handlers --
+
+func (h *Handler) CreateTemplate(c echo.Context) error {
+	var t DocumentTemplate
+	if err := c.Bind(&t); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := h.svc.CreateTemplate(c.Request().Context(), &t); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, t)
+}
+
+func (h *Handler) GetTemplate(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	t, err := h.svc.GetTemplate(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "template not found")
+	}
+	return c.JSON(http.StatusOK, t)
+}
+
+func (h *Handler) ListTemplates(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	items, total, err := h.svc.ListTemplates(c.Request().Context(), pg.Limit, pg.Offset)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+}
+
+func (h *Handler) UpdateTemplate(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var t DocumentTemplate
+	if err := c.Bind(&t); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	t.ID = id
+	if err := h.svc.UpdateTemplate(c.Request().Context(), &t); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, t)
+}
+
+func (h *Handler) DeleteTemplate(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	if err := h.svc.DeleteTemplate(c.Request().Context(), id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) RenderTemplate(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var body struct {
+		Variables map[string]string `json:"variables"`
+	}
+	if err := c.Bind(&body); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	rendered, err := h.svc.RenderTemplate(c.Request().Context(), id, body.Variables)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, rendered)
 }
 
 // -- FHIR Endpoints --

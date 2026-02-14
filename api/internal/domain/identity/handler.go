@@ -41,6 +41,12 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	writeGroup.POST("/patients/:id/contacts", h.AddPatientContact)
 	writeGroup.DELETE("/patients/:id/contacts/:contact_id", h.RemovePatientContact)
 	writeGroup.POST("/patients/:id/identifiers", h.AddPatientIdentifier)
+	// Patient matching / MPI endpoints
+	readGroup.GET("/patients/:id/links", h.GetPatientLinks)
+	writeGroup.POST("/patients/:id/match", h.MatchPatient)
+	writeGroup.POST("/patients/:id/link", h.LinkPatient)
+	writeGroup.DELETE("/patients/:id/links/:linkId", h.UnlinkPatient)
+
 	writeGroup.POST("/practitioners", h.CreatePractitioner)
 	writeGroup.PUT("/practitioners/:id", h.UpdatePractitioner)
 	writeGroup.DELETE("/practitioners/:id", h.DeletePractitioner)
@@ -201,6 +207,59 @@ func (h *Handler) GetPatientIdentifiers(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, idents)
+}
+
+// -- Patient Matching / MPI Handlers --
+
+func (h *Handler) MatchPatient(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	results, err := h.svc.MatchPatient(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, results)
+}
+
+func (h *Handler) LinkPatient(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var link PatientLink
+	if err := c.Bind(&link); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	link.PatientID = id
+	if err := h.svc.LinkPatients(c.Request().Context(), &link); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, link)
+}
+
+func (h *Handler) GetPatientLinks(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	links, err := h.svc.GetPatientLinks(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, links)
+}
+
+func (h *Handler) UnlinkPatient(c echo.Context) error {
+	linkID, err := uuid.Parse(c.Param("linkId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid link id")
+	}
+	if err := h.svc.UnlinkPatients(c.Request().Context(), linkID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 // -- Practitioner Operational Handlers --

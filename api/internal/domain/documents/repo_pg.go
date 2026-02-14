@@ -555,3 +555,105 @@ func (r *compRepoPG) GetSections(ctx context.Context, compositionID uuid.UUID) (
 	}
 	return items, nil
 }
+
+// =========== DocumentTemplate Repository ===========
+
+type documentTemplateRepoPG struct{ pool *pgxpool.Pool }
+
+func NewDocumentTemplateRepoPG(pool *pgxpool.Pool) DocumentTemplateRepository {
+	return &documentTemplateRepoPG{pool: pool}
+}
+
+func (r *documentTemplateRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+const templateCols = `id, name, description, status, type_code, type_display, created_at, updated_at, created_by`
+
+func (r *documentTemplateRepoPG) scanTemplate(row pgx.Row) (*DocumentTemplate, error) {
+	var t DocumentTemplate
+	err := row.Scan(&t.ID, &t.Name, &t.Description, &t.Status, &t.TypeCode, &t.TypeDisplay,
+		&t.CreatedAt, &t.UpdatedAt, &t.CreatedBy)
+	return &t, err
+}
+
+func (r *documentTemplateRepoPG) Create(ctx context.Context, t *DocumentTemplate) error {
+	t.ID = uuid.New()
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO document_template (id, name, description, status, type_code, type_display, created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		t.ID, t.Name, t.Description, t.Status, t.TypeCode, t.TypeDisplay, t.CreatedBy)
+	return err
+}
+
+func (r *documentTemplateRepoPG) GetByID(ctx context.Context, id uuid.UUID) (*DocumentTemplate, error) {
+	return r.scanTemplate(r.conn(ctx).QueryRow(ctx, `SELECT `+templateCols+` FROM document_template WHERE id = $1`, id))
+}
+
+func (r *documentTemplateRepoPG) Update(ctx context.Context, t *DocumentTemplate) error {
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE document_template SET name=$2, description=$3, status=$4, type_code=$5, type_display=$6, updated_at=NOW()
+		WHERE id = $1`,
+		t.ID, t.Name, t.Description, t.Status, t.TypeCode, t.TypeDisplay)
+	return err
+}
+
+func (r *documentTemplateRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM document_template WHERE id = $1`, id)
+	return err
+}
+
+func (r *documentTemplateRepoPG) List(ctx context.Context, limit, offset int) ([]*DocumentTemplate, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM document_template`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+templateCols+` FROM document_template ORDER BY name LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*DocumentTemplate
+	for rows.Next() {
+		t, err := r.scanTemplate(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, t)
+	}
+	return items, total, nil
+}
+
+func (r *documentTemplateRepoPG) AddSection(ctx context.Context, s *TemplateSection) error {
+	s.ID = uuid.New()
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO template_section (id, template_id, title, sort_order, content_template, required)
+		VALUES ($1,$2,$3,$4,$5,$6)`,
+		s.ID, s.TemplateID, s.Title, s.SortOrder, s.ContentTemplate, s.Required)
+	return err
+}
+
+func (r *documentTemplateRepoPG) GetSections(ctx context.Context, templateID uuid.UUID) ([]*TemplateSection, error) {
+	rows, err := r.conn(ctx).Query(ctx, `
+		SELECT id, template_id, title, sort_order, content_template, required
+		FROM template_section WHERE template_id = $1 ORDER BY sort_order ASC`, templateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TemplateSection
+	for rows.Next() {
+		var s TemplateSection
+		if err := rows.Scan(&s.ID, &s.TemplateID, &s.Title, &s.SortOrder, &s.ContentTemplate, &s.Required); err != nil {
+			return nil, err
+		}
+		items = append(items, &s)
+	}
+	return items, nil
+}

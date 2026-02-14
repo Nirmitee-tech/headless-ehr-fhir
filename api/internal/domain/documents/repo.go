@@ -35,6 +35,17 @@ type ClinicalNoteRepository interface {
 	ListByEncounter(ctx context.Context, encounterID uuid.UUID, limit, offset int) ([]*ClinicalNote, int, error)
 }
 
+type DocumentTemplateRepository interface {
+	Create(ctx context.Context, t *DocumentTemplate) error
+	GetByID(ctx context.Context, id uuid.UUID) (*DocumentTemplate, error)
+	Update(ctx context.Context, t *DocumentTemplate) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context, limit, offset int) ([]*DocumentTemplate, int, error)
+	// Sections
+	AddSection(ctx context.Context, s *TemplateSection) error
+	GetSections(ctx context.Context, templateID uuid.UUID) ([]*TemplateSection, error)
+}
+
 type CompositionRepository interface {
 	Create(ctx context.Context, c *Composition) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Composition, error)

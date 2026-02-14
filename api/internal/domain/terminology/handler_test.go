@@ -302,6 +302,165 @@ func TestHandler_FHIRValidateCode_BadRequest(t *testing.T) {
 	}
 }
 
+// =========== ExpandValueSet Handler Tests ===========
+
+func TestHandler_ExpandValueSet_LOINC(t *testing.T) {
+	h, e := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/ValueSet/$expand?url=http://loinc.org/vs&filter=heart&count=10", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExpandValueSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	if result["resourceType"] != "ValueSet" {
+		t.Errorf("expected resourceType 'ValueSet', got %v", result["resourceType"])
+	}
+	expansion, ok := result["expansion"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected expansion object")
+	}
+	if expansion["identifier"] == nil {
+		t.Error("expected expansion identifier")
+	}
+	contains, ok := expansion["contains"].([]interface{})
+	if !ok {
+		t.Fatal("expected contains array")
+	}
+	if len(contains) == 0 {
+		t.Error("expected results for LOINC 'heart' filter")
+	}
+}
+
+func TestHandler_ExpandValueSet_ICD10(t *testing.T) {
+	h, e := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/ValueSet/$expand?url=http://hl7.org/fhir/ValueSet/icd10&filter=diabetes", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExpandValueSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	expansion := result["expansion"].(map[string]interface{})
+	contains := expansion["contains"].([]interface{})
+	if len(contains) == 0 {
+		t.Error("expected results for ICD-10 'diabetes' filter")
+	}
+}
+
+func TestHandler_ExpandValueSet_SNOMED(t *testing.T) {
+	h, e := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/ValueSet/$expand?url=http://snomed.info/sct/vs&filter=appendectomy", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExpandValueSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	expansion := result["expansion"].(map[string]interface{})
+	contains := expansion["contains"].([]interface{})
+	if len(contains) == 0 {
+		t.Error("expected results for SNOMED 'appendectomy' filter")
+	}
+}
+
+func TestHandler_ExpandValueSet_EmptyURL(t *testing.T) {
+	h, e := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/ValueSet/$expand?filter=test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExpandValueSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	expansion := result["expansion"].(map[string]interface{})
+	contains := expansion["contains"].([]interface{})
+	if len(contains) != 0 {
+		t.Errorf("expected empty contains for unknown URL, got %d", len(contains))
+	}
+}
+
+func TestHandler_ExpandValueSet_NoFilter(t *testing.T) {
+	h, e := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/ValueSet/$expand?url=http://loinc.org/vs", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExpandValueSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	expansion := result["expansion"].(map[string]interface{})
+	contains := expansion["contains"].([]interface{})
+	// No filter means empty results (filter is required for search)
+	if len(contains) != 0 {
+		t.Errorf("expected empty contains without filter, got %d", len(contains))
+	}
+}
+
+func TestHandler_ExpandValueSet_WithOffset(t *testing.T) {
+	h, e := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/ValueSet/$expand?url=http://loinc.org/vs&filter=hemoglobin&offset=0&count=10", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExpandValueSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	expansion := result["expansion"].(map[string]interface{})
+	offset := expansion["offset"].(float64)
+	if offset != 0 {
+		t.Errorf("expected offset 0, got %v", offset)
+	}
+}
+
 // =========== Route Registration Tests ===========
 
 func TestHandler_RegisterRoutes(t *testing.T) {
@@ -329,6 +488,8 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 		"GET:/api/v1/terminology/cpt",
 		"POST:/fhir/CodeSystem/$lookup",
 		"POST:/fhir/CodeSystem/$validate-code",
+		"GET:/fhir/ValueSet/$expand",
+		"POST:/fhir/ValueSet/$expand",
 	}
 	for _, path := range expected {
 		if !routePaths[path] {

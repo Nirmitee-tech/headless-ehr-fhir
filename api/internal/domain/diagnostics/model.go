@@ -348,6 +348,18 @@ func (is *ImagingStudy) ToFHIR() map[string]interface{} {
 	return result
 }
 
+// OrderStatusHistory records a status transition for service requests or medication requests.
+type OrderStatusHistory struct {
+	ID           uuid.UUID `db:"id" json:"id"`
+	ResourceType string    `db:"resource_type" json:"resource_type"` // ServiceRequest, MedicationRequest
+	ResourceID   uuid.UUID `db:"resource_id" json:"resource_id"`
+	FromStatus   string    `db:"from_status" json:"from_status"`
+	ToStatus     string    `db:"to_status" json:"to_status"`
+	ChangedBy    string    `db:"changed_by" json:"changed_by"`
+	ChangedAt    time.Time `db:"changed_at" json:"changed_at"`
+	Reason       *string   `db:"reason" json:"reason,omitempty"`
+}
+
 func strVal(s *string) string {
 	if s == nil {
 		return ""

@@ -40,6 +40,11 @@ type DiagnosticReportRepository interface {
 	RemoveResult(ctx context.Context, reportID uuid.UUID, observationID uuid.UUID) error
 }
 
+type OrderStatusHistoryRepository interface {
+	Create(ctx context.Context, h *OrderStatusHistory) error
+	GetByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]*OrderStatusHistory, error)
+}
+
 type ImagingStudyRepository interface {
 	Create(ctx context.Context, is *ImagingStudy) error
 	GetByID(ctx context.Context, id uuid.UUID) (*ImagingStudy, error)

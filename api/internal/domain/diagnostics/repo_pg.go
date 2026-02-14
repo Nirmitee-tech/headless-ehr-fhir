@@ -189,6 +189,54 @@ func (r *serviceRequestRepoPG) Search(ctx context.Context, params map[string]str
 	return items, total, nil
 }
 
+// =========== OrderStatusHistory Repository ===========
+
+type orderStatusHistoryRepoPG struct{ pool *pgxpool.Pool }
+
+func NewOrderStatusHistoryRepoPG(pool *pgxpool.Pool) OrderStatusHistoryRepository {
+	return &orderStatusHistoryRepoPG{pool: pool}
+}
+
+func (r *orderStatusHistoryRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+func (r *orderStatusHistoryRepoPG) Create(ctx context.Context, h *OrderStatusHistory) error {
+	h.ID = uuid.New()
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO order_status_history (id, resource_type, resource_id, from_status, to_status, changed_by, changed_at, reason)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		h.ID, h.ResourceType, h.ResourceID, h.FromStatus, h.ToStatus, h.ChangedBy, h.ChangedAt, h.Reason)
+	return err
+}
+
+func (r *orderStatusHistoryRepoPG) GetByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]*OrderStatusHistory, error) {
+	rows, err := r.conn(ctx).Query(ctx, `
+		SELECT id, resource_type, resource_id, from_status, to_status, changed_by, changed_at, reason
+		FROM order_status_history WHERE resource_type = $1 AND resource_id = $2
+		ORDER BY changed_at ASC`, resourceType, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*OrderStatusHistory
+	for rows.Next() {
+		var h OrderStatusHistory
+		if err := rows.Scan(&h.ID, &h.ResourceType, &h.ResourceID, &h.FromStatus, &h.ToStatus,
+			&h.ChangedBy, &h.ChangedAt, &h.Reason); err != nil {
+			return nil, err
+		}
+		items = append(items, &h)
+	}
+	return items, nil
+}
+
 // =========== Specimen Repository ===========
 
 type specimenRepoPG struct{ pool *pgxpool.Pool }

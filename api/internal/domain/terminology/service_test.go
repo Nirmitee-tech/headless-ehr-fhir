@@ -514,6 +514,121 @@ func TestLookupCPT_EmptyCode(t *testing.T) {
 	}
 }
 
+// =========== SearchCodes Tests ===========
+
+func TestSearchCodes_LOINC(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemLOINC, "heart", 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected results for LOINC 'heart'")
+	}
+	for _, r := range results {
+		if r.SystemURI != SystemLOINC {
+			t.Errorf("expected system %q, got %q", SystemLOINC, r.SystemURI)
+		}
+	}
+}
+
+func TestSearchCodes_ICD10(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemICD10, "diabetes", 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected results for ICD-10 'diabetes'")
+	}
+}
+
+func TestSearchCodes_SNOMED(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemSNOMED, "appendectomy", 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected results for SNOMED 'appendectomy'")
+	}
+}
+
+func TestSearchCodes_RxNorm(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemRxNorm, "metformin", 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected results for RxNorm 'metformin'")
+	}
+}
+
+func TestSearchCodes_CPT(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemCPT, "office", 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected results for CPT 'office'")
+	}
+}
+
+func TestSearchCodes_UnknownSystem(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), "http://unknown.system", "test", 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results != nil {
+		t.Errorf("expected nil results for unknown system, got %d", len(results))
+	}
+}
+
+func TestSearchCodes_WithOffset(t *testing.T) {
+	svc := newTestService()
+	// The mock LOINC repo has 2 hemoglobin entries
+	allResults, err := svc.SearchCodes(context.Background(), SystemLOINC, "hemoglobin", 100, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(allResults) < 2 {
+		t.Skip("need at least 2 results to test offset")
+	}
+
+	offsetResults, err := svc.SearchCodes(context.Background(), SystemLOINC, "hemoglobin", 100, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(offsetResults) != len(allResults)-1 {
+		t.Errorf("expected %d results with offset 1, got %d", len(allResults)-1, len(offsetResults))
+	}
+}
+
+func TestSearchCodes_OffsetBeyondResults(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemLOINC, "heart", 10, 1000)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results != nil {
+		t.Errorf("expected nil results when offset is beyond total, got %d", len(results))
+	}
+}
+
+func TestSearchCodes_DefaultCount(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCodes(context.Background(), SystemLOINC, "hemoglobin", 0, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results == nil {
+		t.Error("expected non-nil results with default count")
+	}
+}
+
 // =========== FHIR $lookup Tests ===========
 
 func TestFHIRLookup_LOINC(t *testing.T) {

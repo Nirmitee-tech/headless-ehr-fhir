@@ -27,6 +27,12 @@ type PatientRepository interface {
 	RemoveIdentifier(ctx context.Context, id uuid.UUID) error
 }
 
+type PatientLinkRepository interface {
+	Create(ctx context.Context, link *PatientLink) error
+	GetByPatientID(ctx context.Context, patientID uuid.UUID) ([]*PatientLink, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 type PractitionerRepository interface {
 	Create(ctx context.Context, p *Practitioner) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Practitioner, error)

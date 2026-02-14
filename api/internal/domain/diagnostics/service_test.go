@@ -291,10 +291,36 @@ func (m *mockISRepo) Search(_ context.Context, _ map[string]string, limit, offse
 	return result, len(result), nil
 }
 
+// -- Mock Order Status History Repository --
+
+type mockOrderStatusHistoryRepo struct {
+	entries map[uuid.UUID]*OrderStatusHistory
+}
+
+func newMockOrderStatusHistoryRepo() *mockOrderStatusHistoryRepo {
+	return &mockOrderStatusHistoryRepo{entries: make(map[uuid.UUID]*OrderStatusHistory)}
+}
+
+func (m *mockOrderStatusHistoryRepo) Create(_ context.Context, h *OrderStatusHistory) error {
+	h.ID = uuid.New()
+	m.entries[h.ID] = h
+	return nil
+}
+
+func (m *mockOrderStatusHistoryRepo) GetByResource(_ context.Context, resourceType string, resourceID uuid.UUID) ([]*OrderStatusHistory, error) {
+	var result []*OrderStatusHistory
+	for _, e := range m.entries {
+		if e.ResourceType == resourceType && e.ResourceID == resourceID {
+			result = append(result, e)
+		}
+	}
+	return result, nil
+}
+
 // -- Tests --
 
 func newTestService() *Service {
-	return NewService(newMockSRRepo(), newMockSpecimenRepo(), newMockDRRepo(), newMockISRepo())
+	return NewService(newMockSRRepo(), newMockSpecimenRepo(), newMockDRRepo(), newMockISRepo(), newMockOrderStatusHistoryRepo())
 }
 
 func TestCreateServiceRequest(t *testing.T) {
@@ -965,5 +991,203 @@ func TestImagingStudyToFHIR(t *testing.T) {
 	fhirRes := is.ToFHIR()
 	if fhirRes["resourceType"] != "ImagingStudy" {
 		t.Errorf("expected ImagingStudy, got %v", fhirRes["resourceType"])
+	}
+}
+
+// -- Order Workflow State Machine Tests --
+
+func TestValidateTransition_ServiceRequest_Valid(t *testing.T) {
+	validTransitions := []struct {
+		from, to string
+	}{
+		{"draft", "active"},
+		{"draft", "on-hold"},
+		{"draft", "revoked"},
+		{"draft", "entered-in-error"},
+		{"active", "on-hold"},
+		{"active", "completed"},
+		{"active", "revoked"},
+		{"active", "entered-in-error"},
+		{"on-hold", "active"},
+		{"on-hold", "revoked"},
+		{"completed", "entered-in-error"},
+		{"revoked", "entered-in-error"},
+	}
+	for _, tc := range validTransitions {
+		err := ValidateTransition("ServiceRequest", tc.from, tc.to)
+		if err != nil {
+			t.Errorf("expected valid transition from %s to %s, got error: %v", tc.from, tc.to, err)
+		}
+	}
+}
+
+func TestValidateTransition_ServiceRequest_Invalid(t *testing.T) {
+	invalidTransitions := []struct {
+		from, to string
+	}{
+		{"draft", "completed"},
+		{"completed", "active"},
+		{"entered-in-error", "active"},
+		{"revoked", "active"},
+	}
+	for _, tc := range invalidTransitions {
+		err := ValidateTransition("ServiceRequest", tc.from, tc.to)
+		if err == nil {
+			t.Errorf("expected invalid transition from %s to %s, got nil", tc.from, tc.to)
+		}
+	}
+}
+
+func TestValidateTransition_MedicationRequest_Valid(t *testing.T) {
+	validTransitions := []struct {
+		from, to string
+	}{
+		{"draft", "active"},
+		{"draft", "on-hold"},
+		{"draft", "cancelled"},
+		{"active", "on-hold"},
+		{"active", "completed"},
+		{"active", "stopped"},
+		{"active", "cancelled"},
+		{"on-hold", "active"},
+		{"on-hold", "cancelled"},
+		{"cancelled", "draft"},
+	}
+	for _, tc := range validTransitions {
+		err := ValidateTransition("MedicationRequest", tc.from, tc.to)
+		if err != nil {
+			t.Errorf("expected valid transition from %s to %s, got error: %v", tc.from, tc.to, err)
+		}
+	}
+}
+
+func TestValidateTransition_MedicationRequest_Invalid(t *testing.T) {
+	invalidTransitions := []struct {
+		from, to string
+	}{
+		{"draft", "completed"},
+		{"completed", "active"},
+		{"stopped", "active"},
+		{"entered-in-error", "active"},
+	}
+	for _, tc := range invalidTransitions {
+		err := ValidateTransition("MedicationRequest", tc.from, tc.to)
+		if err == nil {
+			t.Errorf("expected invalid transition from %s to %s, got nil", tc.from, tc.to)
+		}
+	}
+}
+
+func TestValidateTransition_UnsupportedType(t *testing.T) {
+	err := ValidateTransition("Procedure", "draft", "active")
+	if err == nil {
+		t.Error("expected error for unsupported resource type")
+	}
+}
+
+func TestValidateTransition_UnknownFromStatus(t *testing.T) {
+	err := ValidateTransition("ServiceRequest", "bogus", "active")
+	if err == nil {
+		t.Error("expected error for unknown from-status")
+	}
+}
+
+func TestRecordStatusChange_Valid(t *testing.T) {
+	svc := newTestService()
+	resourceID := uuid.New()
+
+	err := svc.RecordStatusChange(context.Background(), "ServiceRequest", resourceID, "draft", "active", "dr-smith", "patient ready")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRecordStatusChange_InvalidTransition(t *testing.T) {
+	svc := newTestService()
+	resourceID := uuid.New()
+
+	err := svc.RecordStatusChange(context.Background(), "ServiceRequest", resourceID, "completed", "draft", "dr-smith", "")
+	if err == nil {
+		t.Error("expected error for invalid transition")
+	}
+}
+
+func TestRecordStatusChange_NoReason(t *testing.T) {
+	svc := newTestService()
+	resourceID := uuid.New()
+
+	err := svc.RecordStatusChange(context.Background(), "MedicationRequest", resourceID, "draft", "active", "dr-smith", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetStatusHistory(t *testing.T) {
+	svc := newTestService()
+	resourceID := uuid.New()
+
+	// Record multiple transitions
+	svc.RecordStatusChange(context.Background(), "ServiceRequest", resourceID, "draft", "active", "dr-smith", "start")
+	svc.RecordStatusChange(context.Background(), "ServiceRequest", resourceID, "active", "completed", "dr-smith", "done")
+
+	history, err := svc.GetStatusHistory(context.Background(), "ServiceRequest", resourceID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(history) != 2 {
+		t.Fatalf("expected 2 history entries, got %d", len(history))
+	}
+}
+
+func TestGetStatusHistory_Empty(t *testing.T) {
+	svc := newTestService()
+	resourceID := uuid.New()
+
+	history, err := svc.GetStatusHistory(context.Background(), "ServiceRequest", resourceID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(history) != 0 {
+		t.Errorf("expected 0 history entries, got %d", len(history))
+	}
+}
+
+func TestGetStatusHistory_FiltersByResource(t *testing.T) {
+	svc := newTestService()
+	id1 := uuid.New()
+	id2 := uuid.New()
+
+	svc.RecordStatusChange(context.Background(), "ServiceRequest", id1, "draft", "active", "dr-a", "")
+	svc.RecordStatusChange(context.Background(), "ServiceRequest", id2, "draft", "active", "dr-b", "")
+
+	history1, _ := svc.GetStatusHistory(context.Background(), "ServiceRequest", id1)
+	history2, _ := svc.GetStatusHistory(context.Background(), "ServiceRequest", id2)
+
+	if len(history1) != 1 {
+		t.Errorf("expected 1 entry for id1, got %d", len(history1))
+	}
+	if len(history2) != 1 {
+		t.Errorf("expected 1 entry for id2, got %d", len(history2))
+	}
+}
+
+func TestOrderStatusHistoryModel(t *testing.T) {
+	reason := "test reason"
+	h := &OrderStatusHistory{
+		ID:           uuid.New(),
+		ResourceType: "ServiceRequest",
+		ResourceID:   uuid.New(),
+		FromStatus:   "draft",
+		ToStatus:     "active",
+		ChangedBy:    "dr-test",
+		ChangedAt:    time.Now(),
+		Reason:       &reason,
+	}
+
+	if h.ResourceType != "ServiceRequest" {
+		t.Errorf("expected ServiceRequest, got %s", h.ResourceType)
+	}
+	if *h.Reason != "test reason" {
+		t.Errorf("expected test reason, got %s", *h.Reason)
 	}
 }

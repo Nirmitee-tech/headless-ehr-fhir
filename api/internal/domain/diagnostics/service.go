@@ -3,6 +3,7 @@ package diagnostics
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -12,10 +13,84 @@ type Service struct {
 	specimens         SpecimenRepository
 	diagnosticReports DiagnosticReportRepository
 	imagingStudies    ImagingStudyRepository
+	statusHistory     OrderStatusHistoryRepository
 }
 
-func NewService(sr ServiceRequestRepository, sp SpecimenRepository, dr DiagnosticReportRepository, is ImagingStudyRepository) *Service {
-	return &Service{serviceRequests: sr, specimens: sp, diagnosticReports: dr, imagingStudies: is}
+func NewService(sr ServiceRequestRepository, sp SpecimenRepository, dr DiagnosticReportRepository, is ImagingStudyRepository, sh OrderStatusHistoryRepository) *Service {
+	return &Service{serviceRequests: sr, specimens: sp, diagnosticReports: dr, imagingStudies: is, statusHistory: sh}
+}
+
+// -- Order Workflow State Machine --
+
+// serviceRequestTransitions defines valid status transitions for ServiceRequest.
+var serviceRequestTransitions = map[string][]string{
+	"draft":            {"active", "on-hold", "revoked", "entered-in-error"},
+	"active":           {"on-hold", "revoked", "completed", "entered-in-error"},
+	"on-hold":          {"active", "revoked", "entered-in-error"},
+	"completed":        {"entered-in-error"},
+	"revoked":          {"entered-in-error"},
+	"entered-in-error": {},
+	"unknown":          {"draft", "active", "entered-in-error"},
+}
+
+// medicationRequestTransitions defines valid status transitions for MedicationRequest.
+var medicationRequestTransitions = map[string][]string{
+	"draft":            {"active", "on-hold", "cancelled", "entered-in-error"},
+	"active":           {"on-hold", "completed", "stopped", "cancelled", "entered-in-error"},
+	"on-hold":          {"active", "cancelled", "entered-in-error"},
+	"completed":        {"entered-in-error"},
+	"cancelled":        {"draft", "entered-in-error"},
+	"stopped":          {"entered-in-error"},
+	"entered-in-error": {},
+	"unknown":          {"draft", "active", "entered-in-error"},
+}
+
+// ValidateTransition checks if a status transition is valid for the given resource type.
+func ValidateTransition(resourceType, from, to string) error {
+	var transitions map[string][]string
+	switch resourceType {
+	case "ServiceRequest":
+		transitions = serviceRequestTransitions
+	case "MedicationRequest":
+		transitions = medicationRequestTransitions
+	default:
+		return fmt.Errorf("unsupported resource type: %s", resourceType)
+	}
+
+	allowed, ok := transitions[from]
+	if !ok {
+		return fmt.Errorf("unknown from-status: %s", from)
+	}
+	for _, s := range allowed {
+		if s == to {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid transition from %s to %s for %s", from, to, resourceType)
+}
+
+// RecordStatusChange validates the transition and records it in the status history.
+func (s *Service) RecordStatusChange(ctx context.Context, resourceType string, resourceID uuid.UUID, from, to, changedBy, reason string) error {
+	if err := ValidateTransition(resourceType, from, to); err != nil {
+		return err
+	}
+	h := &OrderStatusHistory{
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		FromStatus:   from,
+		ToStatus:     to,
+		ChangedBy:    changedBy,
+		ChangedAt:    time.Now(),
+	}
+	if reason != "" {
+		h.Reason = &reason
+	}
+	return s.statusHistory.Create(ctx, h)
+}
+
+// GetStatusHistory returns the status change history for a resource.
+func (s *Service) GetStatusHistory(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]*OrderStatusHistory, error) {
+	return s.statusHistory.GetByResource(ctx, resourceType, resourceID)
 }
 
 // -- ServiceRequest --
