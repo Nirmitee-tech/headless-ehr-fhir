@@ -1,0 +1,237 @@
+package diagnostics
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+)
+
+type Service struct {
+	serviceRequests   ServiceRequestRepository
+	specimens         SpecimenRepository
+	diagnosticReports DiagnosticReportRepository
+	imagingStudies    ImagingStudyRepository
+}
+
+func NewService(sr ServiceRequestRepository, sp SpecimenRepository, dr DiagnosticReportRepository, is ImagingStudyRepository) *Service {
+	return &Service{serviceRequests: sr, specimens: sp, diagnosticReports: dr, imagingStudies: is}
+}
+
+// -- ServiceRequest --
+
+var validSRStatuses = map[string]bool{
+	"draft": true, "active": true, "on-hold": true, "revoked": true,
+	"completed": true, "entered-in-error": true, "unknown": true,
+}
+
+func (s *Service) CreateServiceRequest(ctx context.Context, sr *ServiceRequest) error {
+	if sr.PatientID == uuid.Nil {
+		return fmt.Errorf("patient_id is required")
+	}
+	if sr.RequesterID == uuid.Nil {
+		return fmt.Errorf("requester_id is required")
+	}
+	if sr.CodeValue == "" {
+		return fmt.Errorf("code_value is required")
+	}
+	if sr.Status == "" {
+		sr.Status = "draft"
+	}
+	if !validSRStatuses[sr.Status] {
+		return fmt.Errorf("invalid status: %s", sr.Status)
+	}
+	if sr.Intent == "" {
+		sr.Intent = "order"
+	}
+	return s.serviceRequests.Create(ctx, sr)
+}
+
+func (s *Service) GetServiceRequest(ctx context.Context, id uuid.UUID) (*ServiceRequest, error) {
+	return s.serviceRequests.GetByID(ctx, id)
+}
+
+func (s *Service) GetServiceRequestByFHIRID(ctx context.Context, fhirID string) (*ServiceRequest, error) {
+	return s.serviceRequests.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdateServiceRequest(ctx context.Context, sr *ServiceRequest) error {
+	if sr.Status != "" && !validSRStatuses[sr.Status] {
+		return fmt.Errorf("invalid status: %s", sr.Status)
+	}
+	return s.serviceRequests.Update(ctx, sr)
+}
+
+func (s *Service) DeleteServiceRequest(ctx context.Context, id uuid.UUID) error {
+	return s.serviceRequests.Delete(ctx, id)
+}
+
+func (s *Service) ListServiceRequestsByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*ServiceRequest, int, error) {
+	return s.serviceRequests.ListByPatient(ctx, patientID, limit, offset)
+}
+
+func (s *Service) SearchServiceRequests(ctx context.Context, params map[string]string, limit, offset int) ([]*ServiceRequest, int, error) {
+	return s.serviceRequests.Search(ctx, params, limit, offset)
+}
+
+// -- Specimen --
+
+var validSpecimenStatuses = map[string]bool{
+	"available": true, "unavailable": true, "unsatisfactory": true, "entered-in-error": true,
+}
+
+func (s *Service) CreateSpecimen(ctx context.Context, sp *Specimen) error {
+	if sp.PatientID == uuid.Nil {
+		return fmt.Errorf("patient_id is required")
+	}
+	if sp.Status == "" {
+		sp.Status = "available"
+	}
+	if !validSpecimenStatuses[sp.Status] {
+		return fmt.Errorf("invalid status: %s", sp.Status)
+	}
+	return s.specimens.Create(ctx, sp)
+}
+
+func (s *Service) GetSpecimen(ctx context.Context, id uuid.UUID) (*Specimen, error) {
+	return s.specimens.GetByID(ctx, id)
+}
+
+func (s *Service) GetSpecimenByFHIRID(ctx context.Context, fhirID string) (*Specimen, error) {
+	return s.specimens.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdateSpecimen(ctx context.Context, sp *Specimen) error {
+	if sp.Status != "" && !validSpecimenStatuses[sp.Status] {
+		return fmt.Errorf("invalid status: %s", sp.Status)
+	}
+	return s.specimens.Update(ctx, sp)
+}
+
+func (s *Service) DeleteSpecimen(ctx context.Context, id uuid.UUID) error {
+	return s.specimens.Delete(ctx, id)
+}
+
+func (s *Service) ListSpecimensByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*Specimen, int, error) {
+	return s.specimens.ListByPatient(ctx, patientID, limit, offset)
+}
+
+func (s *Service) SearchSpecimens(ctx context.Context, params map[string]string, limit, offset int) ([]*Specimen, int, error) {
+	return s.specimens.Search(ctx, params, limit, offset)
+}
+
+// -- DiagnosticReport --
+
+var validDRStatuses = map[string]bool{
+	"registered": true, "partial": true, "preliminary": true, "final": true,
+	"amended": true, "corrected": true, "appended": true,
+	"cancelled": true, "entered-in-error": true, "unknown": true,
+}
+
+func (s *Service) CreateDiagnosticReport(ctx context.Context, dr *DiagnosticReport) error {
+	if dr.PatientID == uuid.Nil {
+		return fmt.Errorf("patient_id is required")
+	}
+	if dr.CodeValue == "" {
+		return fmt.Errorf("code_value is required")
+	}
+	if dr.Status == "" {
+		dr.Status = "registered"
+	}
+	if !validDRStatuses[dr.Status] {
+		return fmt.Errorf("invalid status: %s", dr.Status)
+	}
+	return s.diagnosticReports.Create(ctx, dr)
+}
+
+func (s *Service) GetDiagnosticReport(ctx context.Context, id uuid.UUID) (*DiagnosticReport, error) {
+	return s.diagnosticReports.GetByID(ctx, id)
+}
+
+func (s *Service) GetDiagnosticReportByFHIRID(ctx context.Context, fhirID string) (*DiagnosticReport, error) {
+	return s.diagnosticReports.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdateDiagnosticReport(ctx context.Context, dr *DiagnosticReport) error {
+	if dr.Status != "" && !validDRStatuses[dr.Status] {
+		return fmt.Errorf("invalid status: %s", dr.Status)
+	}
+	return s.diagnosticReports.Update(ctx, dr)
+}
+
+func (s *Service) DeleteDiagnosticReport(ctx context.Context, id uuid.UUID) error {
+	return s.diagnosticReports.Delete(ctx, id)
+}
+
+func (s *Service) ListDiagnosticReportsByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*DiagnosticReport, int, error) {
+	return s.diagnosticReports.ListByPatient(ctx, patientID, limit, offset)
+}
+
+func (s *Service) SearchDiagnosticReports(ctx context.Context, params map[string]string, limit, offset int) ([]*DiagnosticReport, int, error) {
+	return s.diagnosticReports.Search(ctx, params, limit, offset)
+}
+
+func (s *Service) AddDiagnosticReportResult(ctx context.Context, reportID uuid.UUID, observationID uuid.UUID) error {
+	if reportID == uuid.Nil {
+		return fmt.Errorf("report_id is required")
+	}
+	if observationID == uuid.Nil {
+		return fmt.Errorf("observation_id is required")
+	}
+	return s.diagnosticReports.AddResult(ctx, reportID, observationID)
+}
+
+func (s *Service) GetDiagnosticReportResults(ctx context.Context, reportID uuid.UUID) ([]uuid.UUID, error) {
+	return s.diagnosticReports.GetResults(ctx, reportID)
+}
+
+func (s *Service) RemoveDiagnosticReportResult(ctx context.Context, reportID uuid.UUID, observationID uuid.UUID) error {
+	return s.diagnosticReports.RemoveResult(ctx, reportID, observationID)
+}
+
+// -- ImagingStudy --
+
+var validISStatuses = map[string]bool{
+	"registered": true, "available": true, "cancelled": true,
+	"entered-in-error": true, "unknown": true,
+}
+
+func (s *Service) CreateImagingStudy(ctx context.Context, is *ImagingStudy) error {
+	if is.PatientID == uuid.Nil {
+		return fmt.Errorf("patient_id is required")
+	}
+	if is.Status == "" {
+		is.Status = "registered"
+	}
+	if !validISStatuses[is.Status] {
+		return fmt.Errorf("invalid status: %s", is.Status)
+	}
+	return s.imagingStudies.Create(ctx, is)
+}
+
+func (s *Service) GetImagingStudy(ctx context.Context, id uuid.UUID) (*ImagingStudy, error) {
+	return s.imagingStudies.GetByID(ctx, id)
+}
+
+func (s *Service) GetImagingStudyByFHIRID(ctx context.Context, fhirID string) (*ImagingStudy, error) {
+	return s.imagingStudies.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdateImagingStudy(ctx context.Context, is *ImagingStudy) error {
+	if is.Status != "" && !validISStatuses[is.Status] {
+		return fmt.Errorf("invalid status: %s", is.Status)
+	}
+	return s.imagingStudies.Update(ctx, is)
+}
+
+func (s *Service) DeleteImagingStudy(ctx context.Context, id uuid.UUID) error {
+	return s.imagingStudies.Delete(ctx, id)
+}
+
+func (s *Service) ListImagingStudiesByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*ImagingStudy, int, error) {
+	return s.imagingStudies.ListByPatient(ctx, patientID, limit, offset)
+}
+
+func (s *Service) SearchImagingStudies(ctx context.Context, params map[string]string, limit, offset int) ([]*ImagingStudy, int, error) {
+	return s.imagingStudies.Search(ctx, params, limit, offset)
+}

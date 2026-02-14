@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ehr
+      POSTGRES_USER: ehr
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ehr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/ehr
+      KC_DB_USERNAME: ehr
+      KC_DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ehr-server:
+    build: .
+    environment:
+      DATABASE_URL: postgres://ehr:${DB_PASSWORD:-changeme}@postgres:5432/ehr?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      AUTH_ISSUER: http://keycloak:8080/realms/ehr
+      AUTH_JWKS_URL: http://keycloak:8080/realms/ehr/protocol/openid-connect/certs
+      AUTH_AUDIENCE: ehr-api
+      PORT: "8000"
+      ENV: production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  migrate:
+    build: .
+    command: ["ehr-server", "migrate", "up"]
+    environment:
+      DATABASE_URL: postgres://ehr:${DB_PASSWORD:-changeme}@postgres:5432/ehr?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - tools
+
+volumes:
+  pgdata:

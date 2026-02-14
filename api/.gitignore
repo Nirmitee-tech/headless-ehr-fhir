@@ -1,0 +1,40 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build
+dist/
+
+# Dependencies
+vendor/
+
+# Go workspace
+go.work.sum
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Test
+coverage.out
+*.test
+
+# Temporary
+tmp/

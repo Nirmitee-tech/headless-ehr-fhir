@@ -1,0 +1,37 @@
+# Go
+bin/
+*.exe
+*.out
+coverage.out
+coverage.html
+vendor/
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (for future frontend)
+node_modules/
+dist/
+build/
+.next/
+
+# Docker
+pgdata/
+
+# Temporary
+tmp/
+*.tmp
+*.log

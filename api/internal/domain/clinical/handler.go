@@ -1,0 +1,602 @@
+package clinical
+
+import (
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+
+	"github.com/ehr/ehr/internal/platform/auth"
+	"github.com/ehr/ehr/internal/platform/fhir"
+	"github.com/ehr/ehr/pkg/pagination"
+)
+
+type Handler struct {
+	svc *Service
+}
+
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
+}
+
+func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
+	// Read endpoints – admin, physician, nurse
+	readGroup := api.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	readGroup.GET("/conditions", h.ListConditions)
+	readGroup.GET("/conditions/:id", h.GetCondition)
+	readGroup.GET("/observations", h.ListObservations)
+	readGroup.GET("/observations/:id", h.GetObservation)
+	readGroup.GET("/observations/:id/components", h.GetObservationComponents)
+	readGroup.GET("/allergies", h.ListAllergies)
+	readGroup.GET("/allergies/:id", h.GetAllergy)
+	readGroup.GET("/allergies/:id/reactions", h.GetReactions)
+	readGroup.GET("/procedures", h.ListProcedures)
+	readGroup.GET("/procedures/:id", h.GetProcedure)
+	readGroup.GET("/procedures/:id/performers", h.GetPerformers)
+
+	// Write endpoints – admin, physician, nurse
+	writeGroup := api.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	writeGroup.POST("/conditions", h.CreateCondition)
+	writeGroup.PUT("/conditions/:id", h.UpdateCondition)
+	writeGroup.DELETE("/conditions/:id", h.DeleteCondition)
+	writeGroup.POST("/observations", h.CreateObservation)
+	writeGroup.PUT("/observations/:id", h.UpdateObservation)
+	writeGroup.DELETE("/observations/:id", h.DeleteObservation)
+	writeGroup.POST("/observations/:id/components", h.AddObservationComponent)
+	writeGroup.POST("/allergies", h.CreateAllergy)
+	writeGroup.PUT("/allergies/:id", h.UpdateAllergy)
+	writeGroup.DELETE("/allergies/:id", h.DeleteAllergy)
+	writeGroup.POST("/allergies/:id/reactions", h.AddReaction)
+	writeGroup.POST("/procedures", h.CreateProcedure)
+	writeGroup.PUT("/procedures/:id", h.UpdateProcedure)
+	writeGroup.DELETE("/procedures/:id", h.DeleteProcedure)
+	writeGroup.POST("/procedures/:id/performers", h.AddPerformer)
+
+	// FHIR read endpoints
+	fhirRead := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	fhirRead.GET("/Condition", h.SearchConditionsFHIR)
+	fhirRead.GET("/Condition/:id", h.GetConditionFHIR)
+	fhirRead.GET("/Observation", h.SearchObservationsFHIR)
+	fhirRead.GET("/Observation/:id", h.GetObservationFHIR)
+	fhirRead.GET("/AllergyIntolerance", h.SearchAllergiesFHIR)
+	fhirRead.GET("/AllergyIntolerance/:id", h.GetAllergyFHIR)
+	fhirRead.GET("/Procedure", h.SearchProceduresFHIR)
+	fhirRead.GET("/Procedure/:id", h.GetProcedureFHIR)
+
+	// FHIR write endpoints
+	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	fhirWrite.POST("/Condition", h.CreateConditionFHIR)
+	fhirWrite.POST("/Observation", h.CreateObservationFHIR)
+	fhirWrite.POST("/AllergyIntolerance", h.CreateAllergyFHIR)
+	fhirWrite.POST("/Procedure", h.CreateProcedureFHIR)
+}
+
+// -- Condition Handlers --
+
+func (h *Handler) CreateCondition(c echo.Context) error {
+	var cond Condition
+	if err := c.Bind(&cond); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := h.svc.CreateCondition(c.Request().Context(), &cond); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, cond)
+}
+
+func (h *Handler) GetCondition(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	cond, err := h.svc.GetCondition(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "condition not found")
+	}
+	return c.JSON(http.StatusOK, cond)
+}
+
+func (h *Handler) ListConditions(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	if patientID := c.QueryParam("patient_id"); patientID != "" {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid patient_id")
+		}
+		items, total, err := h.svc.ListConditionsByPatient(c.Request().Context(), pid, pg.Limit, pg.Offset)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+	}
+	items, total, err := h.svc.SearchConditions(c.Request().Context(), nil, pg.Limit, pg.Offset)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+}
+
+func (h *Handler) UpdateCondition(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var cond Condition
+	if err := c.Bind(&cond); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	cond.ID = id
+	if err := h.svc.UpdateCondition(c.Request().Context(), &cond); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, cond)
+}
+
+func (h *Handler) DeleteCondition(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	if err := h.svc.DeleteCondition(c.Request().Context(), id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- Observation Handlers --
+
+func (h *Handler) CreateObservation(c echo.Context) error {
+	var obs Observation
+	if err := c.Bind(&obs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := h.svc.CreateObservation(c.Request().Context(), &obs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, obs)
+}
+
+func (h *Handler) GetObservation(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	obs, err := h.svc.GetObservation(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "observation not found")
+	}
+	return c.JSON(http.StatusOK, obs)
+}
+
+func (h *Handler) ListObservations(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	if patientID := c.QueryParam("patient_id"); patientID != "" {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid patient_id")
+		}
+		items, total, err := h.svc.ListObservationsByPatient(c.Request().Context(), pid, pg.Limit, pg.Offset)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+	}
+	items, total, err := h.svc.SearchObservations(c.Request().Context(), nil, pg.Limit, pg.Offset)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+}
+
+func (h *Handler) UpdateObservation(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var obs Observation
+	if err := c.Bind(&obs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	obs.ID = id
+	if err := h.svc.UpdateObservation(c.Request().Context(), &obs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, obs)
+}
+
+func (h *Handler) DeleteObservation(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	if err := h.svc.DeleteObservation(c.Request().Context(), id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) AddObservationComponent(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var comp ObservationComponent
+	if err := c.Bind(&comp); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	comp.ObservationID = id
+	if err := h.svc.AddObservationComponent(c.Request().Context(), &comp); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, comp)
+}
+
+func (h *Handler) GetObservationComponents(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	comps, err := h.svc.GetObservationComponents(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, comps)
+}
+
+// -- Allergy Handlers --
+
+func (h *Handler) CreateAllergy(c echo.Context) error {
+	var a AllergyIntolerance
+	if err := c.Bind(&a); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := h.svc.CreateAllergy(c.Request().Context(), &a); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, a)
+}
+
+func (h *Handler) GetAllergy(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	a, err := h.svc.GetAllergy(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "allergy not found")
+	}
+	return c.JSON(http.StatusOK, a)
+}
+
+func (h *Handler) ListAllergies(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	if patientID := c.QueryParam("patient_id"); patientID != "" {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid patient_id")
+		}
+		items, total, err := h.svc.ListAllergiesByPatient(c.Request().Context(), pid, pg.Limit, pg.Offset)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+	}
+	items, total, err := h.svc.SearchAllergies(c.Request().Context(), nil, pg.Limit, pg.Offset)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+}
+
+func (h *Handler) UpdateAllergy(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var a AllergyIntolerance
+	if err := c.Bind(&a); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	a.ID = id
+	if err := h.svc.UpdateAllergy(c.Request().Context(), &a); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, a)
+}
+
+func (h *Handler) DeleteAllergy(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	if err := h.svc.DeleteAllergy(c.Request().Context(), id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) AddReaction(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var r AllergyReaction
+	if err := c.Bind(&r); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	r.AllergyID = id
+	if err := h.svc.AddAllergyReaction(c.Request().Context(), &r); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, r)
+}
+
+func (h *Handler) GetReactions(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	reactions, err := h.svc.GetAllergyReactions(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, reactions)
+}
+
+// -- Procedure Handlers --
+
+func (h *Handler) CreateProcedure(c echo.Context) error {
+	var p ProcedureRecord
+	if err := c.Bind(&p); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := h.svc.CreateProcedure(c.Request().Context(), &p); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, p)
+}
+
+func (h *Handler) GetProcedure(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	p, err := h.svc.GetProcedure(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "procedure not found")
+	}
+	return c.JSON(http.StatusOK, p)
+}
+
+func (h *Handler) ListProcedures(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	if patientID := c.QueryParam("patient_id"); patientID != "" {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid patient_id")
+		}
+		items, total, err := h.svc.ListProceduresByPatient(c.Request().Context(), pid, pg.Limit, pg.Offset)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+	}
+	items, total, err := h.svc.SearchProcedures(c.Request().Context(), nil, pg.Limit, pg.Offset)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, pagination.NewResponse(items, total, pg.Limit, pg.Offset))
+}
+
+func (h *Handler) UpdateProcedure(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var p ProcedureRecord
+	if err := c.Bind(&p); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	p.ID = id
+	if err := h.svc.UpdateProcedure(c.Request().Context(), &p); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, p)
+}
+
+func (h *Handler) DeleteProcedure(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	if err := h.svc.DeleteProcedure(c.Request().Context(), id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) AddPerformer(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	var pf ProcedurePerformer
+	if err := c.Bind(&pf); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	pf.ProcedureID = id
+	if err := h.svc.AddProcedurePerformer(c.Request().Context(), &pf); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusCreated, pf)
+}
+
+func (h *Handler) GetPerformers(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	performers, err := h.svc.GetProcedurePerformers(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, performers)
+}
+
+// -- FHIR Endpoints --
+
+func (h *Handler) SearchConditionsFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "clinical-status", "category", "code"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchConditions(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Condition"))
+}
+
+func (h *Handler) GetConditionFHIR(c echo.Context) error {
+	cond, err := h.svc.GetConditionByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Condition", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, cond.ToFHIR())
+}
+
+func (h *Handler) CreateConditionFHIR(c echo.Context) error {
+	var cond Condition
+	if err := c.Bind(&cond); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateCondition(c.Request().Context(), &cond); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/Condition/"+cond.FHIRID)
+	return c.JSON(http.StatusCreated, cond.ToFHIR())
+}
+
+func (h *Handler) SearchObservationsFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "category", "code", "date", "status"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchObservations(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Observation"))
+}
+
+func (h *Handler) GetObservationFHIR(c echo.Context) error {
+	obs, err := h.svc.GetObservationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Observation", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, obs.ToFHIR())
+}
+
+func (h *Handler) CreateObservationFHIR(c echo.Context) error {
+	var obs Observation
+	if err := c.Bind(&obs); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateObservation(c.Request().Context(), &obs); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/Observation/"+obs.FHIRID)
+	return c.JSON(http.StatusCreated, obs.ToFHIR())
+}
+
+func (h *Handler) SearchAllergiesFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "clinical-status", "type", "criticality"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchAllergies(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/AllergyIntolerance"))
+}
+
+func (h *Handler) GetAllergyFHIR(c echo.Context) error {
+	a, err := h.svc.GetAllergyByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AllergyIntolerance", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, a.ToFHIR())
+}
+
+func (h *Handler) CreateAllergyFHIR(c echo.Context) error {
+	var a AllergyIntolerance
+	if err := c.Bind(&a); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateAllergy(c.Request().Context(), &a); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/AllergyIntolerance/"+a.FHIRID)
+	return c.JSON(http.StatusCreated, a.ToFHIR())
+}
+
+func (h *Handler) SearchProceduresFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "status", "code", "date"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchProcedures(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Procedure"))
+}
+
+func (h *Handler) GetProcedureFHIR(c echo.Context) error {
+	p, err := h.svc.GetProcedureByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Procedure", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, p.ToFHIR())
+}
+
+func (h *Handler) CreateProcedureFHIR(c echo.Context) error {
+	var p ProcedureRecord
+	if err := c.Bind(&p); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateProcedure(c.Request().Context(), &p); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/Procedure/"+p.FHIRID)
+	return c.JSON(http.StatusCreated, p.ToFHIR())
+}

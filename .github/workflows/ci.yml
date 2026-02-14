@@ -1,0 +1,79 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          working-directory: api
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ehr_test
+          POSTGRES_USER: ehr
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Run unit tests
+        working-directory: api
+        run: go test ./... -v -race -coverprofile=coverage.out
+      - name: Run integration tests
+        working-directory: api
+        env:
+          DATABASE_URL: postgres://ehr:testpass@localhost:5432/ehr_test?sslmode=disable
+        run: go test ./test/integration/ -v -timeout 120s
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: api/coverage.out
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Build
+        working-directory: api
+        run: go build -o ehr-server ./cmd/ehr-server/
+      - name: Docker build
+        run: docker build -t ehr-api api/
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Run govulncheck
+        working-directory: api
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

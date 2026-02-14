@@ -1,0 +1,144 @@
+{
+  "realm": "ehr",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      { "name": "admin", "description": "System administrator" },
+      { "name": "physician", "description": "Physician role" },
+      { "name": "nurse", "description": "Nurse role" },
+      { "name": "pharmacist", "description": "Pharmacist role" },
+      { "name": "billing", "description": "Billing staff" },
+      { "name": "registrar", "description": "Registration clerk" },
+      { "name": "lab_tech", "description": "Laboratory technician" },
+      { "name": "radiologist", "description": "Radiologist role" },
+      { "name": "surgeon", "description": "Surgeon role" },
+      { "name": "patient", "description": "Patient portal user" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ehr-api",
+      "name": "EHR API",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "serviceAccountsEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "change-me-in-production",
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "defaultClientScopes": ["openid", "profile", "fhirUser"],
+      "optionalClientScopes": [
+        "launch",
+        "patient/*.read",
+        "patient/*.write",
+        "user/*.read",
+        "user/*.write"
+      ]
+    },
+    {
+      "clientId": "ehr-web",
+      "name": "EHR Web Application",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:8000"
+      ],
+      "defaultClientScopes": ["openid", "profile", "fhirUser", "launch"],
+      "optionalClientScopes": [
+        "patient/*.read",
+        "patient/*.write",
+        "user/*.read",
+        "user/*.write"
+      ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "openid",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "profile",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "fhirUser",
+      "protocol": "openid-connect",
+      "description": "SMART on FHIR fhirUser scope",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "launch",
+      "protocol": "openid-connect",
+      "description": "SMART on FHIR launch scope",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "patient/*.read",
+      "protocol": "openid-connect",
+      "description": "Read access to all patient-level resources",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "patient/*.write",
+      "protocol": "openid-connect",
+      "description": "Write access to all patient-level resources",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "user/*.read",
+      "protocol": "openid-connect",
+      "description": "Read access to all user-level resources",
+      "attributes": { "include.in.token.scope": "true" }
+    },
+    {
+      "name": "user/*.write",
+      "protocol": "openid-connect",
+      "description": "Write access to all user-level resources",
+      "attributes": { "include.in.token.scope": "true" }
+    }
+  ],
+  "defaultDefaultClientScopes": ["openid", "profile"],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "System",
+      "lastName": "Administrator",
+      "email": "admin@ehr.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    }
+  ],
+  "smtpServer": {},
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000
+}

@@ -1,0 +1,3336 @@
+openapi: 3.0.3
+info:
+  title: EHR API
+  description: |
+    Headless Electronic Health Record API with dual interfaces:
+    - FHIR R4-compliant endpoints under /fhir
+    - Operational REST endpoints under /api/v1
+  version: 0.1.0
+  contact:
+    name: EHR Engineering
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Health
+    description: Health check
+  - name: FHIR Metadata
+    description: FHIR capability statement and SMART discovery
+  - name: Patient
+    description: Patient identity management
+  - name: Practitioner
+    description: Practitioner identity management
+  - name: Encounter
+    description: Clinical encounters
+  - name: Condition
+    description: Conditions and diagnoses
+  - name: Observation
+    description: Clinical observations and vitals
+  - name: AllergyIntolerance
+    description: Allergy and intolerance records
+  - name: Procedure
+    description: Clinical procedures
+  - name: Medication
+    description: Medication catalog
+  - name: MedicationRequest
+    description: Prescriptions and medication orders
+  - name: Appointment
+    description: Scheduling appointments
+  - name: Schedule
+    description: Provider schedules
+  - name: Slot
+    description: Available time slots
+  - name: Coverage
+    description: Insurance coverage
+  - name: Claim
+    description: Billing claims
+  - name: ServiceRequest
+    description: Diagnostic and lab orders
+  - name: DiagnosticReport
+    description: Lab and diagnostic reports
+  - name: DocumentReference
+    description: Clinical documents
+  - name: Consent
+    description: Patient consent records
+  - name: Composition
+    description: Clinical document compositions
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ── Health ──────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: 0.1.0
+
+  # ── FHIR Metadata ──────────────────────────────────────────────────
+  /fhir/metadata:
+    get:
+      tags: [FHIR Metadata]
+      summary: FHIR CapabilityStatement
+      description: Returns the server CapabilityStatement describing supported resources and operations.
+      responses:
+        '200':
+          description: CapabilityStatement resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/CapabilityStatement'
+
+  # ── FHIR Patient ───────────────────────────────────────────────────
+  /fhir/Patient:
+    get:
+      tags: [Patient]
+      summary: Search patients (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRName'
+        - $ref: '#/components/parameters/FHIRFamily'
+        - $ref: '#/components/parameters/FHIRGiven'
+        - $ref: '#/components/parameters/FHIRBirthdate'
+        - $ref: '#/components/parameters/FHIRGender'
+        - $ref: '#/components/parameters/FHIRIdentifier'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Patient]
+      summary: Create patient (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Patient'
+      responses:
+        '201':
+          description: Patient created
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /fhir/Patient/{id}:
+    get:
+      tags: [Patient]
+      summary: Read patient by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Patient resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Patient]
+      summary: Update patient (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Patient'
+      responses:
+        '200':
+          description: Patient updated
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Patient]
+      summary: Delete patient (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '204':
+          description: Patient deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Practitioner ──────────────────────────────────────────────
+  /fhir/Practitioner:
+    get:
+      tags: [Practitioner]
+      summary: Search practitioners (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRName'
+        - $ref: '#/components/parameters/FHIRFamily'
+        - $ref: '#/components/parameters/FHIRIdentifier'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Practitioner]
+      summary: Create practitioner (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Practitioner'
+      responses:
+        '201':
+          description: Practitioner created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Practitioner'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Practitioner/{id}:
+    get:
+      tags: [Practitioner]
+      summary: Read practitioner by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Practitioner resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Practitioner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Practitioner]
+      summary: Update practitioner (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Practitioner'
+      responses:
+        '200':
+          description: Practitioner updated
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Practitioner'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Practitioner]
+      summary: Delete practitioner (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '204':
+          description: Practitioner deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Encounter ─────────────────────────────────────────────────
+  /fhir/Encounter:
+    get:
+      tags: [Encounter]
+      summary: Search encounters (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: class
+          in: query
+          schema:
+            type: string
+          description: Encounter class (e.g. AMB, IMP, EMER)
+        - $ref: '#/components/parameters/FHIRDate'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Encounter]
+      summary: Create encounter (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Encounter'
+      responses:
+        '201':
+          description: Encounter created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Encounter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Encounter/{id}:
+    get:
+      tags: [Encounter]
+      summary: Read encounter by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Encounter resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Encounter'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Encounter]
+      summary: Update encounter (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Encounter'
+      responses:
+        '200':
+          description: Encounter updated
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Encounter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Encounter]
+      summary: Delete encounter (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '204':
+          description: Encounter deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Observation ───────────────────────────────────────────────
+  /fhir/Observation:
+    get:
+      tags: [Observation]
+      summary: Search observations (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Observation category (e.g. vital-signs, laboratory)
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: LOINC or other code
+        - $ref: '#/components/parameters/FHIRDate'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Observation]
+      summary: Create observation (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Observation'
+      responses:
+        '201':
+          description: Observation created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Observation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Observation/{id}:
+    get:
+      tags: [Observation]
+      summary: Read observation by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Observation resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Observation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Condition ─────────────────────────────────────────────────
+  /fhir/Condition:
+    get:
+      tags: [Condition]
+      summary: Search conditions (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - name: clinical-status
+          in: query
+          schema:
+            type: string
+          description: Clinical status (active, recurrence, relapse, inactive, remission, resolved)
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Condition category
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: ICD-10 or SNOMED code
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Condition]
+      summary: Create condition (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Condition'
+      responses:
+        '201':
+          description: Condition created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Condition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Condition/{id}:
+    get:
+      tags: [Condition]
+      summary: Read condition by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Condition resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Condition'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR AllergyIntolerance ────────────────────────────────────────
+  /fhir/AllergyIntolerance:
+    get:
+      tags: [AllergyIntolerance]
+      summary: Search allergies (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - name: clinical-status
+          in: query
+          schema:
+            type: string
+          description: Clinical status (active, inactive, resolved)
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [allergy, intolerance]
+        - name: criticality
+          in: query
+          schema:
+            type: string
+            enum: [low, high, unable-to-assess]
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [AllergyIntolerance]
+      summary: Create allergy (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/AllergyIntolerance'
+      responses:
+        '201':
+          description: AllergyIntolerance created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/AllergyIntolerance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/AllergyIntolerance/{id}:
+    get:
+      tags: [AllergyIntolerance]
+      summary: Read allergy by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: AllergyIntolerance resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/AllergyIntolerance'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Procedure ─────────────────────────────────────────────────
+  /fhir/Procedure:
+    get:
+      tags: [Procedure]
+      summary: Search procedures (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: CPT or SNOMED code
+        - $ref: '#/components/parameters/FHIRDate'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Procedure]
+      summary: Create procedure (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Procedure'
+      responses:
+        '201':
+          description: Procedure created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Procedure'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Procedure/{id}:
+    get:
+      tags: [Procedure]
+      summary: Read procedure by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Procedure resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Procedure'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Medication ────────────────────────────────────────────────
+  /fhir/Medication:
+    get:
+      tags: [Medication]
+      summary: Search medications (FHIR)
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: RxNorm or NDC code
+        - $ref: '#/components/parameters/FHIRStatus'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Medication]
+      summary: Create medication (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Medication'
+      responses:
+        '201':
+          description: Medication created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Medication/{id}:
+    get:
+      tags: [Medication]
+      summary: Read medication by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Medication resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR MedicationRequest ─────────────────────────────────────────
+  /fhir/MedicationRequest:
+    get:
+      tags: [MedicationRequest]
+      summary: Search medication requests (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: intent
+          in: query
+          schema:
+            type: string
+            enum: [proposal, plan, order, original-order, reflex-order, filler-order, instance-order, option]
+          description: Order intent
+        - $ref: '#/components/parameters/FHIRDate'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [MedicationRequest]
+      summary: Create medication request (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/MedicationRequest'
+      responses:
+        '201':
+          description: MedicationRequest created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/MedicationRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/MedicationRequest/{id}:
+    get:
+      tags: [MedicationRequest]
+      summary: Read medication request by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: MedicationRequest resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/MedicationRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR MedicationAdministration ──────────────────────────────────
+  /fhir/MedicationAdministration:
+    get:
+      tags: [Medication]
+      summary: Search medication administrations (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Medication]
+      summary: Create medication administration (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/MedicationAdministration'
+      responses:
+        '201':
+          description: MedicationAdministration created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/MedicationAdministration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/MedicationAdministration/{id}:
+    get:
+      tags: [Medication]
+      summary: Read medication administration by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: MedicationAdministration resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/MedicationAdministration'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR MedicationDispense ────────────────────────────────────────
+  /fhir/MedicationDispense:
+    get:
+      tags: [Medication]
+      summary: Search medication dispenses (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Medication]
+      summary: Create medication dispense (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/MedicationDispense'
+      responses:
+        '201':
+          description: MedicationDispense created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/MedicationDispense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/MedicationDispense/{id}:
+    get:
+      tags: [Medication]
+      summary: Read medication dispense by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: MedicationDispense resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/MedicationDispense'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Appointment ───────────────────────────────────────────────
+  /fhir/Appointment:
+    get:
+      tags: [Appointment]
+      summary: Search appointments (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - $ref: '#/components/parameters/FHIRDate'
+        - name: practitioner
+          in: query
+          schema:
+            type: string
+          description: Practitioner reference
+        - name: service-type
+          in: query
+          schema:
+            type: string
+          description: Service type token
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Appointment]
+      summary: Create appointment (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Appointment'
+      responses:
+        '201':
+          description: Appointment created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Appointment/{id}:
+    get:
+      tags: [Appointment]
+      summary: Read appointment by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Appointment resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Schedule ──────────────────────────────────────────────────
+  /fhir/Schedule:
+    get:
+      tags: [Schedule]
+      summary: Search schedules (FHIR)
+      parameters:
+        - name: actor
+          in: query
+          schema:
+            type: string
+          description: Actor reference (Practitioner or Location)
+        - name: active
+          in: query
+          schema:
+            type: string
+          description: Active status
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Schedule]
+      summary: Create schedule (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Schedule'
+      responses:
+        '201':
+          description: Schedule created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Schedule/{id}:
+    get:
+      tags: [Schedule]
+      summary: Read schedule by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Schedule resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Slot ──────────────────────────────────────────────────────
+  /fhir/Slot:
+    get:
+      tags: [Slot]
+      summary: Search slots (FHIR)
+      parameters:
+        - name: schedule
+          in: query
+          schema:
+            type: string
+          description: Schedule reference
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Slot]
+      summary: Create slot (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Slot'
+      responses:
+        '201':
+          description: Slot created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Slot'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Slot/{id}:
+    get:
+      tags: [Slot]
+      summary: Read slot by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Slot resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Slot'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Coverage ──────────────────────────────────────────────────
+  /fhir/Coverage:
+    get:
+      tags: [Coverage]
+      summary: Search coverages (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Coverage]
+      summary: Create coverage (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Coverage'
+      responses:
+        '201':
+          description: Coverage created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Coverage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Coverage/{id}:
+    get:
+      tags: [Coverage]
+      summary: Read coverage by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Coverage resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Coverage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Claim ─────────────────────────────────────────────────────
+  /fhir/Claim:
+    get:
+      tags: [Claim]
+      summary: Search claims (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: use
+          in: query
+          schema:
+            type: string
+            enum: [claim, preauthorization, predetermination]
+          description: Claim use
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Claim]
+      summary: Create claim (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Claim'
+      responses:
+        '201':
+          description: Claim created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Claim/{id}:
+    get:
+      tags: [Claim]
+      summary: Read claim by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Claim resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR ServiceRequest ────────────────────────────────────────────
+  /fhir/ServiceRequest:
+    get:
+      tags: [ServiceRequest]
+      summary: Search service requests (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Service request category
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Service request code
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [ServiceRequest]
+      summary: Create service request (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+      responses:
+        '201':
+          description: ServiceRequest created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/ServiceRequest/{id}:
+    get:
+      tags: [ServiceRequest]
+      summary: Read service request by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: ServiceRequest resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR DiagnosticReport ──────────────────────────────────────────
+  /fhir/DiagnosticReport:
+    get:
+      tags: [DiagnosticReport]
+      summary: Search diagnostic reports (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Report category (e.g. LAB, RAD)
+        - name: code
+          in: query
+          schema:
+            type: string
+          description: Report code
+        - $ref: '#/components/parameters/FHIRDate'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [DiagnosticReport]
+      summary: Create diagnostic report (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/DiagnosticReport'
+      responses:
+        '201':
+          description: DiagnosticReport created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/DiagnosticReport/{id}:
+    get:
+      tags: [DiagnosticReport]
+      summary: Read diagnostic report by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: DiagnosticReport resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticReport'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Consent ───────────────────────────────────────────────────
+  /fhir/Consent:
+    get:
+      tags: [Consent]
+      summary: Search consents (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Consent category
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Consent]
+      summary: Create consent (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Consent'
+      responses:
+        '201':
+          description: Consent created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Consent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Consent/{id}:
+    get:
+      tags: [Consent]
+      summary: Read consent by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Consent resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Consent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR DocumentReference ────────────────────────────────────────
+  /fhir/DocumentReference:
+    get:
+      tags: [DocumentReference]
+      summary: Search document references (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: Document type code
+        - $ref: '#/components/parameters/FHIRDate'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [DocumentReference]
+      summary: Create document reference (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/DocumentReference'
+      responses:
+        '201':
+          description: DocumentReference created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/DocumentReference'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/DocumentReference/{id}:
+    get:
+      tags: [DocumentReference]
+      summary: Read document reference by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: DocumentReference resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/DocumentReference'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── FHIR Composition ──────────────────────────────────────────────
+  /fhir/Composition:
+    get:
+      tags: [Composition]
+      summary: Search compositions (FHIR)
+      parameters:
+        - $ref: '#/components/parameters/FHIRPatient'
+        - $ref: '#/components/parameters/FHIRStatus'
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: Composition type code
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/FHIRBundle'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Composition]
+      summary: Create composition (FHIR)
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              $ref: '#/components/schemas/Composition'
+      responses:
+        '201':
+          description: Composition created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Composition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /fhir/Composition/{id}:
+    get:
+      tags: [Composition]
+      summary: Read composition by FHIR ID
+      parameters:
+        - $ref: '#/components/parameters/FHIRResourceId'
+      responses:
+        '200':
+          description: Composition resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Composition'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════════════════════════════════════════
+  # Operational REST Endpoints (/api/v1)
+  # ══════════════════════════════════════════════════════════════════
+
+  # ── Patients (Operational) ─────────────────────────────────────────
+  /api/v1/patients:
+    get:
+      tags: [Patient]
+      summary: List patients
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of patients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Patient]
+      summary: Create patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientInput'
+      responses:
+        '201':
+          description: Patient created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientInput'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/patients/{id}:
+    get:
+      tags: [Patient]
+      summary: Get patient by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientInput'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Patient]
+      summary: Update patient
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientInput'
+      responses:
+        '200':
+          description: Patient updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Patient]
+      summary: Delete patient
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Patient deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Encounters (Operational) ───────────────────────────────────────
+  /api/v1/encounters:
+    get:
+      tags: [Encounter]
+      summary: List encounters
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by patient ID
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of encounters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Encounter]
+      summary: Create encounter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncounterInput'
+      responses:
+        '201':
+          description: Encounter created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/encounters/{id}:
+    get:
+      tags: [Encounter]
+      summary: Get encounter by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Encounter details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Encounter]
+      summary: Update encounter
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Encounter updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    delete:
+      tags: [Encounter]
+      summary: Delete encounter
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Encounter deleted
+
+  /api/v1/encounters/{id}/status:
+    patch:
+      tags: [Encounter]
+      summary: Update encounter status
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [planned, arrived, triaged, in-progress, onleave, finished, cancelled]
+      responses:
+        '200':
+          description: Status updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ── Observations (Operational) ─────────────────────────────────────
+  /api/v1/observations:
+    get:
+      tags: [Observation]
+      summary: List observations
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of observations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Observation]
+      summary: Create observation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationInput'
+      responses:
+        '201':
+          description: Observation created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/observations/{id}:
+    get:
+      tags: [Observation]
+      summary: Get observation by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Observation details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Observation]
+      summary: Update observation
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Observation updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    delete:
+      tags: [Observation]
+      summary: Delete observation
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Observation deleted
+
+  # ── Conditions (Operational) ───────────────────────────────────────
+  /api/v1/conditions:
+    get:
+      tags: [Condition]
+      summary: List conditions
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of conditions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags: [Condition]
+      summary: Create condition
+      responses:
+        '201':
+          description: Condition created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/conditions/{id}:
+    get:
+      tags: [Condition]
+      summary: Get condition by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Condition details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Condition]
+      summary: Update condition
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Condition updated
+    delete:
+      tags: [Condition]
+      summary: Delete condition
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Condition deleted
+
+  # ── Medication Requests (Operational) ──────────────────────────────
+  /api/v1/medication-requests:
+    get:
+      tags: [MedicationRequest]
+      summary: List medication requests
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of medication requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags: [MedicationRequest]
+      summary: Create medication request
+      responses:
+        '201':
+          description: Medication request created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/medication-requests/{id}:
+    get:
+      tags: [MedicationRequest]
+      summary: Get medication request by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Medication request details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [MedicationRequest]
+      summary: Update medication request
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Medication request updated
+    delete:
+      tags: [MedicationRequest]
+      summary: Delete medication request
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Medication request deleted
+
+  # ── Appointments (Operational) ─────────────────────────────────────
+  /api/v1/appointments:
+    get:
+      tags: [Appointment]
+      summary: List appointments
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: practitioner_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of appointments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags: [Appointment]
+      summary: Create appointment
+      responses:
+        '201':
+          description: Appointment created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/appointments/{id}:
+    get:
+      tags: [Appointment]
+      summary: Get appointment by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Appointment details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Appointment]
+      summary: Update appointment
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Appointment updated
+    delete:
+      tags: [Appointment]
+      summary: Delete appointment
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Appointment deleted
+
+  # ── Claims (Operational) ───────────────────────────────────────────
+  /api/v1/claims:
+    get:
+      tags: [Claim]
+      summary: List claims
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of claims
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags: [Claim]
+      summary: Create claim
+      responses:
+        '201':
+          description: Claim created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/claims/{id}:
+    get:
+      tags: [Claim]
+      summary: Get claim by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Claim details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Claim]
+      summary: Update claim
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Claim updated
+    delete:
+      tags: [Claim]
+      summary: Delete claim
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Claim deleted
+
+  # ── Coverages (Operational) ────────────────────────────────────────
+  /api/v1/coverages:
+    get:
+      tags: [Coverage]
+      summary: List coverages
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of coverages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags: [Coverage]
+      summary: Create coverage
+      responses:
+        '201':
+          description: Coverage created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/coverages/{id}:
+    get:
+      tags: [Coverage]
+      summary: Get coverage by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Coverage details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Coverage]
+      summary: Update coverage
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Coverage updated
+    delete:
+      tags: [Coverage]
+      summary: Delete coverage
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Coverage deleted
+
+  # ── Practitioners (Operational) ────────────────────────────────────
+  /api/v1/practitioners:
+    get:
+      tags: [Practitioner]
+      summary: List practitioners
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Paginated list of practitioners
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+    post:
+      tags: [Practitioner]
+      summary: Create practitioner
+      responses:
+        '201':
+          description: Practitioner created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/practitioners/{id}:
+    get:
+      tags: [Practitioner]
+      summary: Get practitioner by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Practitioner details
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Practitioner]
+      summary: Update practitioner
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Practitioner updated
+    delete:
+      tags: [Practitioner]
+      summary: Delete practitioner
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Practitioner deleted
+
+# ══════════════════════════════════════════════════════════════════════
+# Components
+# ══════════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT bearer token. In development mode, the server accepts any
+        well-formed JWT. In production, tokens are validated against
+        the configured JWKS endpoint.
+
+  parameters:
+    FHIRResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: FHIR logical resource ID
+
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Internal UUID
+
+    FHIRPatient:
+      name: patient
+      in: query
+      schema:
+        type: string
+      description: Patient reference (e.g. Patient/123)
+
+    FHIRStatus:
+      name: status
+      in: query
+      schema:
+        type: string
+      description: Resource status code
+
+    FHIRDate:
+      name: date
+      in: query
+      schema:
+        type: string
+      description: Date search (supports prefixes eq, ne, gt, lt, ge, le, sa, eb)
+
+    FHIRName:
+      name: name
+      in: query
+      schema:
+        type: string
+      description: Name search (matches given and family names)
+
+    FHIRFamily:
+      name: family
+      in: query
+      schema:
+        type: string
+      description: Family name search
+
+    FHIRGiven:
+      name: given
+      in: query
+      schema:
+        type: string
+      description: Given name search
+
+    FHIRBirthdate:
+      name: birthdate
+      in: query
+      schema:
+        type: string
+        format: date
+      description: Date of birth
+
+    FHIRGender:
+      name: gender
+      in: query
+      schema:
+        type: string
+        enum: [male, female, other, unknown]
+      description: Administrative gender
+
+    FHIRIdentifier:
+      name: identifier
+      in: query
+      schema:
+        type: string
+      description: Identifier token (system|value)
+
+    Count:
+      name: _count
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      description: Number of results per page (FHIR)
+
+    Offset:
+      name: _offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+      description: Result offset for pagination (FHIR)
+
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      description: Number of results per page
+
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+      description: Result offset for pagination
+
+  responses:
+    FHIRBundle:
+      description: FHIR Bundle (searchset)
+      content:
+        application/fhir+json:
+          schema:
+            $ref: '#/components/schemas/Bundle'
+
+    BadRequest:
+      description: Invalid request
+      content:
+        application/fhir+json:
+          schema:
+            $ref: '#/components/schemas/OperationOutcome'
+
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: missing or invalid token
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: insufficient role
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/fhir+json:
+          schema:
+            $ref: '#/components/schemas/OperationOutcome'
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/fhir+json:
+          schema:
+            $ref: '#/components/schemas/OperationOutcome'
+
+  schemas:
+    # ── FHIR Infrastructure ────────────────────────────────────────
+    Bundle:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum: [Bundle]
+        type:
+          type: string
+          enum: [searchset]
+        total:
+          type: integer
+          description: Total number of matching resources
+        link:
+          type: array
+          items:
+            type: object
+            properties:
+              relation:
+                type: string
+                enum: [self, next, previous]
+              url:
+                type: string
+                format: uri
+        entry:
+          type: array
+          items:
+            type: object
+            properties:
+              fullUrl:
+                type: string
+                format: uri
+              resource:
+                type: object
+                description: The FHIR resource
+              search:
+                type: object
+                properties:
+                  mode:
+                    type: string
+                    enum: [match, include, outcome]
+
+    OperationOutcome:
+      type: object
+      required: [resourceType, issue]
+      properties:
+        resourceType:
+          type: string
+          enum: [OperationOutcome]
+        issue:
+          type: array
+          items:
+            type: object
+            required: [severity, code]
+            properties:
+              severity:
+                type: string
+                enum: [fatal, error, warning, information]
+              code:
+                type: string
+                description: Error code (not-found, invalid, etc.)
+              diagnostics:
+                type: string
+                description: Human-readable diagnostic message
+
+    CapabilityStatement:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum: [CapabilityStatement]
+        status:
+          type: string
+          enum: [active]
+        fhirVersion:
+          type: string
+          example: 4.0.1
+        format:
+          type: array
+          items:
+            type: string
+          example: [json]
+        rest:
+          type: array
+          items:
+            type: object
+            properties:
+              mode:
+                type: string
+                enum: [server]
+              resource:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    interaction:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                    searchParam:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          type:
+                            type: string
+
+    Meta:
+      type: object
+      properties:
+        versionId:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+
+    Reference:
+      type: object
+      properties:
+        reference:
+          type: string
+          description: Relative reference (e.g. Patient/123)
+        display:
+          type: string
+
+    CodeableConcept:
+      type: object
+      properties:
+        coding:
+          type: array
+          items:
+            $ref: '#/components/schemas/Coding'
+        text:
+          type: string
+
+    Coding:
+      type: object
+      properties:
+        system:
+          type: string
+          format: uri
+        code:
+          type: string
+        display:
+          type: string
+
+    Period:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+
+    HumanName:
+      type: object
+      properties:
+        use:
+          type: string
+          enum: [usual, official, temp, nickname, anonymous, old, maiden]
+        family:
+          type: string
+        given:
+          type: array
+          items:
+            type: string
+        prefix:
+          type: array
+          items:
+            type: string
+        suffix:
+          type: array
+          items:
+            type: string
+
+    Identifier:
+      type: object
+      properties:
+        system:
+          type: string
+          format: uri
+        value:
+          type: string
+        type:
+          $ref: '#/components/schemas/CodeableConcept'
+
+    ContactPoint:
+      type: object
+      properties:
+        system:
+          type: string
+          enum: [phone, fax, email, pager, url, sms, other]
+        value:
+          type: string
+        use:
+          type: string
+          enum: [home, work, temp, old, mobile]
+
+    Address:
+      type: object
+      properties:
+        use:
+          type: string
+          enum: [home, work, temp, old, billing]
+        line:
+          type: array
+          items:
+            type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    Quantity:
+      type: object
+      properties:
+        value:
+          type: number
+        unit:
+          type: string
+        system:
+          type: string
+          format: uri
+        code:
+          type: string
+
+    # ── FHIR Resources ────────────────────────────────────────────
+    Patient:
+      type: object
+      required: [resourceType]
+      properties:
+        resourceType:
+          type: string
+          enum: [Patient]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        identifier:
+          type: array
+          items:
+            $ref: '#/components/schemas/Identifier'
+        active:
+          type: boolean
+        name:
+          type: array
+          items:
+            $ref: '#/components/schemas/HumanName'
+        telecom:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactPoint'
+        gender:
+          type: string
+          enum: [male, female, other, unknown]
+        birthDate:
+          type: string
+          format: date
+        deceasedBoolean:
+          type: boolean
+        address:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        maritalStatus:
+          $ref: '#/components/schemas/CodeableConcept'
+
+    Practitioner:
+      type: object
+      required: [resourceType]
+      properties:
+        resourceType:
+          type: string
+          enum: [Practitioner]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        identifier:
+          type: array
+          items:
+            $ref: '#/components/schemas/Identifier'
+        active:
+          type: boolean
+        name:
+          type: array
+          items:
+            $ref: '#/components/schemas/HumanName'
+        telecom:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactPoint'
+        gender:
+          type: string
+          enum: [male, female, other, unknown]
+        qualification:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                $ref: '#/components/schemas/CodeableConcept'
+              issuer:
+                $ref: '#/components/schemas/Reference'
+
+    Encounter:
+      type: object
+      required: [resourceType, status, class]
+      properties:
+        resourceType:
+          type: string
+          enum: [Encounter]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [planned, arrived, triaged, in-progress, onleave, finished, cancelled, entered-in-error]
+        class:
+          $ref: '#/components/schemas/Coding'
+        type:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        participant:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CodeableConcept'
+              individual:
+                $ref: '#/components/schemas/Reference'
+        period:
+          $ref: '#/components/schemas/Period'
+        reasonCode:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+
+    Observation:
+      type: object
+      required: [resourceType, status, code]
+      properties:
+        resourceType:
+          type: string
+          enum: [Observation]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [registered, preliminary, final, amended, corrected, cancelled, entered-in-error, unknown]
+        category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        encounter:
+          $ref: '#/components/schemas/Reference'
+        effectiveDateTime:
+          type: string
+          format: date-time
+        valueQuantity:
+          $ref: '#/components/schemas/Quantity'
+        valueString:
+          type: string
+        component:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                $ref: '#/components/schemas/CodeableConcept'
+              valueQuantity:
+                $ref: '#/components/schemas/Quantity'
+
+    Condition:
+      type: object
+      required: [resourceType, subject]
+      properties:
+        resourceType:
+          type: string
+          enum: [Condition]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        clinicalStatus:
+          $ref: '#/components/schemas/CodeableConcept'
+        verificationStatus:
+          $ref: '#/components/schemas/CodeableConcept'
+        category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        severity:
+          $ref: '#/components/schemas/CodeableConcept'
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        encounter:
+          $ref: '#/components/schemas/Reference'
+        onsetDateTime:
+          type: string
+          format: date-time
+        recordedDate:
+          type: string
+          format: date-time
+
+    AllergyIntolerance:
+      type: object
+      required: [resourceType, patient]
+      properties:
+        resourceType:
+          type: string
+          enum: [AllergyIntolerance]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        clinicalStatus:
+          $ref: '#/components/schemas/CodeableConcept'
+        verificationStatus:
+          $ref: '#/components/schemas/CodeableConcept'
+        type:
+          type: string
+          enum: [allergy, intolerance]
+        category:
+          type: array
+          items:
+            type: string
+            enum: [food, medication, environment, biologic]
+        criticality:
+          type: string
+          enum: [low, high, unable-to-assess]
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        patient:
+          $ref: '#/components/schemas/Reference'
+        reaction:
+          type: array
+          items:
+            type: object
+            properties:
+              substance:
+                $ref: '#/components/schemas/CodeableConcept'
+              manifestation:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CodeableConcept'
+              severity:
+                type: string
+                enum: [mild, moderate, severe]
+
+    Procedure:
+      type: object
+      required: [resourceType, status, subject]
+      properties:
+        resourceType:
+          type: string
+          enum: [Procedure]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [preparation, in-progress, not-done, on-hold, stopped, completed, entered-in-error, unknown]
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        encounter:
+          $ref: '#/components/schemas/Reference'
+        performedDateTime:
+          type: string
+          format: date-time
+        performer:
+          type: array
+          items:
+            type: object
+            properties:
+              actor:
+                $ref: '#/components/schemas/Reference'
+              function:
+                $ref: '#/components/schemas/CodeableConcept'
+
+    Medication:
+      type: object
+      required: [resourceType]
+      properties:
+        resourceType:
+          type: string
+          enum: [Medication]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        status:
+          type: string
+          enum: [active, inactive, entered-in-error]
+        form:
+          $ref: '#/components/schemas/CodeableConcept'
+
+    MedicationRequest:
+      type: object
+      required: [resourceType, status, intent, subject, medicationReference]
+      properties:
+        resourceType:
+          type: string
+          enum: [MedicationRequest]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [active, on-hold, cancelled, completed, entered-in-error, stopped, draft, unknown]
+        intent:
+          type: string
+          enum: [proposal, plan, order, original-order, reflex-order, filler-order, instance-order, option]
+        medicationReference:
+          $ref: '#/components/schemas/Reference'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        encounter:
+          $ref: '#/components/schemas/Reference'
+        authoredOn:
+          type: string
+          format: date-time
+        requester:
+          $ref: '#/components/schemas/Reference'
+        dosageInstruction:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              timing:
+                type: object
+              route:
+                $ref: '#/components/schemas/CodeableConcept'
+              doseAndRate:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    doseQuantity:
+                      $ref: '#/components/schemas/Quantity'
+
+    MedicationAdministration:
+      type: object
+      required: [resourceType, status, subject]
+      properties:
+        resourceType:
+          type: string
+          enum: [MedicationAdministration]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [in-progress, not-done, on-hold, completed, entered-in-error, stopped, unknown]
+        medicationReference:
+          $ref: '#/components/schemas/Reference'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        effectiveDateTime:
+          type: string
+          format: date-time
+
+    MedicationDispense:
+      type: object
+      required: [resourceType, status, subject]
+      properties:
+        resourceType:
+          type: string
+          enum: [MedicationDispense]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [preparation, in-progress, cancelled, on-hold, completed, entered-in-error, stopped, declined, unknown]
+        medicationReference:
+          $ref: '#/components/schemas/Reference'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        quantity:
+          $ref: '#/components/schemas/Quantity'
+
+    Appointment:
+      type: object
+      required: [resourceType, status]
+      properties:
+        resourceType:
+          type: string
+          enum: [Appointment]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [proposed, pending, booked, arrived, fulfilled, cancelled, noshow, entered-in-error, checked-in, waitlist]
+        serviceType:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        minutesDuration:
+          type: integer
+        participant:
+          type: array
+          items:
+            type: object
+            required: [actor, status]
+            properties:
+              actor:
+                $ref: '#/components/schemas/Reference'
+              status:
+                type: string
+                enum: [accepted, declined, tentative, needs-action]
+
+    Schedule:
+      type: object
+      required: [resourceType, actor]
+      properties:
+        resourceType:
+          type: string
+          enum: [Schedule]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        active:
+          type: boolean
+        serviceType:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        actor:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reference'
+        planningHorizon:
+          $ref: '#/components/schemas/Period'
+
+    Slot:
+      type: object
+      required: [resourceType, schedule, status, start, end]
+      properties:
+        resourceType:
+          type: string
+          enum: [Slot]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        schedule:
+          $ref: '#/components/schemas/Reference'
+        status:
+          type: string
+          enum: [busy, free, busy-unavailable, busy-tentative, entered-in-error]
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+
+    Coverage:
+      type: object
+      required: [resourceType, status, beneficiary]
+      properties:
+        resourceType:
+          type: string
+          enum: [Coverage]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [active, cancelled, draft, entered-in-error]
+        type:
+          $ref: '#/components/schemas/CodeableConcept'
+        subscriber:
+          $ref: '#/components/schemas/Reference'
+        beneficiary:
+          $ref: '#/components/schemas/Reference'
+        payor:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reference'
+        period:
+          $ref: '#/components/schemas/Period'
+
+    Claim:
+      type: object
+      required: [resourceType, status, type, use, patient, provider]
+      properties:
+        resourceType:
+          type: string
+          enum: [Claim]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [active, cancelled, draft, entered-in-error]
+        type:
+          $ref: '#/components/schemas/CodeableConcept'
+        use:
+          type: string
+          enum: [claim, preauthorization, predetermination]
+        patient:
+          $ref: '#/components/schemas/Reference'
+        provider:
+          $ref: '#/components/schemas/Reference'
+        created:
+          type: string
+          format: date-time
+        total:
+          type: object
+          properties:
+            value:
+              type: number
+            currency:
+              type: string
+
+    ServiceRequest:
+      type: object
+      required: [resourceType, status, intent, subject]
+      properties:
+        resourceType:
+          type: string
+          enum: [ServiceRequest]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [draft, active, on-hold, revoked, completed, entered-in-error, unknown]
+        intent:
+          type: string
+          enum: [proposal, plan, directive, order, original-order, reflex-order, filler-order, instance-order, option]
+        category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        encounter:
+          $ref: '#/components/schemas/Reference'
+        requester:
+          $ref: '#/components/schemas/Reference'
+        authoredOn:
+          type: string
+          format: date-time
+
+    DiagnosticReport:
+      type: object
+      required: [resourceType, status, code]
+      properties:
+        resourceType:
+          type: string
+          enum: [DiagnosticReport]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [registered, partial, preliminary, final, amended, corrected, appended, cancelled, entered-in-error, unknown]
+        category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        code:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        encounter:
+          $ref: '#/components/schemas/Reference'
+        effectiveDateTime:
+          type: string
+          format: date-time
+        issued:
+          type: string
+          format: date-time
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reference'
+        conclusion:
+          type: string
+
+    Consent:
+      type: object
+      required: [resourceType, status, scope, category]
+      properties:
+        resourceType:
+          type: string
+          enum: [Consent]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [draft, proposed, active, rejected, inactive, entered-in-error]
+        scope:
+          $ref: '#/components/schemas/CodeableConcept'
+        category:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeableConcept'
+        patient:
+          $ref: '#/components/schemas/Reference'
+        dateTime:
+          type: string
+          format: date-time
+
+    DocumentReference:
+      type: object
+      required: [resourceType, status, content]
+      properties:
+        resourceType:
+          type: string
+          enum: [DocumentReference]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [current, superseded, entered-in-error]
+        type:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        date:
+          type: string
+          format: date-time
+        content:
+          type: array
+          items:
+            type: object
+            properties:
+              attachment:
+                type: object
+                properties:
+                  contentType:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+                  title:
+                    type: string
+
+    Composition:
+      type: object
+      required: [resourceType, status, type, subject, date, author]
+      properties:
+        resourceType:
+          type: string
+          enum: [Composition]
+        id:
+          type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+        status:
+          type: string
+          enum: [preliminary, final, amended, entered-in-error]
+        type:
+          $ref: '#/components/schemas/CodeableConcept'
+        subject:
+          $ref: '#/components/schemas/Reference'
+        date:
+          type: string
+          format: date-time
+        author:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reference'
+        title:
+          type: string
+        section:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              code:
+                $ref: '#/components/schemas/CodeableConcept'
+              text:
+                type: object
+                properties:
+                  div:
+                    type: string
+              entry:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reference'
+
+    # ── Operational Schemas ────────────────────────────────────────
+    PaginatedResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+          description: Total number of matching records
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    PatientInput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fhir_id:
+          type: string
+          readOnly: true
+        family_name:
+          type: string
+        given_name:
+          type: string
+        birth_date:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female, other, unknown]
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        address_line:
+          type: string
+        address_city:
+          type: string
+        address_state:
+          type: string
+        address_postal_code:
+          type: string
+        mrn:
+          type: string
+          description: Medical record number
+        ssn_last_four:
+          type: string
+          description: Last four digits of SSN
+        active:
+          type: boolean
+          default: true
+
+    EncounterInput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        patient_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [planned, arrived, triaged, in-progress, onleave, finished, cancelled]
+        class_code:
+          type: string
+          description: Encounter class (AMB, IMP, EMER)
+        type_code:
+          type: string
+        type_display:
+          type: string
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+        reason:
+          type: string
+
+    ObservationInput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        patient_id:
+          type: string
+          format: uuid
+        encounter_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [registered, preliminary, final, amended, corrected, cancelled]
+        category:
+          type: string
+          description: Observation category (vital-signs, laboratory, etc.)
+        code_system:
+          type: string
+        code_value:
+          type: string
+        code_display:
+          type: string
+        value_quantity:
+          type: number
+        value_unit:
+          type: string
+        value_string:
+          type: string
+        effective_at:
+          type: string
+          format: date-time
