@@ -1,7 +1,10 @@
 package billing
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -66,8 +69,24 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "billing"))
 	fhirWrite.POST("/Coverage", h.CreateCoverageFHIR)
+	fhirWrite.PUT("/Coverage/:id", h.UpdateCoverageFHIR)
+	fhirWrite.DELETE("/Coverage/:id", h.DeleteCoverageFHIR)
+	fhirWrite.PATCH("/Coverage/:id", h.PatchCoverageFHIR)
 	fhirWrite.POST("/Claim", h.CreateClaimFHIR)
+	fhirWrite.PUT("/Claim/:id", h.UpdateClaimFHIR)
+	fhirWrite.DELETE("/Claim/:id", h.DeleteClaimFHIR)
+	fhirWrite.PATCH("/Claim/:id", h.PatchClaimFHIR)
 	fhirWrite.POST("/ClaimResponse", h.CreateClaimResponseFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Coverage/_search", h.SearchCoveragesFHIR)
+	fhirRead.POST("/Claim/_search", h.SearchClaimsFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Coverage/:id/_history/:vid", h.VreadCoverageFHIR)
+	fhirRead.GET("/Coverage/:id/_history", h.HistoryCoverageFHIR)
+	fhirRead.GET("/Claim/:id/_history/:vid", h.VreadClaimFHIR)
+	fhirRead.GET("/Claim/:id/_history", h.HistoryClaimFHIR)
 }
 
 // -- Coverage Handlers --
@@ -581,4 +600,202 @@ func (h *Handler) SearchEOBsFHIR(c echo.Context) error {
 func (h *Handler) GetEOBFHIR(c echo.Context) error {
 	// EOB read by FHIR ID is not yet fully wired; return not found for now
 	return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+}
+
+// -- FHIR Update Endpoints --
+
+func (h *Handler) UpdateCoverageFHIR(c echo.Context) error {
+	var cov Coverage
+	if err := c.Bind(&cov); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetCoverageByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Coverage", c.Param("id")))
+	}
+	cov.ID = existing.ID
+	cov.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateCoverage(c.Request().Context(), &cov); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, cov.ToFHIR())
+}
+
+func (h *Handler) UpdateClaimFHIR(c echo.Context) error {
+	var cl Claim
+	if err := c.Bind(&cl); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetClaimByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Claim", c.Param("id")))
+	}
+	cl.ID = existing.ID
+	cl.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateClaim(c.Request().Context(), &cl); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, cl.ToFHIR())
+}
+
+// -- FHIR Delete Endpoints --
+
+func (h *Handler) DeleteCoverageFHIR(c echo.Context) error {
+	existing, err := h.svc.GetCoverageByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Coverage", c.Param("id")))
+	}
+	if err := h.svc.DeleteCoverage(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteClaimFHIR(c echo.Context) error {
+	existing, err := h.svc.GetClaimByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Claim", c.Param("id")))
+	}
+	if err := h.svc.DeleteClaim(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PATCH Endpoints --
+
+func (h *Handler) PatchCoverageFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Coverage", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetCoverageByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Coverage", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateCoverage(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) PatchClaimFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Claim", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetClaimByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Claim", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateClaim(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+// handlePatch dispatches to JSON Patch or Merge Patch based on Content-Type.
+func (h *Handler) handlePatch(c echo.Context, resourceType, fhirID string, applyFn func(echo.Context, map[string]interface{}) error) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	// Get current resource as FHIR map
+	var currentResource map[string]interface{}
+	switch resourceType {
+	case "Coverage":
+		existing, err := h.svc.GetCoverageByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "Claim":
+		existing, err := h.svc.GetClaimByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	default:
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("unsupported resource type for PATCH"))
+	}
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	return applyFn(c, patched)
+}
+
+// -- FHIR vread and history endpoints --
+
+func (h *Handler) VreadCoverageFHIR(c echo.Context) error {
+	cov, err := h.svc.GetCoverageByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Coverage", c.Param("id")))
+	}
+	result := cov.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, cov.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryCoverageFHIR(c echo.Context) error {
+	cov, err := h.svc.GetCoverageByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Coverage", c.Param("id")))
+	}
+	result := cov.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Coverage", ResourceID: cov.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: cov.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadClaimFHIR(c echo.Context) error {
+	cl, err := h.svc.GetClaimByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Claim", c.Param("id")))
+	}
+	result := cl.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, cl.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryClaimFHIR(c echo.Context) error {
+	cl, err := h.svc.GetClaimByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Claim", c.Param("id")))
+	}
+	result := cl.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Claim", ResourceID: cl.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: cl.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

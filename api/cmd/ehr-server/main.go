@@ -460,6 +460,47 @@ func runServer() error {
 		{Name: "status", Type: "token"},
 	})
 
+	// Set advanced capabilities for all registered resource types
+	defaultCaps := fhir.DefaultCapabilityOptions()
+	for _, rt := range []string{
+		"Patient", "Practitioner", "Organization", "Location", "Encounter",
+		"Condition", "Observation", "AllergyIntolerance", "Procedure",
+		"Medication", "MedicationRequest", "MedicationAdministration", "MedicationDispense",
+		"ServiceRequest", "DiagnosticReport", "ImagingStudy", "Specimen",
+		"Appointment", "Schedule", "Slot",
+		"Coverage", "Claim",
+		"Consent", "DocumentReference", "Composition",
+		"Communication",
+		"ResearchStudy",
+		"Questionnaire", "QuestionnaireResponse",
+	} {
+		capBuilder.SetResourceCapabilities(rt, defaultCaps)
+	}
+
+	// Include registry for _include/_revinclude resolution
+	includeRegistry := fhir.NewIncludeRegistry()
+
+	// History repository for resource versioning
+	historyRepo := fhir.NewHistoryRepository()
+	_ = historyRepo // Used by domain handlers
+
+	// Register common references for _include support
+	for _, rt := range []string{"Condition", "Observation", "AllergyIntolerance", "Procedure",
+		"MedicationRequest", "MedicationAdministration", "MedicationDispense",
+		"ServiceRequest", "DiagnosticReport", "Encounter", "Appointment",
+		"Claim", "Coverage", "Consent", "DocumentReference", "Composition",
+		"Communication", "QuestionnaireResponse", "Specimen", "ImagingStudy"} {
+		includeRegistry.RegisterReference(rt, "patient", "Patient")
+		includeRegistry.RegisterReference(rt, "subject", "Patient")
+	}
+	for _, rt := range []string{"Condition", "Observation", "Procedure",
+		"MedicationRequest", "MedicationAdministration", "ServiceRequest",
+		"DiagnosticReport"} {
+		includeRegistry.RegisterReference(rt, "encounter", "Encounter")
+	}
+
+	_ = includeRegistry // Used by domain handlers
+
 	// FHIR metadata (dynamic CapabilityStatement)
 	fhirGroup.GET("/metadata", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, capBuilder.Build())

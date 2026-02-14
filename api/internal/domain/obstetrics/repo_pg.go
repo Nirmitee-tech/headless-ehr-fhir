@@ -26,6 +26,9 @@ func NewPregnancyRepoPG(pool *pgxpool.Pool) PregnancyRepository {
 }
 
 func (r *pregnancyRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -137,6 +140,9 @@ func NewPrenatalVisitRepoPG(pool *pgxpool.Pool) PrenatalVisitRepository {
 }
 
 func (r *prenatalVisitRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -235,6 +241,9 @@ type laborRepoPG struct{ pool *pgxpool.Pool }
 func NewLaborRepoPG(pool *pgxpool.Pool) LaborRepository { return &laborRepoPG{pool: pool} }
 
 func (r *laborRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -393,6 +402,9 @@ func NewDeliveryRepoPG(pool *pgxpool.Pool) DeliveryRepository {
 }
 
 func (r *deliveryRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -487,6 +499,9 @@ type newbornRepoPG struct{ pool *pgxpool.Pool }
 func NewNewbornRepoPG(pool *pgxpool.Pool) NewbornRepository { return &newbornRepoPG{pool: pool} }
 
 func (r *newbornRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -585,6 +600,9 @@ func NewPostpartumRepoPG(pool *pgxpool.Pool) PostpartumRepository {
 }
 
 func (r *postpartumRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

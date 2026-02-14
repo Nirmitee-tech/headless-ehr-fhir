@@ -27,6 +27,9 @@ func NewPortalAccountRepoPG(pool *pgxpool.Pool) PortalAccountRepository {
 }
 
 func (r *portalAccountRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -126,6 +129,9 @@ func NewPortalMessageRepoPG(pool *pgxpool.Pool) PortalMessageRepository {
 }
 
 func (r *portalMessageRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -221,6 +227,9 @@ func NewQuestionnaireRepoPG(pool *pgxpool.Pool) QuestionnaireRepository {
 }
 
 func (r *questionnaireRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -390,6 +399,9 @@ func NewQuestionnaireResponseRepoPG(pool *pgxpool.Pool) QuestionnaireResponseRep
 }
 
 func (r *questionnaireResponseRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -573,6 +585,9 @@ func NewPatientCheckinRepoPG(pool *pgxpool.Pool) PatientCheckinRepository {
 }
 
 func (r *patientCheckinRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

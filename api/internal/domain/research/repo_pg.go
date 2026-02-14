@@ -27,6 +27,9 @@ func NewStudyRepoPG(pool *pgxpool.Pool) ResearchStudyRepository {
 }
 
 func (r *studyRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -203,6 +206,9 @@ func NewEnrollmentRepoPG(pool *pgxpool.Pool) EnrollmentRepository {
 }
 
 func (r *enrollmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -308,6 +314,9 @@ func NewAdverseEventRepoPG(pool *pgxpool.Pool) AdverseEventRepository {
 }
 
 func (r *adverseEventRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -392,6 +401,9 @@ func NewDeviationRepoPG(pool *pgxpool.Pool) DeviationRepository {
 }
 
 func (r *deviationRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

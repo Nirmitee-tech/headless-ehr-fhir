@@ -454,6 +454,345 @@ func TestAssignRole_RoleRequired(t *testing.T) {
 	}
 }
 
+func TestGetOrganizationByFHIRID(t *testing.T) {
+	svc := newTestService()
+	org := &Organization{Name: "Test Hospital"}
+	svc.CreateOrganization(context.Background(), org)
+
+	fetched, err := svc.GetOrganizationByFHIRID(context.Background(), org.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != org.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetOrganizationByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetOrganizationByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateOrganization(t *testing.T) {
+	svc := newTestService()
+	org := &Organization{Name: "Test Hospital"}
+	svc.CreateOrganization(context.Background(), org)
+
+	org.Name = "Updated Hospital"
+	err := svc.UpdateOrganization(context.Background(), org)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateOrganization_NameRequired(t *testing.T) {
+	svc := newTestService()
+	org := &Organization{Name: "Test Hospital"}
+	svc.CreateOrganization(context.Background(), org)
+
+	org.Name = ""
+	err := svc.UpdateOrganization(context.Background(), org)
+	if err == nil {
+		t.Error("expected error for missing name")
+	}
+}
+
+func TestListOrganizations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateOrganization(context.Background(), &Organization{Name: "Hospital A"})
+	svc.CreateOrganization(context.Background(), &Organization{Name: "Hospital B"})
+
+	result, total, err := svc.ListOrganizations(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestSearchOrganizations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateOrganization(context.Background(), &Organization{Name: "Hospital A"})
+
+	result, total, err := svc.SearchOrganizations(context.Background(), map[string]string{"name": "Hospital"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestGetDepartment(t *testing.T) {
+	svc := newTestService()
+	dept := &Department{Name: "Cardiology", OrganizationID: uuid.New()}
+	svc.CreateDepartment(context.Background(), dept)
+
+	fetched, err := svc.GetDepartment(context.Background(), dept.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.Name != "Cardiology" {
+		t.Errorf("expected Cardiology, got %s", fetched.Name)
+	}
+}
+
+func TestGetDepartment_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetDepartment(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateDepartment(t *testing.T) {
+	svc := newTestService()
+	dept := &Department{Name: "Cardiology", OrganizationID: uuid.New()}
+	svc.CreateDepartment(context.Background(), dept)
+
+	dept.Name = "Neurology"
+	err := svc.UpdateDepartment(context.Background(), dept)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteDepartment(t *testing.T) {
+	svc := newTestService()
+	dept := &Department{Name: "Cardiology", OrganizationID: uuid.New()}
+	svc.CreateDepartment(context.Background(), dept)
+	err := svc.DeleteDepartment(context.Background(), dept.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetDepartment(context.Background(), dept.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListDepartments(t *testing.T) {
+	svc := newTestService()
+	orgID := uuid.New()
+	svc.CreateDepartment(context.Background(), &Department{Name: "Cardiology", OrganizationID: orgID})
+	svc.CreateDepartment(context.Background(), &Department{Name: "Neurology", OrganizationID: orgID})
+	svc.CreateDepartment(context.Background(), &Department{Name: "Other", OrganizationID: uuid.New()})
+
+	result, total, err := svc.ListDepartments(context.Background(), orgID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestGetLocation(t *testing.T) {
+	svc := newTestService()
+	loc := &Location{Name: "Main Building"}
+	svc.CreateLocation(context.Background(), loc)
+
+	fetched, err := svc.GetLocation(context.Background(), loc.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.Name != "Main Building" {
+		t.Errorf("expected Main Building, got %s", fetched.Name)
+	}
+}
+
+func TestGetLocation_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetLocation(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetLocationByFHIRID(t *testing.T) {
+	svc := newTestService()
+	loc := &Location{Name: "Main Building"}
+	svc.CreateLocation(context.Background(), loc)
+
+	fetched, err := svc.GetLocationByFHIRID(context.Background(), loc.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != loc.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetLocationByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetLocationByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateLocation(t *testing.T) {
+	svc := newTestService()
+	loc := &Location{Name: "Main Building"}
+	svc.CreateLocation(context.Background(), loc)
+
+	loc.Name = "East Wing"
+	err := svc.UpdateLocation(context.Background(), loc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteLocation(t *testing.T) {
+	svc := newTestService()
+	loc := &Location{Name: "Main Building"}
+	svc.CreateLocation(context.Background(), loc)
+	err := svc.DeleteLocation(context.Background(), loc.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetLocation(context.Background(), loc.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListLocations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateLocation(context.Background(), &Location{Name: "Building A"})
+	svc.CreateLocation(context.Background(), &Location{Name: "Building B"})
+
+	result, total, err := svc.ListLocations(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestGetSystemUser(t *testing.T) {
+	svc := newTestService()
+	user := &SystemUser{Username: "jdoe", UserType: "provider"}
+	svc.CreateSystemUser(context.Background(), user)
+
+	fetched, err := svc.GetSystemUser(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.Username != "jdoe" {
+		t.Errorf("expected jdoe, got %s", fetched.Username)
+	}
+}
+
+func TestGetSystemUser_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSystemUser(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetSystemUserByUsername(t *testing.T) {
+	svc := newTestService()
+	user := &SystemUser{Username: "unique_user", UserType: "provider"}
+	svc.CreateSystemUser(context.Background(), user)
+
+	fetched, err := svc.GetSystemUserByUsername(context.Background(), "unique_user")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != user.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetSystemUserByUsername_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSystemUserByUsername(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateSystemUser(t *testing.T) {
+	svc := newTestService()
+	user := &SystemUser{Username: "jdoe", UserType: "provider"}
+	svc.CreateSystemUser(context.Background(), user)
+
+	user.Status = "inactive"
+	err := svc.UpdateSystemUser(context.Background(), user)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteSystemUser(t *testing.T) {
+	svc := newTestService()
+	user := &SystemUser{Username: "jdoe", UserType: "provider"}
+	svc.CreateSystemUser(context.Background(), user)
+	err := svc.DeleteSystemUser(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetSystemUser(context.Background(), user.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListSystemUsers(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSystemUser(context.Background(), &SystemUser{Username: "user1", UserType: "provider"})
+	svc.CreateSystemUser(context.Background(), &SystemUser{Username: "user2", UserType: "admin"})
+
+	result, total, err := svc.ListSystemUsers(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestRemoveRole(t *testing.T) {
+	svc := newTestService()
+	user := &SystemUser{Username: "jdoe", UserType: "provider"}
+	svc.CreateSystemUser(context.Background(), user)
+
+	assignment := &UserRoleAssignment{UserID: user.ID, RoleName: "physician"}
+	svc.AssignRole(context.Background(), assignment)
+
+	err := svc.RemoveRole(context.Background(), assignment.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	roles, _ := svc.GetUserRoles(context.Background(), user.ID)
+	if len(roles) != 0 {
+		t.Errorf("expected 0 roles after removal, got %d", len(roles))
+	}
+}
+
 func TestOrganizationToFHIR(t *testing.T) {
 	phone := "+1-555-1234"
 	email := "info@hospital.com"

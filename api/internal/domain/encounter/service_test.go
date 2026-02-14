@@ -473,6 +473,82 @@ func TestRemoveParticipant(t *testing.T) {
 	}
 }
 
+func TestUpdateEncounter(t *testing.T) {
+	svc := newTestService()
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	svc.CreateEncounter(context.Background(), enc)
+
+	enc.Status = "in-progress"
+	err := svc.UpdateEncounter(context.Background(), enc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateEncounter_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	svc.CreateEncounter(context.Background(), enc)
+
+	enc.Status = "bogus"
+	err := svc.UpdateEncounter(context.Background(), enc)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListEncounters(t *testing.T) {
+	svc := newTestService()
+	svc.CreateEncounter(context.Background(), &Encounter{PatientID: uuid.New(), ClassCode: "AMB"})
+	svc.CreateEncounter(context.Background(), &Encounter{PatientID: uuid.New(), ClassCode: "IMP"})
+
+	result, total, err := svc.ListEncounters(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestSearchEncounters(t *testing.T) {
+	svc := newTestService()
+	svc.CreateEncounter(context.Background(), &Encounter{PatientID: uuid.New(), ClassCode: "AMB"})
+
+	result, total, err := svc.SearchEncounters(context.Background(), map[string]string{"class": "AMB"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestRemoveDiagnosis(t *testing.T) {
+	svc := newTestService()
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	svc.CreateEncounter(context.Background(), enc)
+
+	d := &EncounterDiagnosis{EncounterID: enc.ID}
+	svc.AddDiagnosis(context.Background(), d)
+
+	err := svc.RemoveDiagnosis(context.Background(), d.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	diags, _ := svc.GetDiagnoses(context.Background(), enc.ID)
+	if len(diags) != 0 {
+		t.Errorf("expected 0 diagnoses after removal, got %d", len(diags))
+	}
+}
+
 func TestEncounterToFHIR(t *testing.T) {
 	patientID := uuid.New()
 	practID := uuid.New()

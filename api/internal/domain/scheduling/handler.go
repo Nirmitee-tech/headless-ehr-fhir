@@ -1,7 +1,10 @@
 package scheduling
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -60,8 +63,30 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse", "registrar"))
 	fhirWrite.POST("/Schedule", h.CreateScheduleFHIR)
+	fhirWrite.PUT("/Schedule/:id", h.UpdateScheduleFHIR)
+	fhirWrite.DELETE("/Schedule/:id", h.DeleteScheduleFHIR)
+	fhirWrite.PATCH("/Schedule/:id", h.PatchScheduleFHIR)
 	fhirWrite.POST("/Slot", h.CreateSlotFHIR)
+	fhirWrite.PUT("/Slot/:id", h.UpdateSlotFHIR)
+	fhirWrite.DELETE("/Slot/:id", h.DeleteSlotFHIR)
+	fhirWrite.PATCH("/Slot/:id", h.PatchSlotFHIR)
 	fhirWrite.POST("/Appointment", h.CreateAppointmentFHIR)
+	fhirWrite.PUT("/Appointment/:id", h.UpdateAppointmentFHIR)
+	fhirWrite.DELETE("/Appointment/:id", h.DeleteAppointmentFHIR)
+	fhirWrite.PATCH("/Appointment/:id", h.PatchAppointmentFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Schedule/_search", h.SearchSchedulesFHIR)
+	fhirRead.POST("/Slot/_search", h.SearchSlotsFHIR)
+	fhirRead.POST("/Appointment/_search", h.SearchAppointmentsFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Schedule/:id/_history/:vid", h.VreadScheduleFHIR)
+	fhirRead.GET("/Schedule/:id/_history", h.HistoryScheduleFHIR)
+	fhirRead.GET("/Slot/:id/_history/:vid", h.VreadSlotFHIR)
+	fhirRead.GET("/Slot/:id/_history", h.HistorySlotFHIR)
+	fhirRead.GET("/Appointment/:id/_history/:vid", h.VreadAppointmentFHIR)
+	fhirRead.GET("/Appointment/:id/_history", h.HistoryAppointmentFHIR)
 }
 
 // -- Schedule Handlers --
@@ -511,4 +536,276 @@ func (h *Handler) CreateAppointmentFHIR(c echo.Context) error {
 	}
 	c.Response().Header().Set("Location", "/fhir/Appointment/"+a.FHIRID)
 	return c.JSON(http.StatusCreated, a.ToFHIR())
+}
+
+// -- FHIR Update Endpoints --
+
+func (h *Handler) UpdateScheduleFHIR(c echo.Context) error {
+	var sched Schedule
+	if err := c.Bind(&sched); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetScheduleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Schedule", c.Param("id")))
+	}
+	sched.ID = existing.ID
+	sched.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateSchedule(c.Request().Context(), &sched); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, sched.ToFHIR())
+}
+
+func (h *Handler) UpdateSlotFHIR(c echo.Context) error {
+	var sl Slot
+	if err := c.Bind(&sl); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetSlotByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Slot", c.Param("id")))
+	}
+	sl.ID = existing.ID
+	sl.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateSlot(c.Request().Context(), &sl); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, sl.ToFHIR())
+}
+
+func (h *Handler) UpdateAppointmentFHIR(c echo.Context) error {
+	var a Appointment
+	if err := c.Bind(&a); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetAppointmentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Appointment", c.Param("id")))
+	}
+	a.ID = existing.ID
+	a.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateAppointment(c.Request().Context(), &a); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, a.ToFHIR())
+}
+
+// -- FHIR Delete Endpoints --
+
+func (h *Handler) DeleteScheduleFHIR(c echo.Context) error {
+	existing, err := h.svc.GetScheduleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Schedule", c.Param("id")))
+	}
+	if err := h.svc.DeleteSchedule(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteSlotFHIR(c echo.Context) error {
+	existing, err := h.svc.GetSlotByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Slot", c.Param("id")))
+	}
+	if err := h.svc.DeleteSlot(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteAppointmentFHIR(c echo.Context) error {
+	existing, err := h.svc.GetAppointmentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Appointment", c.Param("id")))
+	}
+	if err := h.svc.DeleteAppointment(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PATCH Endpoints --
+
+func (h *Handler) PatchScheduleFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Schedule", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetScheduleByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Schedule", ctx.Param("id")))
+		}
+		if v, ok := resource["comment"].(string); ok {
+			existing.Comment = &v
+		}
+		if err := h.svc.UpdateSchedule(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) PatchSlotFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Slot", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetSlotByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Slot", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateSlot(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) PatchAppointmentFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Appointment", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetAppointmentByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Appointment", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateAppointment(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+// handlePatch dispatches to JSON Patch or Merge Patch based on Content-Type.
+func (h *Handler) handlePatch(c echo.Context, resourceType, fhirID string, applyFn func(echo.Context, map[string]interface{}) error) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	// Get current resource as FHIR map
+	var currentResource map[string]interface{}
+	switch resourceType {
+	case "Schedule":
+		existing, err := h.svc.GetScheduleByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "Slot":
+		existing, err := h.svc.GetSlotByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "Appointment":
+		existing, err := h.svc.GetAppointmentByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	default:
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("unsupported resource type for PATCH"))
+	}
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	return applyFn(c, patched)
+}
+
+// -- FHIR vread and history endpoints --
+
+func (h *Handler) VreadScheduleFHIR(c echo.Context) error {
+	sched, err := h.svc.GetScheduleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Schedule", c.Param("id")))
+	}
+	result := sched.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, sched.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryScheduleFHIR(c echo.Context) error {
+	sched, err := h.svc.GetScheduleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Schedule", c.Param("id")))
+	}
+	result := sched.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Schedule", ResourceID: sched.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: sched.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadSlotFHIR(c echo.Context) error {
+	sl, err := h.svc.GetSlotByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Slot", c.Param("id")))
+	}
+	result := sl.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, sl.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistorySlotFHIR(c echo.Context) error {
+	sl, err := h.svc.GetSlotByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Slot", c.Param("id")))
+	}
+	result := sl.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Slot", ResourceID: sl.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: sl.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadAppointmentFHIR(c echo.Context) error {
+	a, err := h.svc.GetAppointmentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Appointment", c.Param("id")))
+	}
+	result := a.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, a.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryAppointmentFHIR(c echo.Context) error {
+	a, err := h.svc.GetAppointmentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Appointment", c.Param("id")))
+	}
+	result := a.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Appointment", ResourceID: a.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: a.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

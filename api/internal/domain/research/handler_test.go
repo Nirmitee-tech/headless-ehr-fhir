@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+
+	_ "github.com/ehr/ehr/internal/platform/fhir"
 )
 
 func newTestHandler() (*Handler, *echo.Echo) {
@@ -330,5 +332,352 @@ func TestHandler_DeleteDeviation(t *testing.T) {
 	}
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d", rec.Code)
+	}
+}
+
+// -- REST: Missing List/Update/GetArms Tests --
+
+func TestHandler_ListStudies(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateStudy(nil, &ResearchStudy{ProtocolNumber: "P-1", Title: "T1"})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListStudies(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateStudy(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	body := `{"title":"Updated","protocol_number":"P-1","status":"active-recruiting"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.ID.String())
+	if err := h.UpdateStudy(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetArms(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	h.svc.AddStudyArm(nil, &ResearchArm{StudyID: s.ID, Name: "Arm A"})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.ID.String())
+	if err := h.GetArms(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListEnrollments(t *testing.T) {
+	h, e := newTestHandler()
+	sid := uuid.New()
+	h.svc.CreateEnrollment(nil, &ResearchEnrollment{StudyID: sid, PatientID: uuid.New()})
+	req := httptest.NewRequest(http.MethodGet, "/?study_id="+sid.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListEnrollments(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateEnrollment(t *testing.T) {
+	h, e := newTestHandler()
+	en := &ResearchEnrollment{StudyID: uuid.New(), PatientID: uuid.New()}
+	h.svc.CreateEnrollment(nil, en)
+	body := `{"status":"enrolled","study_id":"` + en.StudyID.String() + `","patient_id":"` + en.PatientID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(en.ID.String())
+	if err := h.UpdateEnrollment(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListAdverseEvents(t *testing.T) {
+	h, e := newTestHandler()
+	eid := uuid.New()
+	h.svc.CreateAdverseEvent(nil, &ResearchAdverseEvent{EnrollmentID: eid, Description: "AE"})
+	req := httptest.NewRequest(http.MethodGet, "/?enrollment_id="+eid.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListAdverseEvents(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateAdverseEvent(t *testing.T) {
+	h, e := newTestHandler()
+	ae := &ResearchAdverseEvent{EnrollmentID: uuid.New(), Description: "AE"}
+	h.svc.CreateAdverseEvent(nil, ae)
+	body := `{"description":"Updated AE","enrollment_id":"` + ae.EnrollmentID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(ae.ID.String())
+	if err := h.UpdateAdverseEvent(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListDeviations(t *testing.T) {
+	h, e := newTestHandler()
+	eid := uuid.New()
+	h.svc.CreateDeviation(nil, &ResearchProtocolDeviation{EnrollmentID: eid, Description: "D"})
+	req := httptest.NewRequest(http.MethodGet, "/?enrollment_id="+eid.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListDeviations(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateDeviation(t *testing.T) {
+	h, e := newTestHandler()
+	d := &ResearchProtocolDeviation{EnrollmentID: uuid.New(), Description: "D"}
+	h.svc.CreateDeviation(nil, d)
+	body := `{"description":"Updated","enrollment_id":"` + d.EnrollmentID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(d.ID.String())
+	if err := h.UpdateDeviation(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+// -- FHIR ResearchStudy Handlers --
+
+func TestHandler_SearchStudiesFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateStudy(nil, &ResearchStudy{ProtocolNumber: "P-1", Title: "T"})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.SearchStudiesFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetStudyFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.GetStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetStudyFHIR_NotFound(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("nonexistent")
+	if err := h.GetStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CreateStudyFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	body := `{"protocol_number":"P-1","title":"T"}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.CreateStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d", rec.Code)
+	}
+	if rec.Header().Get("Location") == "" {
+		t.Error("expected Location header")
+	}
+}
+
+func TestHandler_UpdateStudyFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	body := `{"protocol_number":"P-1","title":"Updated","status":"active-recruiting"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.UpdateStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_DeleteStudyFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.DeleteStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", rec.Code)
+	}
+}
+
+func TestHandler_PatchStudyFHIR_MergePatch(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	body := `{"title":"Patched"}`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/merge-patch+json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.PatchStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_PatchStudyFHIR_JSONPatch(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	body := `[{"op":"replace","path":"/title","value":"JP"}]`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json-patch+json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.PatchStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_PatchStudyFHIR_UnsupportedMediaType(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.PatchStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Errorf("expected 415, got %d", rec.Code)
+	}
+}
+
+func TestHandler_VreadStudyFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "vid")
+	c.SetParamValues(s.FHIRID, "1")
+	if err := h.VreadStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_HistoryStudyFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &ResearchStudy{ProtocolNumber: "P-1", Title: "T"}
+	h.svc.CreateStudy(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	if err := h.HistoryStudyFHIR(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
 	}
 }

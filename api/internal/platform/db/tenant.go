@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -15,6 +16,7 @@ type contextKey string
 const (
 	TenantIDKey contextKey = "tenant_id"
 	DBConnKey   contextKey = "db_conn"
+	DBTxKey     contextKey = "db_tx"
 )
 
 var tenantIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
@@ -81,6 +83,27 @@ func ConnFromContext(ctx context.Context) *pgxpool.Conn {
 func TenantFromContext(ctx context.Context) string {
 	tid, _ := ctx.Value(TenantIDKey).(string)
 	return tid
+}
+
+// WithTx starts a transaction using the connection from context and returns a new context
+// containing the transaction. The caller must commit or rollback the returned pgx.Tx.
+func WithTx(ctx context.Context) (context.Context, pgx.Tx, error) {
+	conn := ConnFromContext(ctx)
+	if conn == nil {
+		return ctx, nil, fmt.Errorf("no database connection in context")
+	}
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return ctx, nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	txCtx := context.WithValue(ctx, DBTxKey, tx)
+	return txCtx, tx, nil
+}
+
+// TxFromContext retrieves the active transaction from context, if any.
+func TxFromContext(ctx context.Context) pgx.Tx {
+	tx, _ := ctx.Value(DBTxKey).(pgx.Tx)
+	return tx
 }
 
 // CreateTenantSchema creates a new schema for a tenant and runs all migrations against it.

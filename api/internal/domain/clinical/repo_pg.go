@@ -25,6 +25,9 @@ type conditionRepoPG struct{ pool *pgxpool.Pool }
 func NewConditionRepoPG(pool *pgxpool.Pool) ConditionRepository { return &conditionRepoPG{pool: pool} }
 
 func (r *conditionRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -200,6 +203,9 @@ func NewObservationRepoPG(pool *pgxpool.Pool) ObservationRepository {
 }
 
 func (r *observationRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -417,6 +423,9 @@ type allergyRepoPG struct{ pool *pgxpool.Pool }
 func NewAllergyRepoPG(pool *pgxpool.Pool) AllergyRepository { return &allergyRepoPG{pool: pool} }
 
 func (r *allergyRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -553,6 +562,9 @@ func NewProcedureRepoPG(pool *pgxpool.Pool) ProcedureRepository {
 }
 
 func (r *procedureRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

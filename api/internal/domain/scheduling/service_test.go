@@ -480,6 +480,440 @@ func TestScheduleToFHIR(t *testing.T) {
 	}
 }
 
+// -- Additional Schedule Tests --
+
+func TestGetScheduleByFHIRID(t *testing.T) {
+	svc := newTestService()
+	s := &Schedule{PractitionerID: uuid.New()}
+	svc.CreateSchedule(context.Background(), s)
+	fetched, err := svc.GetScheduleByFHIRID(context.Background(), s.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != s.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetScheduleByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetScheduleByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateSchedule(t *testing.T) {
+	svc := newTestService()
+	s := &Schedule{PractitionerID: uuid.New()}
+	svc.CreateSchedule(context.Background(), s)
+	err := svc.UpdateSchedule(context.Background(), s)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListSchedulesByPractitioner(t *testing.T) {
+	svc := newTestService()
+	practID := uuid.New()
+	svc.CreateSchedule(context.Background(), &Schedule{PractitionerID: practID})
+	svc.CreateSchedule(context.Background(), &Schedule{PractitionerID: practID})
+	items, total, err := svc.ListSchedulesByPractitioner(context.Background(), practID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+func TestSearchSchedules(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSchedule(context.Background(), &Schedule{PractitionerID: uuid.New()})
+	items, total, err := svc.SearchSchedules(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// -- Additional Slot Tests --
+
+func TestGetSlot(t *testing.T) {
+	svc := newTestService()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	svc.CreateSlot(context.Background(), sl)
+	fetched, err := svc.GetSlot(context.Background(), sl.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != sl.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetSlot_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSlot(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetSlotByFHIRID(t *testing.T) {
+	svc := newTestService()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	svc.CreateSlot(context.Background(), sl)
+	fetched, err := svc.GetSlotByFHIRID(context.Background(), sl.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != sl.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetSlotByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSlotByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateSlot(t *testing.T) {
+	svc := newTestService()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	svc.CreateSlot(context.Background(), sl)
+	sl.Status = "busy"
+	err := svc.UpdateSlot(context.Background(), sl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateSlot_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	svc.CreateSlot(context.Background(), sl)
+	sl.Status = "bogus"
+	err := svc.UpdateSlot(context.Background(), sl)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteSlot(t *testing.T) {
+	svc := newTestService()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	svc.CreateSlot(context.Background(), sl)
+	err := svc.DeleteSlot(context.Background(), sl.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetSlot(context.Background(), sl.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListSlotsBySchedule(t *testing.T) {
+	svc := newTestService()
+	schedID := uuid.New()
+	svc.CreateSlot(context.Background(), &Slot{ScheduleID: schedID, StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)})
+	slots, total, err := svc.ListSlotsBySchedule(context.Background(), schedID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(slots) != 1 {
+		t.Errorf("expected 1 slot, got %d", len(slots))
+	}
+}
+
+func TestSearchAvailableSlots(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSlot(context.Background(), &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)})
+	slots, total, err := svc.SearchAvailableSlots(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(slots) < 1 {
+		t.Error("expected slots")
+	}
+}
+
+// -- Additional Appointment Tests --
+
+func TestGetAppointment(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	fetched, err := svc.GetAppointment(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != a.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetAppointment_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetAppointment(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetAppointmentByFHIRID(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	fetched, err := svc.GetAppointmentByFHIRID(context.Background(), a.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != a.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetAppointmentByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetAppointmentByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateAppointment(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	a.Status = "booked"
+	err := svc.UpdateAppointment(context.Background(), a)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateAppointment_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	a.Status = "bogus"
+	err := svc.UpdateAppointment(context.Background(), a)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteAppointment(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	err := svc.DeleteAppointment(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetAppointment(context.Background(), a.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListAppointmentsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	start := time.Now()
+	svc.CreateAppointment(context.Background(), &Appointment{PatientID: patientID, StartTime: &start})
+	items, total, err := svc.ListAppointmentsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1, got %d", len(items))
+	}
+}
+
+func TestListAppointmentsByPractitioner(t *testing.T) {
+	svc := newTestService()
+	practID := uuid.New()
+	start := time.Now()
+	svc.CreateAppointment(context.Background(), &Appointment{PatientID: uuid.New(), StartTime: &start, PractitionerID: &practID})
+	items, total, err := svc.ListAppointmentsByPractitioner(context.Background(), practID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1, got %d", len(items))
+	}
+}
+
+func TestSearchAppointments(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	svc.CreateAppointment(context.Background(), &Appointment{PatientID: uuid.New(), StartTime: &start})
+	items, total, err := svc.SearchAppointments(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+func TestGetAppointmentParticipants(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	svc.AddAppointmentParticipant(context.Background(), &AppointmentParticipant{AppointmentID: a.ID, ActorType: "Practitioner", ActorID: uuid.New()})
+	participants, err := svc.GetAppointmentParticipants(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(participants) != 1 {
+		t.Errorf("expected 1 participant, got %d", len(participants))
+	}
+}
+
+func TestRemoveAppointmentParticipant(t *testing.T) {
+	svc := newTestService()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+	p := &AppointmentParticipant{AppointmentID: a.ID, ActorType: "Practitioner", ActorID: uuid.New()}
+	svc.AddAppointmentParticipant(context.Background(), p)
+	err := svc.RemoveAppointmentParticipant(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	parts, _ := svc.GetAppointmentParticipants(context.Background(), a.ID)
+	if len(parts) != 0 {
+		t.Errorf("expected 0 after removal, got %d", len(parts))
+	}
+}
+
+// -- Additional Waitlist Tests --
+
+func TestGetWaitlistEntry(t *testing.T) {
+	svc := newTestService()
+	w := &Waitlist{PatientID: uuid.New()}
+	svc.CreateWaitlistEntry(context.Background(), w)
+	fetched, err := svc.GetWaitlistEntry(context.Background(), w.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != w.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetWaitlistEntry_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetWaitlistEntry(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateWaitlistEntry(t *testing.T) {
+	svc := newTestService()
+	w := &Waitlist{PatientID: uuid.New()}
+	svc.CreateWaitlistEntry(context.Background(), w)
+	w.Status = "called"
+	err := svc.UpdateWaitlistEntry(context.Background(), w)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateWaitlistEntry_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	w := &Waitlist{PatientID: uuid.New()}
+	svc.CreateWaitlistEntry(context.Background(), w)
+	w.Status = "bogus"
+	err := svc.UpdateWaitlistEntry(context.Background(), w)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteWaitlistEntry(t *testing.T) {
+	svc := newTestService()
+	w := &Waitlist{PatientID: uuid.New()}
+	svc.CreateWaitlistEntry(context.Background(), w)
+	err := svc.DeleteWaitlistEntry(context.Background(), w.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetWaitlistEntry(context.Background(), w.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListWaitlistByDepartment(t *testing.T) {
+	svc := newTestService()
+	dept := "cardiology"
+	svc.CreateWaitlistEntry(context.Background(), &Waitlist{PatientID: uuid.New(), Department: &dept})
+	items, total, err := svc.ListWaitlistByDepartment(context.Background(), "cardiology", 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1, got %d", len(items))
+	}
+}
+
+func TestListWaitlistByPractitioner(t *testing.T) {
+	svc := newTestService()
+	practID := uuid.New()
+	svc.CreateWaitlistEntry(context.Background(), &Waitlist{PatientID: uuid.New(), PractitionerID: &practID})
+	items, total, err := svc.ListWaitlistByPractitioner(context.Background(), practID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1, got %d", len(items))
+	}
+}
+
 func TestAppointmentToFHIR(t *testing.T) {
 	start := time.Now()
 	a := &Appointment{

@@ -695,3 +695,464 @@ func TestHandler_AddMedReconciliationItem(t *testing.T) {
 		t.Errorf("expected 201, got %d", rec.Code)
 	}
 }
+
+// ── List and Update Tests ──
+
+func TestHandler_ListCDSRules(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateCDSRule(nil, &CDSRule{RuleName: "Rule1", RuleType: "allergy-check"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListCDSRules(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateCDSRule(t *testing.T) {
+	h, e := newTestHandler()
+	r := &CDSRule{RuleName: "Rule1", RuleType: "allergy-check"}
+	h.svc.CreateCDSRule(nil, r)
+
+	body := `{"rule_name":"Updated","rule_type":"allergy-check"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(r.ID.String())
+	err := h.UpdateCDSRule(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListCDSAlerts(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateCDSAlert(nil, &CDSAlert{RuleID: uuid.New(), PatientID: uuid.New(), Summary: "Alert"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListCDSAlerts(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateCDSAlert(t *testing.T) {
+	h, e := newTestHandler()
+	a := &CDSAlert{RuleID: uuid.New(), PatientID: uuid.New(), Summary: "Alert"}
+	h.svc.CreateCDSAlert(nil, a)
+
+	body := `{"summary":"Updated Alert","rule_id":"` + uuid.New().String() + `","patient_id":"` + uuid.New().String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.ID.String())
+	err := h.UpdateCDSAlert(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetAlertResponses(t *testing.T) {
+	h, e := newTestHandler()
+	a := &CDSAlert{RuleID: uuid.New(), PatientID: uuid.New(), Summary: "Alert"}
+	h.svc.CreateCDSAlert(nil, a)
+	h.svc.AddAlertResponse(nil, &CDSAlertResponse{AlertID: a.ID, PractitionerID: uuid.New(), Action: "accept"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.ID.String())
+	err := h.GetAlertResponses(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListDrugInteractions(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateDrugInteraction(nil, &DrugInteraction{MedicationAName: "Warfarin", MedicationBName: "Aspirin", Severity: "high"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListDrugInteractions(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateDrugInteraction(t *testing.T) {
+	h, e := newTestHandler()
+	d := &DrugInteraction{MedicationAName: "Warfarin", MedicationBName: "Aspirin", Severity: "high"}
+	h.svc.CreateDrugInteraction(nil, d)
+
+	body := `{"medication_a_name":"Warfarin","medication_b_name":"Aspirin","severity":"moderate"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(d.ID.String())
+	err := h.UpdateDrugInteraction(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListOrderSets(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateOrderSet(nil, &OrderSet{Name: "Sepsis Bundle"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListOrderSets(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateOrderSet(t *testing.T) {
+	h, e := newTestHandler()
+	o := &OrderSet{Name: "Sepsis Bundle"}
+	h.svc.CreateOrderSet(nil, o)
+
+	body := `{"name":"Updated Bundle"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(o.ID.String())
+	err := h.UpdateOrderSet(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetOrderSetSections(t *testing.T) {
+	h, e := newTestHandler()
+	o := &OrderSet{Name: "Sepsis Bundle"}
+	h.svc.CreateOrderSet(nil, o)
+	h.svc.AddOrderSetSection(nil, &OrderSetSection{OrderSetID: o.ID, Name: "Antibiotics"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(o.ID.String())
+	err := h.GetOrderSetSections(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetOrderSetItems(t *testing.T) {
+	h, e := newTestHandler()
+	secID := uuid.New()
+	h.svc.AddOrderSetItem(nil, &OrderSetItem{SectionID: secID, ItemName: "Ceftriaxone"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(secID.String())
+	err := h.GetOrderSetItems(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListClinicalPathways(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateClinicalPathway(nil, &ClinicalPathway{Name: "Heart Failure"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListClinicalPathways(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateClinicalPathway(t *testing.T) {
+	h, e := newTestHandler()
+	p := &ClinicalPathway{Name: "Heart Failure"}
+	h.svc.CreateClinicalPathway(nil, p)
+
+	body := `{"name":"Updated Pathway"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(p.ID.String())
+	err := h.UpdateClinicalPathway(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetPathwayPhases(t *testing.T) {
+	h, e := newTestHandler()
+	p := &ClinicalPathway{Name: "Heart Failure"}
+	h.svc.CreateClinicalPathway(nil, p)
+	h.svc.AddPathwayPhase(nil, &ClinicalPathwayPhase{PathwayID: p.ID, Name: "Acute Phase"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(p.ID.String())
+	err := h.GetPathwayPhases(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListPathwayEnrollments(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreatePathwayEnrollment(nil, &PatientPathwayEnrollment{PathwayID: uuid.New(), PatientID: uuid.New()})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListPathwayEnrollments(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdatePathwayEnrollment(t *testing.T) {
+	h, e := newTestHandler()
+	en := &PatientPathwayEnrollment{PathwayID: uuid.New(), PatientID: uuid.New()}
+	h.svc.CreatePathwayEnrollment(nil, en)
+
+	body := `{"pathway_id":"` + uuid.New().String() + `","patient_id":"` + uuid.New().String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(en.ID.String())
+	err := h.UpdatePathwayEnrollment(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListFormularies(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateFormulary(nil, &Formulary{Name: "2025 Formulary"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListFormularies(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateFormulary(t *testing.T) {
+	h, e := newTestHandler()
+	f := &Formulary{Name: "2025 Formulary"}
+	h.svc.CreateFormulary(nil, f)
+
+	body := `{"name":"Updated Formulary"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(f.ID.String())
+	err := h.UpdateFormulary(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetFormularyItems(t *testing.T) {
+	h, e := newTestHandler()
+	f := &Formulary{Name: "2025 Formulary"}
+	h.svc.CreateFormulary(nil, f)
+	h.svc.AddFormularyItem(nil, &FormularyItem{FormularyID: f.ID, MedicationName: "Metformin"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(f.ID.String())
+	err := h.GetFormularyItems(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListMedReconciliations(t *testing.T) {
+	h, e := newTestHandler()
+	h.svc.CreateMedReconciliation(nil, &MedicationReconciliation{PatientID: uuid.New()})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListMedReconciliations(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateMedReconciliation(t *testing.T) {
+	h, e := newTestHandler()
+	mr := &MedicationReconciliation{PatientID: uuid.New()}
+	h.svc.CreateMedReconciliation(nil, mr)
+
+	body := `{"patient_id":"` + uuid.New().String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(mr.ID.String())
+	err := h.UpdateMedReconciliation(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetMedReconciliationItems(t *testing.T) {
+	h, e := newTestHandler()
+	mr := &MedicationReconciliation{PatientID: uuid.New()}
+	h.svc.CreateMedReconciliation(nil, mr)
+	h.svc.AddMedReconciliationItem(nil, &MedicationReconciliationItem{ReconciliationID: mr.ID, MedicationName: "Lisinopril"})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(mr.ID.String())
+	err := h.GetMedReconciliationItems(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+// ── RegisterRoutes ──
+
+func TestHandler_RegisterRoutes(t *testing.T) {
+	h, e := newTestHandler()
+	api := e.Group("/api/v1")
+	h.RegisterRoutes(api)
+
+	routes := e.Routes()
+	if len(routes) == 0 {
+		t.Error("expected routes to be registered")
+	}
+
+	routePaths := make(map[string]bool)
+	for _, r := range routes {
+		routePaths[r.Method+":"+r.Path] = true
+	}
+
+	expected := []string{
+		"POST:/api/v1/cds-rules",
+		"GET:/api/v1/cds-rules",
+		"GET:/api/v1/cds-rules/:id",
+		"PUT:/api/v1/cds-rules/:id",
+		"DELETE:/api/v1/cds-rules/:id",
+		"POST:/api/v1/cds-alerts",
+		"GET:/api/v1/cds-alerts",
+		"GET:/api/v1/cds-alerts/:id",
+		"POST:/api/v1/drug-interactions",
+		"GET:/api/v1/drug-interactions",
+		"POST:/api/v1/order-sets",
+		"GET:/api/v1/order-sets",
+		"POST:/api/v1/clinical-pathways",
+		"GET:/api/v1/clinical-pathways",
+		"POST:/api/v1/formularies",
+		"GET:/api/v1/formularies",
+		"POST:/api/v1/medication-reconciliations",
+		"GET:/api/v1/medication-reconciliations",
+	}
+	for _, path := range expected {
+		if !routePaths[path] {
+			t.Errorf("missing expected route: %s", path)
+		}
+	}
+}

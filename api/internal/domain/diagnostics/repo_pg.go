@@ -27,6 +27,9 @@ func NewServiceRequestRepoPG(pool *pgxpool.Pool) ServiceRequestRepository {
 }
 
 func (r *serviceRequestRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -193,6 +196,9 @@ type specimenRepoPG struct{ pool *pgxpool.Pool }
 func NewSpecimenRepoPG(pool *pgxpool.Pool) SpecimenRepository { return &specimenRepoPG{pool: pool} }
 
 func (r *specimenRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -345,6 +351,9 @@ func NewDiagnosticReportRepoPG(pool *pgxpool.Pool) DiagnosticReportRepository {
 }
 
 func (r *diagnosticReportRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -531,6 +540,9 @@ func NewImagingStudyRepoPG(pool *pgxpool.Pool) ImagingStudyRepository {
 }
 
 func (r *imagingStudyRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

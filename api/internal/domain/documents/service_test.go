@@ -527,6 +527,299 @@ func TestAddCompositionSection_CompositionIDRequired(t *testing.T) {
 	}
 }
 
+// -- Additional Consent Tests --
+
+func TestGetConsentByFHIRID(t *testing.T) {
+	svc := newTestService()
+	c := &Consent{PatientID: uuid.New()}
+	svc.CreateConsent(context.Background(), c)
+
+	fetched, err := svc.GetConsentByFHIRID(context.Background(), c.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != c.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetConsentByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetConsentByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateConsent(t *testing.T) {
+	svc := newTestService()
+	c := &Consent{PatientID: uuid.New()}
+	svc.CreateConsent(context.Background(), c)
+
+	c.Status = "active"
+	err := svc.UpdateConsent(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateConsent_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	c := &Consent{PatientID: uuid.New()}
+	svc.CreateConsent(context.Background(), c)
+
+	c.Status = "bogus"
+	err := svc.UpdateConsent(context.Background(), c)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListConsentsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateConsent(context.Background(), &Consent{PatientID: patientID})
+	svc.CreateConsent(context.Background(), &Consent{PatientID: uuid.New()})
+
+	result, total, err := svc.ListConsentsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchConsents(t *testing.T) {
+	svc := newTestService()
+	svc.CreateConsent(context.Background(), &Consent{PatientID: uuid.New()})
+
+	result, total, err := svc.SearchConsents(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+// -- Additional DocumentReference Tests --
+
+func TestGetDocumentReferenceByFHIRID(t *testing.T) {
+	svc := newTestService()
+	d := &DocumentReference{PatientID: uuid.New()}
+	svc.CreateDocumentReference(context.Background(), d)
+
+	fetched, err := svc.GetDocumentReferenceByFHIRID(context.Background(), d.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != d.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetDocumentReferenceByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetDocumentReferenceByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateDocumentReference(t *testing.T) {
+	svc := newTestService()
+	d := &DocumentReference{PatientID: uuid.New()}
+	svc.CreateDocumentReference(context.Background(), d)
+
+	d.Status = "superseded"
+	err := svc.UpdateDocumentReference(context.Background(), d)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateDocumentReference_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	d := &DocumentReference{PatientID: uuid.New()}
+	svc.CreateDocumentReference(context.Background(), d)
+
+	d.Status = "bogus"
+	err := svc.UpdateDocumentReference(context.Background(), d)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListDocumentReferencesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateDocumentReference(context.Background(), &DocumentReference{PatientID: patientID})
+	svc.CreateDocumentReference(context.Background(), &DocumentReference{PatientID: uuid.New()})
+
+	result, total, err := svc.ListDocumentReferencesByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchDocumentReferences(t *testing.T) {
+	svc := newTestService()
+	svc.CreateDocumentReference(context.Background(), &DocumentReference{PatientID: uuid.New()})
+
+	result, total, err := svc.SearchDocumentReferences(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+// -- Additional ClinicalNote Tests --
+
+func TestUpdateClinicalNote(t *testing.T) {
+	svc := newTestService()
+	n := &ClinicalNote{PatientID: uuid.New(), AuthorID: uuid.New(), NoteType: "progress"}
+	svc.CreateClinicalNote(context.Background(), n)
+
+	n.Status = "final"
+	err := svc.UpdateClinicalNote(context.Background(), n)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateClinicalNote_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	n := &ClinicalNote{PatientID: uuid.New(), AuthorID: uuid.New(), NoteType: "progress"}
+	svc.CreateClinicalNote(context.Background(), n)
+
+	n.Status = "bogus"
+	err := svc.UpdateClinicalNote(context.Background(), n)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListClinicalNotesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateClinicalNote(context.Background(), &ClinicalNote{PatientID: patientID, AuthorID: uuid.New(), NoteType: "progress"})
+	svc.CreateClinicalNote(context.Background(), &ClinicalNote{PatientID: uuid.New(), AuthorID: uuid.New(), NoteType: "progress"})
+
+	result, total, err := svc.ListClinicalNotesByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestListClinicalNotesByEncounter(t *testing.T) {
+	svc := newTestService()
+	encounterID := uuid.New()
+	otherEncounterID := uuid.New()
+	svc.CreateClinicalNote(context.Background(), &ClinicalNote{PatientID: uuid.New(), AuthorID: uuid.New(), NoteType: "progress", EncounterID: &encounterID})
+	svc.CreateClinicalNote(context.Background(), &ClinicalNote{PatientID: uuid.New(), AuthorID: uuid.New(), NoteType: "progress", EncounterID: &otherEncounterID})
+
+	result, total, err := svc.ListClinicalNotesByEncounter(context.Background(), encounterID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+// -- Additional Composition Tests --
+
+func TestGetCompositionByFHIRID(t *testing.T) {
+	svc := newTestService()
+	c := &Composition{PatientID: uuid.New()}
+	svc.CreateComposition(context.Background(), c)
+
+	fetched, err := svc.GetCompositionByFHIRID(context.Background(), c.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != c.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetCompositionByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetCompositionByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateComposition(t *testing.T) {
+	svc := newTestService()
+	c := &Composition{PatientID: uuid.New()}
+	svc.CreateComposition(context.Background(), c)
+
+	c.Status = "final"
+	err := svc.UpdateComposition(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateComposition_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	c := &Composition{PatientID: uuid.New()}
+	svc.CreateComposition(context.Background(), c)
+
+	c.Status = "bogus"
+	err := svc.UpdateComposition(context.Background(), c)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListCompositionsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateComposition(context.Background(), &Composition{PatientID: patientID})
+	svc.CreateComposition(context.Background(), &Composition{PatientID: uuid.New()})
+
+	result, total, err := svc.ListCompositionsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
 // -- ToFHIR Tests --
 
 func TestConsentToFHIR(t *testing.T) {

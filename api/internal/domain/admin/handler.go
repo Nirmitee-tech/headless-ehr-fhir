@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -61,7 +64,21 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirWrite.POST("/Organization", h.CreateOrganizationFHIR)
 	fhirWrite.PUT("/Organization/:id", h.UpdateOrganizationFHIR)
 	fhirWrite.DELETE("/Organization/:id", h.DeleteOrganizationFHIR)
+	fhirWrite.PATCH("/Organization/:id", h.PatchOrganizationFHIR)
 	fhirWrite.POST("/Location", h.CreateLocationFHIR)
+	fhirWrite.PUT("/Location/:id", h.UpdateLocationFHIR)
+	fhirWrite.DELETE("/Location/:id", h.DeleteLocationFHIR)
+	fhirWrite.PATCH("/Location/:id", h.PatchLocationFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Organization/_search", h.SearchOrganizationsFHIR)
+	fhirRead.POST("/Location/_search", h.SearchLocationsFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Organization/:id/_history/:vid", h.VreadOrganizationFHIR)
+	fhirRead.GET("/Organization/:id/_history", h.HistoryOrganizationFHIR)
+	fhirRead.GET("/Location/:id/_history/:vid", h.VreadLocationFHIR)
+	fhirRead.GET("/Location/:id/_history", h.HistoryLocationFHIR)
 }
 
 // -- Organization Handlers (Operational) --
@@ -463,4 +480,182 @@ func (h *Handler) CreateLocationFHIR(c echo.Context) error {
 	}
 	c.Response().Header().Set("Location", "/fhir/Location/"+loc.FHIRID)
 	return c.JSON(http.StatusCreated, loc.ToFHIR())
+}
+
+func (h *Handler) UpdateLocationFHIR(c echo.Context) error {
+	existing, err := h.svc.GetLocationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Location", c.Param("id")))
+	}
+	var loc Location
+	if err := c.Bind(&loc); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	loc.ID = existing.ID
+	loc.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateLocation(c.Request().Context(), &loc); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, loc.ToFHIR())
+}
+
+func (h *Handler) DeleteLocationFHIR(c echo.Context) error {
+	loc, err := h.svc.GetLocationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Location", c.Param("id")))
+	}
+	if err := h.svc.DeleteLocation(c.Request().Context(), loc.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR Organization PATCH/vread/history --
+
+func (h *Handler) PatchOrganizationFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	existing, err := h.svc.GetOrganizationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Organization", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	if v, ok := patched["name"].(string); ok {
+		existing.Name = v
+	}
+	if v, ok := patched["active"].(bool); ok {
+		existing.Active = v
+	}
+	if err := h.svc.UpdateOrganization(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) VreadOrganizationFHIR(c echo.Context) error {
+	org, err := h.svc.GetOrganizationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Organization", c.Param("id")))
+	}
+	result := org.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, org.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryOrganizationFHIR(c echo.Context) error {
+	org, err := h.svc.GetOrganizationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Organization", c.Param("id")))
+	}
+	result := org.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Organization", ResourceID: org.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: org.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// -- FHIR Location PATCH/vread/history --
+
+func (h *Handler) PatchLocationFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	existing, err := h.svc.GetLocationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Location", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if v, ok := patched["name"].(string); ok {
+		existing.Name = v
+	}
+	if err := h.svc.UpdateLocation(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) VreadLocationFHIR(c echo.Context) error {
+	loc, err := h.svc.GetLocationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Location", c.Param("id")))
+	}
+	result := loc.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, loc.CreatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryLocationFHIR(c echo.Context) error {
+	loc, err := h.svc.GetLocationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Location", c.Param("id")))
+	}
+	result := loc.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Location", ResourceID: loc.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: loc.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

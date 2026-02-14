@@ -25,6 +25,9 @@ type triageRepoPG struct{ pool *pgxpool.Pool }
 func NewTriageRepoPG(pool *pgxpool.Pool) TriageRepository { return &triageRepoPG{pool: pool} }
 
 func (r *triageRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -187,6 +190,9 @@ func NewEDTrackingRepoPG(pool *pgxpool.Pool) EDTrackingRepository {
 }
 
 func (r *edTrackingRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -364,6 +370,9 @@ type traumaRepoPG struct{ pool *pgxpool.Pool }
 func NewTraumaRepoPG(pool *pgxpool.Pool) TraumaRepository { return &traumaRepoPG{pool: pool} }
 
 func (r *traumaRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

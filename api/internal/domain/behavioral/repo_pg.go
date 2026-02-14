@@ -27,6 +27,9 @@ func NewPsychAssessmentRepoPG(pool *pgxpool.Pool) PsychAssessmentRepository {
 }
 
 func (r *psychAssessmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -170,6 +173,9 @@ func NewSafetyPlanRepoPG(pool *pgxpool.Pool) SafetyPlanRepository {
 }
 
 func (r *safetyPlanRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -301,6 +307,9 @@ func NewLegalHoldRepoPG(pool *pgxpool.Pool) LegalHoldRepository {
 }
 
 func (r *legalHoldRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -432,6 +441,9 @@ func NewSeclusionRestraintRepoPG(pool *pgxpool.Pool) SeclusionRestraintRepositor
 }
 
 func (r *seclusionRestraintRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -563,6 +575,9 @@ func NewGroupTherapyRepoPG(pool *pgxpool.Pool) GroupTherapyRepository {
 }
 
 func (r *groupTherapyRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

@@ -26,6 +26,9 @@ func NewCancerDiagnosisRepoPG(pool *pgxpool.Pool) CancerDiagnosisRepository {
 }
 
 func (r *cancerDiagnosisRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -141,6 +144,9 @@ func NewTreatmentProtocolRepoPG(pool *pgxpool.Pool) TreatmentProtocolRepository 
 }
 
 func (r *treatmentProtocolRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -257,6 +263,9 @@ func NewChemoCycleRepoPG(pool *pgxpool.Pool) ChemoCycleRepository {
 }
 
 func (r *chemoCycleRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -383,6 +392,9 @@ func NewRadiationTherapyRepoPG(pool *pgxpool.Pool) RadiationTherapyRepository {
 }
 
 func (r *radiationRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -509,6 +521,9 @@ func NewTumorMarkerRepoPG(pool *pgxpool.Pool) TumorMarkerRepository {
 }
 
 func (r *tumorMarkerRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -597,6 +612,9 @@ func NewTumorBoardRepoPG(pool *pgxpool.Pool) TumorBoardRepository {
 }
 
 func (r *tumorBoardRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

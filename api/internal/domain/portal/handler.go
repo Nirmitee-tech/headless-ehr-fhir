@@ -1,7 +1,10 @@
 package portal
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -65,7 +68,23 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
 	fhirWrite.POST("/Questionnaire", h.CreateQuestionnaireFHIR)
+	fhirWrite.PUT("/Questionnaire/:id", h.UpdateQuestionnaireFHIR)
+	fhirWrite.DELETE("/Questionnaire/:id", h.DeleteQuestionnaireFHIR)
+	fhirWrite.PATCH("/Questionnaire/:id", h.PatchQuestionnaireFHIR)
 	fhirWrite.POST("/QuestionnaireResponse", h.CreateQuestionnaireResponseFHIR)
+	fhirWrite.PUT("/QuestionnaireResponse/:id", h.UpdateQuestionnaireResponseFHIR)
+	fhirWrite.DELETE("/QuestionnaireResponse/:id", h.DeleteQuestionnaireResponseFHIR)
+	fhirWrite.PATCH("/QuestionnaireResponse/:id", h.PatchQuestionnaireResponseFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Questionnaire/_search", h.SearchQuestionnairesFHIR)
+	fhirRead.POST("/QuestionnaireResponse/_search", h.SearchQuestionnaireResponsesFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Questionnaire/:id/_history/:vid", h.VreadQuestionnaireFHIR)
+	fhirRead.GET("/Questionnaire/:id/_history", h.HistoryQuestionnaireFHIR)
+	fhirRead.GET("/QuestionnaireResponse/:id/_history/:vid", h.VreadQuestionnaireResponseFHIR)
+	fhirRead.GET("/QuestionnaireResponse/:id/_history", h.HistoryQuestionnaireResponseFHIR)
 }
 
 // -- Portal Account Handlers --
@@ -551,4 +570,207 @@ func (h *Handler) CreateQuestionnaireResponseFHIR(c echo.Context) error {
 	}
 	c.Response().Header().Set("Location", "/fhir/QuestionnaireResponse/"+qr.FHIRID)
 	return c.JSON(http.StatusCreated, qr.ToFHIR())
+}
+
+// -- FHIR Questionnaire PUT/DELETE/PATCH/vread/history --
+
+func (h *Handler) UpdateQuestionnaireFHIR(c echo.Context) error {
+	existing, err := h.svc.GetQuestionnaireByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Questionnaire", c.Param("id")))
+	}
+	var q Questionnaire
+	if err := c.Bind(&q); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	q.ID = existing.ID
+	q.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateQuestionnaire(c.Request().Context(), &q); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, q.ToFHIR())
+}
+
+func (h *Handler) DeleteQuestionnaireFHIR(c echo.Context) error {
+	q, err := h.svc.GetQuestionnaireByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Questionnaire", c.Param("id")))
+	}
+	if err := h.svc.DeleteQuestionnaire(c.Request().Context(), q.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) PatchQuestionnaireFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	existing, err := h.svc.GetQuestionnaireByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Questionnaire", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if v, ok := patched["name"].(string); ok {
+		existing.Name = v
+	}
+	if err := h.svc.UpdateQuestionnaire(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) VreadQuestionnaireFHIR(c echo.Context) error {
+	q, err := h.svc.GetQuestionnaireByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Questionnaire", c.Param("id")))
+	}
+	result := q.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, q.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryQuestionnaireFHIR(c echo.Context) error {
+	q, err := h.svc.GetQuestionnaireByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Questionnaire", c.Param("id")))
+	}
+	result := q.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Questionnaire", ResourceID: q.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: q.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// -- FHIR QuestionnaireResponse PUT/DELETE/PATCH/vread/history --
+
+func (h *Handler) UpdateQuestionnaireResponseFHIR(c echo.Context) error {
+	existing, err := h.svc.GetQuestionnaireResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("QuestionnaireResponse", c.Param("id")))
+	}
+	var qr QuestionnaireResponse
+	if err := c.Bind(&qr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	qr.ID = existing.ID
+	qr.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateQuestionnaireResponse(c.Request().Context(), &qr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, qr.ToFHIR())
+}
+
+func (h *Handler) DeleteQuestionnaireResponseFHIR(c echo.Context) error {
+	qr, err := h.svc.GetQuestionnaireResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("QuestionnaireResponse", c.Param("id")))
+	}
+	if err := h.svc.DeleteQuestionnaireResponse(c.Request().Context(), qr.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) PatchQuestionnaireResponseFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	existing, err := h.svc.GetQuestionnaireResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("QuestionnaireResponse", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateQuestionnaireResponse(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) VreadQuestionnaireResponseFHIR(c echo.Context) error {
+	qr, err := h.svc.GetQuestionnaireResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("QuestionnaireResponse", c.Param("id")))
+	}
+	result := qr.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, qr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryQuestionnaireResponseFHIR(c echo.Context) error {
+	qr, err := h.svc.GetQuestionnaireResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("QuestionnaireResponse", c.Param("id")))
+	}
+	result := qr.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "QuestionnaireResponse", ResourceID: qr.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: qr.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

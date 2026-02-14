@@ -733,3 +733,269 @@ func TestGenerateLaunchToken(t *testing.T) {
 		t.Error("expected unique tokens")
 	}
 }
+
+func TestLaunchContextStore_ConsumeExpired(t *testing.T) {
+	store := NewLaunchContextStore(50 * time.Millisecond)
+
+	ctx, _ := store.Create("patient-expire", "", "")
+	token := ctx.LaunchToken
+
+	// Wait for expiry
+	time.Sleep(100 * time.Millisecond)
+
+	consumed := store.Consume(token)
+	if consumed != nil {
+		t.Error("expected nil when consuming expired context")
+	}
+
+	// The token should have been cleaned up
+	got := store.Get(token)
+	if got != nil {
+		t.Error("expected nil after expired consume")
+	}
+}
+
+func TestLaunchContextStore_ConsumeNonExistent(t *testing.T) {
+	store := NewLaunchContextStore(5 * time.Minute)
+
+	consumed := store.Consume("nonexistent-token")
+	if consumed != nil {
+		t.Error("expected nil for non-existent token")
+	}
+}
+
+func TestSMARTScopeMiddleware(t *testing.T) {
+	e := echo.New()
+
+	handler := func(c echo.Context) error {
+		ctx := c.Request().Context()
+		scopes := SMARTScopesFromContext(ctx)
+		return c.JSON(http.StatusOK, map[string]int{"scopes": len(scopes)})
+	}
+
+	mw := SMARTScopeMiddleware()
+	e.GET("/test", handler, mw)
+
+	t.Run("parses scopes from context", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), UserScopesKey, []string{
+			"openid",
+			"patient/Patient.read",
+			"user/Observation.write",
+		})
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+
+		var result map[string]int
+		json.Unmarshal(rec.Body.Bytes(), &result)
+		if result["scopes"] != 2 {
+			t.Errorf("expected 2 parsed SMART scopes, got %d", result["scopes"])
+		}
+	})
+
+	t.Run("empty scopes", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+
+		var result map[string]int
+		json.Unmarshal(rec.Body.Bytes(), &result)
+		if result["scopes"] != 0 {
+			t.Errorf("expected 0 parsed SMART scopes, got %d", result["scopes"])
+		}
+	})
+}
+
+func TestParseSMARTScopes_AllNonResource(t *testing.T) {
+	scopes := []string{"openid", "profile", "fhirUser", "launch", "launch/patient"}
+	parsed := ParseSMARTScopes(scopes)
+	if len(parsed) != 0 {
+		t.Errorf("expected 0 parsed scopes for all non-resource scopes, got %d", len(parsed))
+	}
+}
+
+func TestParseSMARTScopes_Empty(t *testing.T) {
+	parsed := ParseSMARTScopes(nil)
+	if parsed != nil {
+		t.Errorf("expected nil for nil input, got %v", parsed)
+	}
+}
+
+func TestResourceMatches(t *testing.T) {
+	tests := []struct {
+		granted   string
+		requested string
+		want      bool
+	}{
+		{"Patient", "Patient", true},
+		{"*", "Patient", true},
+		{"*", "Observation", true},
+		{"Patient", "Observation", false},
+		{"Observation", "Patient", false},
+	}
+
+	for _, tt := range tests {
+		got := resourceMatches(tt.granted, tt.requested)
+		if got != tt.want {
+			t.Errorf("resourceMatches(%q, %q) = %v, want %v", tt.granted, tt.requested, got, tt.want)
+		}
+	}
+}
+
+func TestOperationMatches(t *testing.T) {
+	tests := []struct {
+		granted   string
+		requested string
+		want      bool
+	}{
+		{"read", "read", true},
+		{"write", "write", true},
+		{"*", "read", true},
+		{"*", "write", true},
+		{"read", "write", false},
+		{"write", "read", false},
+	}
+
+	for _, tt := range tests {
+		got := operationMatches(tt.granted, tt.requested)
+		if got != tt.want {
+			t.Errorf("operationMatches(%q, %q) = %v, want %v", tt.granted, tt.requested, got, tt.want)
+		}
+	}
+}
+
+func TestLaunchContextStore_ConcurrentAccess(t *testing.T) {
+	store := NewLaunchContextStore(5 * time.Minute)
+	done := make(chan bool, 20)
+
+	// Concurrent creates
+	for i := 0; i < 10; i++ {
+		go func(idx int) {
+			_, err := store.Create("patient", "", "")
+			if err != nil {
+				t.Errorf("concurrent create %d failed: %v", idx, err)
+			}
+			done <- true
+		}(i)
+	}
+
+	// Concurrent reads
+	for i := 0; i < 10; i++ {
+		go func() {
+			store.Get("nonexistent")
+			done <- true
+		}()
+	}
+
+	for i := 0; i < 20; i++ {
+		<-done
+	}
+}
+
+func TestSMARTConfiguration_Fields(t *testing.T) {
+	cfg := SMARTConfiguration{
+		AuthorizationEndpoint:    "http://auth.example.com/auth",
+		TokenEndpoint:            "http://auth.example.com/token",
+		TokenEndpointAuthMethods: []string{"client_secret_basic"},
+		GrantTypes:               []string{"authorization_code"},
+		Scopes:                   []string{"openid", "patient/*.read"},
+		ResponseTypes:            []string{"code"},
+		Capabilities:             []string{"launch-ehr"},
+		CodeChallengeMethodsSupported: []string{"S256"},
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(data, &result)
+
+	if result["authorization_endpoint"] != "http://auth.example.com/auth" {
+		t.Errorf("unexpected authorization_endpoint: %v", result["authorization_endpoint"])
+	}
+	if result["token_endpoint"] != "http://auth.example.com/token" {
+		t.Errorf("unexpected token_endpoint: %v", result["token_endpoint"])
+	}
+}
+
+func TestLaunchContext_Fields(t *testing.T) {
+	ctx := LaunchContext{
+		LaunchToken: "test-token",
+		PatientID:   "patient-1",
+		EncounterID: "enc-1",
+		FHIRUser:    "Practitioner/dr-1",
+		CreatedAt:   time.Now(),
+	}
+
+	data, err := json.Marshal(ctx)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(data, &result)
+
+	if result["launch"] != "test-token" {
+		t.Errorf("unexpected launch: %v", result["launch"])
+	}
+	if result["patient"] != "patient-1" {
+		t.Errorf("unexpected patient: %v", result["patient"])
+	}
+	if result["encounter"] != "enc-1" {
+		t.Errorf("unexpected encounter: %v", result["encounter"])
+	}
+	if result["fhirUser"] != "Practitioner/dr-1" {
+		t.Errorf("unexpected fhirUser: %v", result["fhirUser"])
+	}
+	// CreatedAt should not be serialized (json:"-")
+	if _, ok := result["CreatedAt"]; ok {
+		t.Error("CreatedAt should not be serialized")
+	}
+}
+
+func TestRequireSMARTScope_WriteOperations(t *testing.T) {
+	methods := []string{http.MethodPut, http.MethodPatch, http.MethodDelete}
+
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			e := echo.New()
+			handler := func(c echo.Context) error {
+				return c.String(http.StatusOK, "ok")
+			}
+
+			mw := RequireSMARTScope("Patient")
+
+			switch method {
+			case http.MethodPut:
+				e.PUT("/fhir/Patient/:id", handler, mw)
+			case http.MethodPatch:
+				e.PATCH("/fhir/Patient/:id", handler, mw)
+			case http.MethodDelete:
+				e.DELETE("/fhir/Patient/:id", handler, mw)
+			}
+
+			req := httptest.NewRequest(method, "/fhir/Patient/123", nil)
+			ctx := context.WithValue(req.Context(), SMARTScopesKey, []SMARTScope{
+				{Context: "patient", ResourceType: "Patient", Operation: "write"},
+			})
+			req = req.WithContext(ctx)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("expected 200 for %s with write scope, got %d", method, rec.Code)
+			}
+		})
+	}
+}

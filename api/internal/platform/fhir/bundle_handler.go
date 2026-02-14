@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/db"
 	"github.com/labstack/echo/v4"
 )
 
@@ -69,6 +70,19 @@ func (h *BundleHandler) ProcessBundle(c echo.Context) error {
 // processTransaction processes a transaction bundle atomically.
 // If any entry fails, all changes are rolled back.
 func (h *BundleHandler) processTransaction(c echo.Context, bundle *Bundle) error {
+	ctx := c.Request().Context()
+
+	txCtx, tx, err := db.WithTx(ctx)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, NewOutcomeBuilder().
+			AddIssue(IssueSeverityError, IssueTypeException,
+				"failed to begin transaction: "+err.Error()).
+			Build())
+	}
+
+	// Use the transaction context for all entry processing
+	c.SetRequest(c.Request().WithContext(txCtx))
+
 	responseEntries := make([]BundleEntry, len(bundle.Entry))
 
 	for i, entry := range bundle.Entry {
@@ -77,7 +91,9 @@ func (h *BundleHandler) processTransaction(c echo.Context, bundle *Bundle) error
 		respEntry, err := h.processor.ProcessEntry(c, method, resourceType, resourceID, entry.Resource)
 		if err != nil {
 			// Transaction: any failure rolls back everything.
-			// Return an OperationOutcome for the failed entry.
+			_ = tx.Rollback(ctx)
+			// Restore original context
+			c.SetRequest(c.Request().WithContext(ctx))
 			return c.JSON(http.StatusBadRequest, NewOutcomeBuilder().
 				AddIssue(IssueSeverityError, IssueTypeProcessing,
 					fmt.Sprintf("transaction failed at entry[%d]: %s", i, err.Error())).
@@ -86,6 +102,17 @@ func (h *BundleHandler) processTransaction(c echo.Context, bundle *Bundle) error
 		responseEntries[i] = respEntry
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		// Restore original context
+		c.SetRequest(c.Request().WithContext(ctx))
+		return c.JSON(http.StatusInternalServerError, NewOutcomeBuilder().
+			AddIssue(IssueSeverityError, IssueTypeException,
+				"failed to commit transaction: "+err.Error()).
+			Build())
+	}
+
+	// Restore original context
+	c.SetRequest(c.Request().WithContext(ctx))
 	return c.JSON(http.StatusOK, NewTransactionResponse(responseEntries))
 }
 

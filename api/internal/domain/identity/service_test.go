@@ -443,6 +443,281 @@ func TestPractitionerRole_Validation(t *testing.T) {
 	}
 }
 
+func TestGetPatientByFHIRID(t *testing.T) {
+	svc := newTestService()
+	p := &Patient{FirstName: "Jane", LastName: "Smith", MRN: "MRN-F1"}
+	svc.CreatePatient(context.Background(), p)
+
+	fetched, err := svc.GetPatientByFHIRID(context.Background(), p.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != p.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetPatientByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPatientByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdatePatient(t *testing.T) {
+	svc := newTestService()
+	p := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-U1"}
+	svc.CreatePatient(context.Background(), p)
+
+	p.FirstName = "Jonathan"
+	err := svc.UpdatePatient(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdatePatient_NameRequired(t *testing.T) {
+	svc := newTestService()
+	p := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-U2"}
+	svc.CreatePatient(context.Background(), p)
+
+	p.FirstName = ""
+	err := svc.UpdatePatient(context.Background(), p)
+	if err == nil {
+		t.Error("expected error for missing first_name")
+	}
+}
+
+func TestListPatients(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePatient(context.Background(), &Patient{FirstName: "A", LastName: "B", MRN: "M1"})
+	svc.CreatePatient(context.Background(), &Patient{FirstName: "C", LastName: "D", MRN: "M2"})
+
+	result, total, err := svc.ListPatients(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestSearchPatients(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePatient(context.Background(), &Patient{FirstName: "John", LastName: "Doe", MRN: "M-S1"})
+
+	result, total, err := svc.SearchPatients(context.Background(), map[string]string{"name": "Doe"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestRemovePatientContact(t *testing.T) {
+	svc := newTestService()
+	p := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-RC"}
+	svc.CreatePatient(context.Background(), p)
+
+	name := "Jane"
+	contact := &PatientContact{PatientID: p.ID, Relationship: "emergency", FirstName: &name}
+	svc.AddPatientContact(context.Background(), contact)
+
+	err := svc.RemovePatientContact(context.Background(), contact.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	contacts, _ := svc.GetPatientContacts(context.Background(), p.ID)
+	if len(contacts) != 0 {
+		t.Errorf("expected 0 contacts after removal, got %d", len(contacts))
+	}
+}
+
+func TestRemovePatientIdentifier(t *testing.T) {
+	svc := newTestService()
+	p := &Patient{FirstName: "John", LastName: "Doe", MRN: "MRN-RI"}
+	svc.CreatePatient(context.Background(), p)
+
+	ident := &PatientIdentifier{PatientID: p.ID, SystemURI: "http://hospital.com/mrn", Value: "MRN-RI"}
+	svc.AddPatientIdentifier(context.Background(), ident)
+
+	err := svc.RemovePatientIdentifier(context.Background(), ident.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	idents, _ := svc.GetPatientIdentifiers(context.Background(), p.ID)
+	if len(idents) != 0 {
+		t.Errorf("expected 0 identifiers after removal, got %d", len(idents))
+	}
+}
+
+func TestGetPractitioner(t *testing.T) {
+	svc := newTestService()
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson"}
+	svc.CreatePractitioner(context.Background(), p)
+
+	fetched, err := svc.GetPractitioner(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.FirstName != "Sarah" {
+		t.Errorf("expected Sarah, got %s", fetched.FirstName)
+	}
+}
+
+func TestGetPractitioner_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPractitioner(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetPractitionerByFHIRID(t *testing.T) {
+	svc := newTestService()
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson"}
+	svc.CreatePractitioner(context.Background(), p)
+
+	fetched, err := svc.GetPractitionerByFHIRID(context.Background(), p.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != p.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetPractitionerByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPractitionerByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetPractitionerByNPI(t *testing.T) {
+	svc := newTestService()
+	npi := "1234567890"
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson", NPINumber: &npi}
+	svc.CreatePractitioner(context.Background(), p)
+
+	fetched, err := svc.GetPractitionerByNPI(context.Background(), "1234567890")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != p.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetPractitionerByNPI_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPractitionerByNPI(context.Background(), "0000000000")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdatePractitioner(t *testing.T) {
+	svc := newTestService()
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson"}
+	svc.CreatePractitioner(context.Background(), p)
+
+	p.FirstName = "Dr. Sarah"
+	err := svc.UpdatePractitioner(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdatePractitioner_NameRequired(t *testing.T) {
+	svc := newTestService()
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson"}
+	svc.CreatePractitioner(context.Background(), p)
+
+	p.FirstName = ""
+	err := svc.UpdatePractitioner(context.Background(), p)
+	if err == nil {
+		t.Error("expected error for missing first_name")
+	}
+}
+
+func TestDeletePractitioner(t *testing.T) {
+	svc := newTestService()
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson"}
+	svc.CreatePractitioner(context.Background(), p)
+	err := svc.DeletePractitioner(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetPractitioner(context.Background(), p.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListPractitioners(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePractitioner(context.Background(), &Practitioner{FirstName: "A", LastName: "B"})
+	svc.CreatePractitioner(context.Background(), &Practitioner{FirstName: "C", LastName: "D"})
+
+	result, total, err := svc.ListPractitioners(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestSearchPractitioners(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePractitioner(context.Background(), &Practitioner{FirstName: "Sarah", LastName: "Johnson"})
+
+	result, total, err := svc.SearchPractitioners(context.Background(), map[string]string{"name": "Johnson"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestRemovePractitionerRole(t *testing.T) {
+	svc := newTestService()
+	p := &Practitioner{FirstName: "Sarah", LastName: "Johnson"}
+	svc.CreatePractitioner(context.Background(), p)
+
+	role := &PractitionerRole{PractitionerID: p.ID, RoleCode: "doctor"}
+	svc.AddPractitionerRole(context.Background(), role)
+
+	err := svc.RemovePractitionerRole(context.Background(), role.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	roles, _ := svc.GetPractitionerRoles(context.Background(), p.ID)
+	if len(roles) != 0 {
+		t.Errorf("expected 0 roles after removal, got %d", len(roles))
+	}
+}
+
 func TestPatientToFHIR(t *testing.T) {
 	mobile := "+1-555-9999"
 	email := "john@example.com"

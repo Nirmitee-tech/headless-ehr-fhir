@@ -27,6 +27,9 @@ type querier interface {
 }
 
 func (r *repoPG) conn(ctx context.Context) querier {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

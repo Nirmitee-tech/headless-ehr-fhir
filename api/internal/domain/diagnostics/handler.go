@@ -1,7 +1,10 @@
 package diagnostics
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -63,9 +66,37 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "lab_tech", "radiologist"))
 	fhirWrite.POST("/ServiceRequest", h.CreateServiceRequestFHIR)
+	fhirWrite.PUT("/ServiceRequest/:id", h.UpdateServiceRequestFHIR)
+	fhirWrite.DELETE("/ServiceRequest/:id", h.DeleteServiceRequestFHIR)
+	fhirWrite.PATCH("/ServiceRequest/:id", h.PatchServiceRequestFHIR)
 	fhirWrite.POST("/DiagnosticReport", h.CreateDiagnosticReportFHIR)
+	fhirWrite.PUT("/DiagnosticReport/:id", h.UpdateDiagnosticReportFHIR)
+	fhirWrite.DELETE("/DiagnosticReport/:id", h.DeleteDiagnosticReportFHIR)
+	fhirWrite.PATCH("/DiagnosticReport/:id", h.PatchDiagnosticReportFHIR)
 	fhirWrite.POST("/Specimen", h.CreateSpecimenFHIR)
+	fhirWrite.PUT("/Specimen/:id", h.UpdateSpecimenFHIR)
+	fhirWrite.DELETE("/Specimen/:id", h.DeleteSpecimenFHIR)
+	fhirWrite.PATCH("/Specimen/:id", h.PatchSpecimenFHIR)
 	fhirWrite.POST("/ImagingStudy", h.CreateImagingStudyFHIR)
+	fhirWrite.PUT("/ImagingStudy/:id", h.UpdateImagingStudyFHIR)
+	fhirWrite.DELETE("/ImagingStudy/:id", h.DeleteImagingStudyFHIR)
+	fhirWrite.PATCH("/ImagingStudy/:id", h.PatchImagingStudyFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/ServiceRequest/_search", h.SearchServiceRequestsFHIR)
+	fhirRead.POST("/DiagnosticReport/_search", h.SearchDiagnosticReportsFHIR)
+	fhirRead.POST("/Specimen/_search", h.SearchSpecimensFHIR)
+	fhirRead.POST("/ImagingStudy/_search", h.SearchImagingStudiesFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/ServiceRequest/:id/_history/:vid", h.VreadServiceRequestFHIR)
+	fhirRead.GET("/ServiceRequest/:id/_history", h.HistoryServiceRequestFHIR)
+	fhirRead.GET("/DiagnosticReport/:id/_history/:vid", h.VreadDiagnosticReportFHIR)
+	fhirRead.GET("/DiagnosticReport/:id/_history", h.HistoryDiagnosticReportFHIR)
+	fhirRead.GET("/ImagingStudy/:id/_history/:vid", h.VreadImagingStudyFHIR)
+	fhirRead.GET("/ImagingStudy/:id/_history", h.HistoryImagingStudyFHIR)
+	fhirRead.GET("/Specimen/:id/_history/:vid", h.VreadSpecimenFHIR)
+	fhirRead.GET("/Specimen/:id/_history", h.HistorySpecimenFHIR)
 }
 
 // -- ServiceRequest Handlers --
@@ -559,4 +590,396 @@ func (h *Handler) CreateImagingStudyFHIR(c echo.Context) error {
 	}
 	c.Response().Header().Set("Location", "/fhir/ImagingStudy/"+is.FHIRID)
 	return c.JSON(http.StatusCreated, is.ToFHIR())
+}
+
+// -- FHIR Update Endpoints --
+
+func (h *Handler) UpdateServiceRequestFHIR(c echo.Context) error {
+	var sr ServiceRequest
+	if err := c.Bind(&sr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetServiceRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ServiceRequest", c.Param("id")))
+	}
+	sr.ID = existing.ID
+	sr.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateServiceRequest(c.Request().Context(), &sr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, sr.ToFHIR())
+}
+
+func (h *Handler) UpdateDiagnosticReportFHIR(c echo.Context) error {
+	var dr DiagnosticReport
+	if err := c.Bind(&dr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetDiagnosticReportByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DiagnosticReport", c.Param("id")))
+	}
+	dr.ID = existing.ID
+	dr.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateDiagnosticReport(c.Request().Context(), &dr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, dr.ToFHIR())
+}
+
+func (h *Handler) UpdateSpecimenFHIR(c echo.Context) error {
+	var sp Specimen
+	if err := c.Bind(&sp); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetSpecimenByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Specimen", c.Param("id")))
+	}
+	sp.ID = existing.ID
+	sp.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateSpecimen(c.Request().Context(), &sp); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, sp.ToFHIR())
+}
+
+func (h *Handler) UpdateImagingStudyFHIR(c echo.Context) error {
+	var is ImagingStudy
+	if err := c.Bind(&is); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetImagingStudyByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ImagingStudy", c.Param("id")))
+	}
+	is.ID = existing.ID
+	is.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateImagingStudy(c.Request().Context(), &is); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, is.ToFHIR())
+}
+
+// -- FHIR Delete Endpoints --
+
+func (h *Handler) DeleteServiceRequestFHIR(c echo.Context) error {
+	existing, err := h.svc.GetServiceRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ServiceRequest", c.Param("id")))
+	}
+	if err := h.svc.DeleteServiceRequest(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteDiagnosticReportFHIR(c echo.Context) error {
+	existing, err := h.svc.GetDiagnosticReportByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DiagnosticReport", c.Param("id")))
+	}
+	if err := h.svc.DeleteDiagnosticReport(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteSpecimenFHIR(c echo.Context) error {
+	existing, err := h.svc.GetSpecimenByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Specimen", c.Param("id")))
+	}
+	if err := h.svc.DeleteSpecimen(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteImagingStudyFHIR(c echo.Context) error {
+	existing, err := h.svc.GetImagingStudyByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ImagingStudy", c.Param("id")))
+	}
+	if err := h.svc.DeleteImagingStudy(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PATCH Endpoints --
+
+func (h *Handler) PatchServiceRequestFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetServiceRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ServiceRequest", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateServiceRequest(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) PatchDiagnosticReportFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetDiagnosticReportByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DiagnosticReport", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateDiagnosticReport(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) PatchSpecimenFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetSpecimenByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Specimen", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateSpecimen(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) PatchImagingStudyFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetImagingStudyByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ImagingStudy", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateImagingStudy(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+// -- FHIR vread and history endpoints --
+
+func (h *Handler) VreadServiceRequestFHIR(c echo.Context) error {
+	sr, err := h.svc.GetServiceRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ServiceRequest", c.Param("id")))
+	}
+	result := sr.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, sr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryServiceRequestFHIR(c echo.Context) error {
+	sr, err := h.svc.GetServiceRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ServiceRequest", c.Param("id")))
+	}
+	result := sr.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "ServiceRequest", ResourceID: sr.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: sr.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadDiagnosticReportFHIR(c echo.Context) error {
+	dr, err := h.svc.GetDiagnosticReportByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DiagnosticReport", c.Param("id")))
+	}
+	result := dr.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, dr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryDiagnosticReportFHIR(c echo.Context) error {
+	dr, err := h.svc.GetDiagnosticReportByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DiagnosticReport", c.Param("id")))
+	}
+	result := dr.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "DiagnosticReport", ResourceID: dr.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: dr.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadImagingStudyFHIR(c echo.Context) error {
+	is, err := h.svc.GetImagingStudyByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ImagingStudy", c.Param("id")))
+	}
+	result := is.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, is.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryImagingStudyFHIR(c echo.Context) error {
+	is, err := h.svc.GetImagingStudyByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ImagingStudy", c.Param("id")))
+	}
+	result := is.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "ImagingStudy", ResourceID: is.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: is.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadSpecimenFHIR(c echo.Context) error {
+	sp, err := h.svc.GetSpecimenByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Specimen", c.Param("id")))
+	}
+	result := sp.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, sp.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistorySpecimenFHIR(c echo.Context) error {
+	sp, err := h.svc.GetSpecimenByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Specimen", c.Param("id")))
+	}
+	result := sp.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Specimen", ResourceID: sp.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: sp.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

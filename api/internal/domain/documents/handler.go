@@ -1,7 +1,10 @@
 package documents
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -60,8 +63,30 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
 	fhirWrite.POST("/Consent", h.CreateConsentFHIR)
+	fhirWrite.PUT("/Consent/:id", h.UpdateConsentFHIR)
+	fhirWrite.DELETE("/Consent/:id", h.DeleteConsentFHIR)
+	fhirWrite.PATCH("/Consent/:id", h.PatchConsentFHIR)
 	fhirWrite.POST("/DocumentReference", h.CreateDocumentReferenceFHIR)
+	fhirWrite.PUT("/DocumentReference/:id", h.UpdateDocumentReferenceFHIR)
+	fhirWrite.DELETE("/DocumentReference/:id", h.DeleteDocumentReferenceFHIR)
+	fhirWrite.PATCH("/DocumentReference/:id", h.PatchDocumentReferenceFHIR)
 	fhirWrite.POST("/Composition", h.CreateCompositionFHIR)
+	fhirWrite.PUT("/Composition/:id", h.UpdateCompositionFHIR)
+	fhirWrite.DELETE("/Composition/:id", h.DeleteCompositionFHIR)
+	fhirWrite.PATCH("/Composition/:id", h.PatchCompositionFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Consent/_search", h.SearchConsentsFHIR)
+	fhirRead.POST("/DocumentReference/_search", h.SearchDocumentReferencesFHIR)
+	fhirRead.POST("/Composition/_search", h.SearchCompositionsFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Consent/:id/_history/:vid", h.VreadConsentFHIR)
+	fhirRead.GET("/Consent/:id/_history", h.HistoryConsentFHIR)
+	fhirRead.GET("/DocumentReference/:id/_history/:vid", h.VreadDocumentReferenceFHIR)
+	fhirRead.GET("/DocumentReference/:id/_history", h.HistoryDocumentReferenceFHIR)
+	fhirRead.GET("/Composition/:id/_history/:vid", h.VreadCompositionFHIR)
+	fhirRead.GET("/Composition/:id/_history", h.HistoryCompositionFHIR)
 }
 
 // -- Consent Handlers --
@@ -501,4 +526,276 @@ func (h *Handler) CreateCompositionFHIR(c echo.Context) error {
 	}
 	c.Response().Header().Set("Location", "/fhir/Composition/"+comp.FHIRID)
 	return c.JSON(http.StatusCreated, comp.ToFHIR())
+}
+
+// -- FHIR Update Endpoints --
+
+func (h *Handler) UpdateConsentFHIR(c echo.Context) error {
+	var consent Consent
+	if err := c.Bind(&consent); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetConsentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
+	}
+	consent.ID = existing.ID
+	consent.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateConsent(c.Request().Context(), &consent); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, consent.ToFHIR())
+}
+
+func (h *Handler) UpdateDocumentReferenceFHIR(c echo.Context) error {
+	var doc DocumentReference
+	if err := c.Bind(&doc); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
+	}
+	doc.ID = existing.ID
+	doc.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateDocumentReference(c.Request().Context(), &doc); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, doc.ToFHIR())
+}
+
+func (h *Handler) UpdateCompositionFHIR(c echo.Context) error {
+	var comp Composition
+	if err := c.Bind(&comp); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
+	}
+	comp.ID = existing.ID
+	comp.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateComposition(c.Request().Context(), &comp); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, comp.ToFHIR())
+}
+
+// -- FHIR Delete Endpoints --
+
+func (h *Handler) DeleteConsentFHIR(c echo.Context) error {
+	existing, err := h.svc.GetConsentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
+	}
+	if err := h.svc.DeleteConsent(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteDocumentReferenceFHIR(c echo.Context) error {
+	existing, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
+	}
+	if err := h.svc.DeleteDocumentReference(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteCompositionFHIR(c echo.Context) error {
+	existing, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
+	}
+	if err := h.svc.DeleteComposition(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PATCH Endpoints --
+
+func (h *Handler) PatchConsentFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Consent", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetConsentByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateConsent(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) PatchDocumentReferenceFHIR(c echo.Context) error {
+	return h.handlePatch(c, "DocumentReference", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetDocumentReferenceByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateDocumentReference(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) PatchCompositionFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Composition", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetCompositionByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateComposition(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+// handlePatch dispatches to JSON Patch or Merge Patch based on Content-Type.
+func (h *Handler) handlePatch(c echo.Context, resourceType, fhirID string, applyFn func(echo.Context, map[string]interface{}) error) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	// Get current resource as FHIR map
+	var currentResource map[string]interface{}
+	switch resourceType {
+	case "Consent":
+		existing, err := h.svc.GetConsentByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "DocumentReference":
+		existing, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "Composition":
+		existing, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	default:
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("unsupported resource type for PATCH"))
+	}
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	return applyFn(c, patched)
+}
+
+// -- FHIR vread and history endpoints --
+
+func (h *Handler) VreadConsentFHIR(c echo.Context) error {
+	consent, err := h.svc.GetConsentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
+	}
+	result := consent.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, consent.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryConsentFHIR(c echo.Context) error {
+	consent, err := h.svc.GetConsentByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
+	}
+	result := consent.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Consent", ResourceID: consent.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: consent.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadDocumentReferenceFHIR(c echo.Context) error {
+	doc, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
+	}
+	result := doc.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, doc.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryDocumentReferenceFHIR(c echo.Context) error {
+	doc, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
+	}
+	result := doc.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "DocumentReference", ResourceID: doc.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: doc.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadCompositionFHIR(c echo.Context) error {
+	comp, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
+	}
+	result := comp.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, comp.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryCompositionFHIR(c echo.Context) error {
+	comp, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
+	}
+	result := comp.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Composition", ResourceID: comp.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: comp.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

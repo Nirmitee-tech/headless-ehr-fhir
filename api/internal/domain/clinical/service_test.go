@@ -825,3 +825,396 @@ func TestProcedureToFHIR(t *testing.T) {
 		t.Errorf("expected status 'completed', got %v", f["status"])
 	}
 }
+
+// =========== Additional Condition Tests ===========
+
+func TestGetConditionByFHIRID(t *testing.T) {
+	svc := newTestService()
+	c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI"}
+	svc.CreateCondition(context.Background(), c)
+
+	got, err := svc.GetConditionByFHIRID(context.Background(), c.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != c.ID {
+		t.Errorf("expected ID %v, got %v", c.ID, got.ID)
+	}
+}
+
+func TestGetConditionByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetConditionByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestUpdateCondition_ValidStatus(t *testing.T) {
+	svc := newTestService()
+	c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI"}
+	svc.CreateCondition(context.Background(), c)
+	c.ClinicalStatus = "resolved"
+	if err := svc.UpdateCondition(context.Background(), c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateCondition_NotFound(t *testing.T) {
+	svc := newTestService()
+	c := &Condition{ID: uuid.New(), ClinicalStatus: "active"}
+	if err := svc.UpdateCondition(context.Background(), c); err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestSearchConditions(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateCondition(context.Background(), &Condition{PatientID: pid, CodeValue: "J06.9", CodeDisplay: "URI"})
+	items, total, err := svc.SearchConditions(context.Background(), map[string]string{"code": "J06.9"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+func TestCreateCondition_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active", "recurrence", "relapse", "inactive", "remission", "resolved"} {
+		svc := newTestService()
+		c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI", ClinicalStatus: s}
+		if err := svc.CreateCondition(context.Background(), c); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+// =========== Additional Observation Tests ===========
+
+func TestGetObservation(t *testing.T) {
+	svc := newTestService()
+	o := &Observation{PatientID: uuid.New(), CodeValue: "8310-5"}
+	svc.CreateObservation(context.Background(), o)
+
+	got, err := svc.GetObservation(context.Background(), o.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != o.ID {
+		t.Errorf("expected ID %v, got %v", o.ID, got.ID)
+	}
+}
+
+func TestGetObservation_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetObservation(context.Background(), uuid.New())
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestGetObservationByFHIRID(t *testing.T) {
+	svc := newTestService()
+	o := &Observation{PatientID: uuid.New(), CodeValue: "8310-5"}
+	svc.CreateObservation(context.Background(), o)
+
+	got, err := svc.GetObservationByFHIRID(context.Background(), o.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != o.ID {
+		t.Errorf("expected ID %v, got %v", o.ID, got.ID)
+	}
+}
+
+func TestGetObservationByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetObservationByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestUpdateObservation(t *testing.T) {
+	svc := newTestService()
+	o := &Observation{PatientID: uuid.New(), CodeValue: "8310-5"}
+	svc.CreateObservation(context.Background(), o)
+	o.Status = "amended"
+	if err := svc.UpdateObservation(context.Background(), o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateObservation_NotFound(t *testing.T) {
+	svc := newTestService()
+	o := &Observation{ID: uuid.New()}
+	if err := svc.UpdateObservation(context.Background(), o); err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestDeleteObservation(t *testing.T) {
+	svc := newTestService()
+	o := &Observation{PatientID: uuid.New(), CodeValue: "8310-5"}
+	svc.CreateObservation(context.Background(), o)
+	if err := svc.DeleteObservation(context.Background(), o.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err := svc.GetObservation(context.Background(), o.ID)
+	if err == nil {
+		t.Fatal("expected error after delete")
+	}
+}
+
+func TestListObservationsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateObservation(context.Background(), &Observation{PatientID: pid, CodeValue: "8310-5"})
+	svc.CreateObservation(context.Background(), &Observation{PatientID: pid, CodeValue: "8462-4"})
+	svc.CreateObservation(context.Background(), &Observation{PatientID: uuid.New(), CodeValue: "8480-6"})
+
+	items, total, err := svc.ListObservationsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2 observations, got %d", total)
+	}
+}
+
+func TestSearchObservations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateObservation(context.Background(), &Observation{PatientID: uuid.New(), CodeValue: "8310-5"})
+	items, total, err := svc.SearchObservations(context.Background(), map[string]string{"code": "8310-5"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// =========== Additional Allergy Tests ===========
+
+func TestGetAllergy(t *testing.T) {
+	svc := newTestService()
+	a := &AllergyIntolerance{PatientID: uuid.New()}
+	svc.CreateAllergy(context.Background(), a)
+
+	got, err := svc.GetAllergy(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != a.ID {
+		t.Errorf("expected ID %v, got %v", a.ID, got.ID)
+	}
+}
+
+func TestGetAllergy_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetAllergy(context.Background(), uuid.New())
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestGetAllergyByFHIRID(t *testing.T) {
+	svc := newTestService()
+	a := &AllergyIntolerance{PatientID: uuid.New()}
+	svc.CreateAllergy(context.Background(), a)
+
+	got, err := svc.GetAllergyByFHIRID(context.Background(), a.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != a.ID {
+		t.Errorf("expected ID %v, got %v", a.ID, got.ID)
+	}
+}
+
+func TestGetAllergyByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetAllergyByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestUpdateAllergy(t *testing.T) {
+	svc := newTestService()
+	a := &AllergyIntolerance{PatientID: uuid.New()}
+	svc.CreateAllergy(context.Background(), a)
+	resolved := "resolved"
+	a.ClinicalStatus = &resolved
+	if err := svc.UpdateAllergy(context.Background(), a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateAllergy_NotFound(t *testing.T) {
+	svc := newTestService()
+	a := &AllergyIntolerance{ID: uuid.New()}
+	if err := svc.UpdateAllergy(context.Background(), a); err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestDeleteAllergy(t *testing.T) {
+	svc := newTestService()
+	a := &AllergyIntolerance{PatientID: uuid.New()}
+	svc.CreateAllergy(context.Background(), a)
+	if err := svc.DeleteAllergy(context.Background(), a.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err := svc.GetAllergy(context.Background(), a.ID)
+	if err == nil {
+		t.Fatal("expected error after delete")
+	}
+}
+
+func TestListAllergiesByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateAllergy(context.Background(), &AllergyIntolerance{PatientID: pid})
+	svc.CreateAllergy(context.Background(), &AllergyIntolerance{PatientID: pid})
+	svc.CreateAllergy(context.Background(), &AllergyIntolerance{PatientID: uuid.New()})
+
+	items, total, err := svc.ListAllergiesByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2 allergies, got %d", total)
+	}
+}
+
+func TestSearchAllergies(t *testing.T) {
+	svc := newTestService()
+	svc.CreateAllergy(context.Background(), &AllergyIntolerance{PatientID: uuid.New()})
+	items, total, err := svc.SearchAllergies(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// =========== Additional Procedure Tests ===========
+
+func TestGetProcedure(t *testing.T) {
+	svc := newTestService()
+	p := &ProcedureRecord{PatientID: uuid.New(), CodeValue: "80146002"}
+	svc.CreateProcedure(context.Background(), p)
+
+	got, err := svc.GetProcedure(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != p.ID {
+		t.Errorf("expected ID %v, got %v", p.ID, got.ID)
+	}
+}
+
+func TestGetProcedure_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetProcedure(context.Background(), uuid.New())
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestGetProcedureByFHIRID(t *testing.T) {
+	svc := newTestService()
+	p := &ProcedureRecord{PatientID: uuid.New(), CodeValue: "80146002"}
+	svc.CreateProcedure(context.Background(), p)
+
+	got, err := svc.GetProcedureByFHIRID(context.Background(), p.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != p.ID {
+		t.Errorf("expected ID %v, got %v", p.ID, got.ID)
+	}
+}
+
+func TestGetProcedureByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetProcedureByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestUpdateProcedure(t *testing.T) {
+	svc := newTestService()
+	p := &ProcedureRecord{PatientID: uuid.New(), CodeValue: "80146002"}
+	svc.CreateProcedure(context.Background(), p)
+	p.Status = "in-progress"
+	if err := svc.UpdateProcedure(context.Background(), p); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateProcedure_NotFound(t *testing.T) {
+	svc := newTestService()
+	p := &ProcedureRecord{ID: uuid.New()}
+	if err := svc.UpdateProcedure(context.Background(), p); err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestDeleteProcedure(t *testing.T) {
+	svc := newTestService()
+	p := &ProcedureRecord{PatientID: uuid.New(), CodeValue: "80146002"}
+	svc.CreateProcedure(context.Background(), p)
+	if err := svc.DeleteProcedure(context.Background(), p.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err := svc.GetProcedure(context.Background(), p.ID)
+	if err == nil {
+		t.Fatal("expected error after delete")
+	}
+}
+
+func TestListProceduresByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateProcedure(context.Background(), &ProcedureRecord{PatientID: pid, CodeValue: "80146002"})
+	svc.CreateProcedure(context.Background(), &ProcedureRecord{PatientID: pid, CodeValue: "44950"})
+	svc.CreateProcedure(context.Background(), &ProcedureRecord{PatientID: uuid.New(), CodeValue: "47562"})
+
+	items, total, err := svc.ListProceduresByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2 procedures, got %d", total)
+	}
+}
+
+func TestSearchProcedures(t *testing.T) {
+	svc := newTestService()
+	svc.CreateProcedure(context.Background(), &ProcedureRecord{PatientID: uuid.New(), CodeValue: "80146002"})
+	items, total, err := svc.SearchProcedures(context.Background(), map[string]string{"code": "80146002"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(items) < 1 {
+		t.Error("expected items")
+	}
+}

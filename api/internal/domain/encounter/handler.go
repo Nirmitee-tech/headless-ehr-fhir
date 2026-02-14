@@ -1,7 +1,10 @@
 package encounter
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -47,6 +50,14 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirWrite.POST("/Encounter", h.CreateEncounterFHIR)
 	fhirWrite.PUT("/Encounter/:id", h.UpdateEncounterFHIR)
 	fhirWrite.DELETE("/Encounter/:id", h.DeleteEncounterFHIR)
+	fhirWrite.PATCH("/Encounter/:id", h.PatchEncounterFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Encounter/_search", h.SearchEncountersFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Encounter/:id/_history/:vid", h.VreadEncounterFHIR)
+	fhirRead.GET("/Encounter/:id/_history", h.HistoryEncounterFHIR)
 }
 
 // -- Operational Handlers --
@@ -278,4 +289,73 @@ func (h *Handler) DeleteEncounterFHIR(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PATCH Endpoints --
+
+func (h *Handler) PatchEncounterFHIR(c echo.Context) error {
+	ctx := c.Request().Context()
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetEncounterByFHIRID(ctx, c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Encounter", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome("PATCH requires application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if err := h.svc.UpdateEncounter(ctx, existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+// -- FHIR vread and history endpoints --
+
+func (h *Handler) VreadEncounterFHIR(c echo.Context) error {
+	enc, err := h.svc.GetEncounterByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Encounter", c.Param("id")))
+	}
+	result := enc.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, enc.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryEncounterFHIR(c echo.Context) error {
+	enc, err := h.svc.GetEncounterByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Encounter", c.Param("id")))
+	}
+	result := enc.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Encounter", ResourceID: enc.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: enc.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

@@ -23,6 +23,9 @@ func NewOrganizationRepo(pool *pgxpool.Pool) OrganizationRepository {
 }
 
 func (r *orgRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -224,6 +227,9 @@ func NewDepartmentRepo(pool *pgxpool.Pool) DepartmentRepository {
 }
 
 func (r *deptRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -305,6 +311,9 @@ func NewLocationRepo(pool *pgxpool.Pool) LocationRepository {
 }
 
 func (r *locRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -435,6 +444,9 @@ func NewSystemUserRepo(pool *pgxpool.Pool) SystemUserRepository {
 }
 
 func (r *userRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

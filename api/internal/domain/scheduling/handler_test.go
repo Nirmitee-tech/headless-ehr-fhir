@@ -351,6 +351,650 @@ func TestHandler_DeleteWaitlistEntry(t *testing.T) {
 	}
 }
 
+// -- List/Update Tests --
+
+func TestHandler_ListSchedules(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListSchedules(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateSchedule(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	body := `{"practitioner_id":"` + s.PractitionerID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.ID.String())
+	err := h.UpdateSchedule(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListSlots(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListSlots(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateSlot(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	start := time.Now().Format(time.RFC3339)
+	end := time.Now().Add(60 * time.Minute).Format(time.RFC3339)
+	body := `{"schedule_id":"` + sl.ScheduleID.String() + `","start_time":"` + start + `","end_time":"` + end + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(sl.ID.String())
+	err := h.UpdateSlot(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_ListAppointments(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListAppointments(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateAppointment(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	body := `{"patient_id":"` + a.PatientID.String() + `","start_time":"` + start.Format(time.RFC3339) + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.ID.String())
+	err := h.UpdateAppointment(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetParticipants(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	p := &AppointmentParticipant{AppointmentID: a.ID, ActorType: "Practitioner", ActorID: uuid.New()}
+	h.svc.AddAppointmentParticipant(nil, p)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.ID.String())
+	err := h.GetParticipants(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateWaitlistEntry(t *testing.T) {
+	h, e := newTestHandler()
+	w := &Waitlist{PatientID: uuid.New()}
+	h.svc.CreateWaitlistEntry(nil, w)
+	body := `{"patient_id":"` + w.PatientID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(w.ID.String())
+	err := h.UpdateWaitlistEntry(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+// -- FHIR Schedule Endpoints --
+
+func TestHandler_SearchSchedulesFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/fhir/Schedule", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.SearchSchedulesFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Bundle") {
+		t.Error("expected Bundle in response")
+	}
+}
+
+func TestHandler_GetScheduleFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	err := h.GetScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetScheduleFHIR_NotFound(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("nonexistent")
+	_ = h.GetScheduleFHIR(c)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CreateScheduleFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	body := `{"practitioner_id":"` + uuid.New().String() + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.CreateScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if loc == "" || !strings.Contains(loc, "/fhir/Schedule/") {
+		t.Errorf("expected Location header, got %q", loc)
+	}
+}
+
+func TestHandler_UpdateScheduleFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	body := `{"practitioner_id":"` + s.PractitionerID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	err := h.UpdateScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_DeleteScheduleFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	err := h.DeleteScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", rec.Code)
+	}
+}
+
+func TestHandler_PatchScheduleFHIR_MergePatch(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	body := `{"comment":"Updated"}`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/merge-patch+json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	err := h.PatchScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_VreadScheduleFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "vid")
+	c.SetParamValues(s.FHIRID, "1")
+	err := h.VreadScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_HistoryScheduleFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	s := &Schedule{PractitionerID: uuid.New()}
+	h.svc.CreateSchedule(nil, s)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(s.FHIRID)
+	err := h.HistoryScheduleFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+// -- FHIR Slot Endpoints --
+
+func TestHandler_SearchSlotsFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	req := httptest.NewRequest(http.MethodGet, "/fhir/Slot", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.SearchSlotsFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetSlotFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(sl.FHIRID)
+	err := h.GetSlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CreateSlotFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now().Format(time.RFC3339)
+	end := time.Now().Add(30 * time.Minute).Format(time.RFC3339)
+	body := `{"schedule_id":"` + uuid.New().String() + `","start_time":"` + start + `","end_time":"` + end + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.CreateSlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateSlotFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	start := time.Now().Format(time.RFC3339)
+	end := time.Now().Add(60 * time.Minute).Format(time.RFC3339)
+	body := `{"schedule_id":"` + sl.ScheduleID.String() + `","start_time":"` + start + `","end_time":"` + end + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(sl.FHIRID)
+	err := h.UpdateSlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_DeleteSlotFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(sl.FHIRID)
+	err := h.DeleteSlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", rec.Code)
+	}
+}
+
+func TestHandler_PatchSlotFHIR_MergePatch(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	body := `{"status":"busy"}`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/merge-patch+json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(sl.FHIRID)
+	err := h.PatchSlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_VreadSlotFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "vid")
+	c.SetParamValues(sl.FHIRID, "1")
+	err := h.VreadSlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_HistorySlotFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	sl := &Slot{ScheduleID: uuid.New(), StartTime: time.Now(), EndTime: time.Now().Add(30 * time.Minute)}
+	h.svc.CreateSlot(nil, sl)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(sl.FHIRID)
+	err := h.HistorySlotFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+// -- FHIR Appointment Endpoints --
+
+func TestHandler_SearchAppointmentsFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	req := httptest.NewRequest(http.MethodGet, "/fhir/Appointment", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.SearchAppointmentsFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetAppointmentFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.FHIRID)
+	err := h.GetAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_GetAppointmentFHIR_NotFound(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("nonexistent")
+	_ = h.GetAppointmentFHIR(c)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CreateAppointmentFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now().Format(time.RFC3339)
+	body := `{"patient_id":"` + uuid.New().String() + `","start_time":"` + start + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.CreateAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if loc == "" || !strings.Contains(loc, "/fhir/Appointment/") {
+		t.Errorf("expected Location header, got %q", loc)
+	}
+}
+
+func TestHandler_UpdateAppointmentFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	body := `{"patient_id":"` + a.PatientID.String() + `","start_time":"` + start.Format(time.RFC3339) + `"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.FHIRID)
+	err := h.UpdateAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_DeleteAppointmentFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.FHIRID)
+	err := h.DeleteAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", rec.Code)
+	}
+}
+
+func TestHandler_PatchAppointmentFHIR_MergePatch(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	body := `{"status":"cancelled"}`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/merge-patch+json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.FHIRID)
+	err := h.PatchAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_VreadAppointmentFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "vid")
+	c.SetParamValues(a.FHIRID, "1")
+	err := h.VreadAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandler_HistoryAppointmentFHIR(t *testing.T) {
+	h, e := newTestHandler()
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	h.svc.CreateAppointment(nil, a)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(a.FHIRID)
+	err := h.HistoryAppointmentFHIR(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+}
+
+// -- Route Registration --
+
 func TestHandler_RegisterRoutes(t *testing.T) {
 	h, e := newTestHandler()
 	api := e.Group("/api/v1")
@@ -367,14 +1011,37 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 	}
 	expected := []string{
 		"POST:/api/v1/schedules",
+		"GET:/api/v1/schedules",
 		"GET:/api/v1/schedules/:id",
+		"PUT:/api/v1/schedules/:id",
+		"DELETE:/api/v1/schedules/:id",
 		"POST:/api/v1/slots",
+		"GET:/api/v1/slots",
+		"GET:/api/v1/slots/:id",
+		"PUT:/api/v1/slots/:id",
 		"POST:/api/v1/appointments",
+		"GET:/api/v1/appointments",
 		"GET:/api/v1/appointments/:id",
+		"PUT:/api/v1/appointments/:id",
+		"GET:/api/v1/appointments/:id/participants",
 		"POST:/api/v1/waitlist",
+		"GET:/api/v1/waitlist/:id",
+		"PUT:/api/v1/waitlist/:id",
 		"GET:/fhir/Schedule",
+		"GET:/fhir/Schedule/:id",
+		"POST:/fhir/Schedule",
+		"PUT:/fhir/Schedule/:id",
+		"DELETE:/fhir/Schedule/:id",
+		"PATCH:/fhir/Schedule/:id",
 		"GET:/fhir/Slot",
+		"GET:/fhir/Slot/:id",
+		"POST:/fhir/Slot",
 		"GET:/fhir/Appointment",
+		"GET:/fhir/Appointment/:id",
+		"POST:/fhir/Appointment",
+		"PUT:/fhir/Appointment/:id",
+		"DELETE:/fhir/Appointment/:id",
+		"PATCH:/fhir/Appointment/:id",
 	}
 	for _, path := range expected {
 		if !routePaths[path] {

@@ -459,6 +459,454 @@ func TestCreateImagingStudy_PatientIDRequired(t *testing.T) {
 	}
 }
 
+func TestGetServiceRequestByFHIRID(t *testing.T) {
+	svc := newTestService()
+	sr := &ServiceRequest{PatientID: uuid.New(), RequesterID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateServiceRequest(context.Background(), sr)
+
+	fetched, err := svc.GetServiceRequestByFHIRID(context.Background(), sr.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != sr.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetServiceRequestByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetServiceRequestByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateServiceRequest(t *testing.T) {
+	svc := newTestService()
+	sr := &ServiceRequest{PatientID: uuid.New(), RequesterID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateServiceRequest(context.Background(), sr)
+
+	sr.Status = "active"
+	err := svc.UpdateServiceRequest(context.Background(), sr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateServiceRequest_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	sr := &ServiceRequest{PatientID: uuid.New(), RequesterID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateServiceRequest(context.Background(), sr)
+
+	sr.Status = "bogus"
+	err := svc.UpdateServiceRequest(context.Background(), sr)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListServiceRequestsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateServiceRequest(context.Background(), &ServiceRequest{PatientID: patientID, RequesterID: uuid.New(), CodeValue: "CBC"})
+	svc.CreateServiceRequest(context.Background(), &ServiceRequest{PatientID: patientID, RequesterID: uuid.New(), CodeValue: "BMP"})
+	svc.CreateServiceRequest(context.Background(), &ServiceRequest{PatientID: uuid.New(), RequesterID: uuid.New(), CodeValue: "CMP"})
+
+	result, total, err := svc.ListServiceRequestsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestSearchServiceRequests(t *testing.T) {
+	svc := newTestService()
+	svc.CreateServiceRequest(context.Background(), &ServiceRequest{PatientID: uuid.New(), RequesterID: uuid.New(), CodeValue: "CBC"})
+
+	result, total, err := svc.SearchServiceRequests(context.Background(), map[string]string{"code": "CBC"}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestGetSpecimen(t *testing.T) {
+	svc := newTestService()
+	sp := &Specimen{PatientID: uuid.New()}
+	svc.CreateSpecimen(context.Background(), sp)
+
+	fetched, err := svc.GetSpecimen(context.Background(), sp.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != sp.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetSpecimen_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSpecimen(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetSpecimenByFHIRID(t *testing.T) {
+	svc := newTestService()
+	sp := &Specimen{PatientID: uuid.New()}
+	svc.CreateSpecimen(context.Background(), sp)
+
+	fetched, err := svc.GetSpecimenByFHIRID(context.Background(), sp.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != sp.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetSpecimenByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSpecimenByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateSpecimen(t *testing.T) {
+	svc := newTestService()
+	sp := &Specimen{PatientID: uuid.New()}
+	svc.CreateSpecimen(context.Background(), sp)
+
+	sp.Status = "unavailable"
+	err := svc.UpdateSpecimen(context.Background(), sp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateSpecimen_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	sp := &Specimen{PatientID: uuid.New()}
+	svc.CreateSpecimen(context.Background(), sp)
+
+	sp.Status = "bogus"
+	err := svc.UpdateSpecimen(context.Background(), sp)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteSpecimen(t *testing.T) {
+	svc := newTestService()
+	sp := &Specimen{PatientID: uuid.New()}
+	svc.CreateSpecimen(context.Background(), sp)
+	err := svc.DeleteSpecimen(context.Background(), sp.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetSpecimen(context.Background(), sp.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListSpecimensByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateSpecimen(context.Background(), &Specimen{PatientID: patientID})
+	svc.CreateSpecimen(context.Background(), &Specimen{PatientID: uuid.New()})
+
+	result, total, err := svc.ListSpecimensByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchSpecimens(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSpecimen(context.Background(), &Specimen{PatientID: uuid.New()})
+
+	result, total, err := svc.SearchSpecimens(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestGetDiagnosticReport(t *testing.T) {
+	svc := newTestService()
+	dr := &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateDiagnosticReport(context.Background(), dr)
+
+	fetched, err := svc.GetDiagnosticReport(context.Background(), dr.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != dr.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetDiagnosticReport_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetDiagnosticReport(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetDiagnosticReportByFHIRID(t *testing.T) {
+	svc := newTestService()
+	dr := &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateDiagnosticReport(context.Background(), dr)
+
+	fetched, err := svc.GetDiagnosticReportByFHIRID(context.Background(), dr.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != dr.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetDiagnosticReportByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetDiagnosticReportByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateDiagnosticReport(t *testing.T) {
+	svc := newTestService()
+	dr := &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateDiagnosticReport(context.Background(), dr)
+
+	dr.Status = "final"
+	err := svc.UpdateDiagnosticReport(context.Background(), dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateDiagnosticReport_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	dr := &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateDiagnosticReport(context.Background(), dr)
+
+	dr.Status = "bogus"
+	err := svc.UpdateDiagnosticReport(context.Background(), dr)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteDiagnosticReport(t *testing.T) {
+	svc := newTestService()
+	dr := &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateDiagnosticReport(context.Background(), dr)
+	err := svc.DeleteDiagnosticReport(context.Background(), dr.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetDiagnosticReport(context.Background(), dr.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListDiagnosticReportsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateDiagnosticReport(context.Background(), &DiagnosticReport{PatientID: patientID, CodeValue: "CBC"})
+	svc.CreateDiagnosticReport(context.Background(), &DiagnosticReport{PatientID: uuid.New(), CodeValue: "BMP"})
+
+	result, total, err := svc.ListDiagnosticReportsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchDiagnosticReports(t *testing.T) {
+	svc := newTestService()
+	svc.CreateDiagnosticReport(context.Background(), &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"})
+
+	result, total, err := svc.SearchDiagnosticReports(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestRemoveDiagnosticReportResult(t *testing.T) {
+	svc := newTestService()
+	dr := &DiagnosticReport{PatientID: uuid.New(), CodeValue: "CBC"}
+	svc.CreateDiagnosticReport(context.Background(), dr)
+
+	obsID := uuid.New()
+	svc.AddDiagnosticReportResult(context.Background(), dr.ID, obsID)
+
+	err := svc.RemoveDiagnosticReportResult(context.Background(), dr.ID, obsID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	results, _ := svc.GetDiagnosticReportResults(context.Background(), dr.ID)
+	if len(results) != 0 {
+		t.Errorf("expected 0 results after removal, got %d", len(results))
+	}
+}
+
+func TestGetImagingStudy(t *testing.T) {
+	svc := newTestService()
+	is := &ImagingStudy{PatientID: uuid.New()}
+	svc.CreateImagingStudy(context.Background(), is)
+
+	fetched, err := svc.GetImagingStudy(context.Background(), is.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != is.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetImagingStudy_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetImagingStudy(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetImagingStudyByFHIRID(t *testing.T) {
+	svc := newTestService()
+	is := &ImagingStudy{PatientID: uuid.New()}
+	svc.CreateImagingStudy(context.Background(), is)
+
+	fetched, err := svc.GetImagingStudyByFHIRID(context.Background(), is.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != is.ID {
+		t.Errorf("expected same ID")
+	}
+}
+
+func TestGetImagingStudyByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetImagingStudyByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateImagingStudy(t *testing.T) {
+	svc := newTestService()
+	is := &ImagingStudy{PatientID: uuid.New()}
+	svc.CreateImagingStudy(context.Background(), is)
+
+	is.Status = "available"
+	err := svc.UpdateImagingStudy(context.Background(), is)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateImagingStudy_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	is := &ImagingStudy{PatientID: uuid.New()}
+	svc.CreateImagingStudy(context.Background(), is)
+
+	is.Status = "bogus"
+	err := svc.UpdateImagingStudy(context.Background(), is)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteImagingStudy(t *testing.T) {
+	svc := newTestService()
+	is := &ImagingStudy{PatientID: uuid.New()}
+	svc.CreateImagingStudy(context.Background(), is)
+	err := svc.DeleteImagingStudy(context.Background(), is.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetImagingStudy(context.Background(), is.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListImagingStudiesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateImagingStudy(context.Background(), &ImagingStudy{PatientID: patientID})
+	svc.CreateImagingStudy(context.Background(), &ImagingStudy{PatientID: uuid.New()})
+
+	result, total, err := svc.ListImagingStudiesByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchImagingStudies(t *testing.T) {
+	svc := newTestService()
+	svc.CreateImagingStudy(context.Background(), &ImagingStudy{PatientID: uuid.New()})
+
+	result, total, err := svc.SearchImagingStudies(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
 func TestServiceRequestToFHIR(t *testing.T) {
 	sr := &ServiceRequest{
 		FHIRID:      "sr-123",

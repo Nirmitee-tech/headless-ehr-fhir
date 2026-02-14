@@ -87,10 +87,10 @@ func TestCapabilityBuilder_Build_Resources(t *testing.T) {
 		t.Errorf("expected 2 Encounter interactions, got %d", len(encInteractions))
 	}
 
-	// Check Patient has 6 interactions (default)
+	// Check Patient has 9 interactions (default)
 	patInteractions := resources[2]["interaction"].([]map[string]string)
-	if len(patInteractions) != 6 {
-		t.Errorf("expected 6 Patient interactions, got %d", len(patInteractions))
+	if len(patInteractions) != 9 {
+		t.Errorf("expected 9 Patient interactions, got %d", len(patInteractions))
 	}
 }
 
@@ -284,13 +284,14 @@ func TestCapabilityBuilder_SearchParamDocumentation(t *testing.T) {
 
 func TestDefaultInteractions(t *testing.T) {
 	interactions := DefaultInteractions()
-	if len(interactions) != 6 {
-		t.Fatalf("expected 6 interactions, got %d", len(interactions))
+	if len(interactions) != 9 {
+		t.Fatalf("expected 9 interactions, got %d", len(interactions))
 	}
 
 	expected := map[string]bool{
 		"read": true, "vread": true, "search-type": true,
 		"create": true, "update": true, "delete": true,
+		"patch": true, "history-instance": true, "history-type": true,
 	}
 	for _, i := range interactions {
 		if !expected[i] {
@@ -337,5 +338,299 @@ func TestCapabilityBuilder_ConcurrentAccess(t *testing.T) {
 
 	if b.ResourceCount() > 5 {
 		t.Errorf("expected at most 5 resources, got %d", b.ResourceCount())
+	}
+}
+
+func TestDefaultCapabilityOptions(t *testing.T) {
+	opts := DefaultCapabilityOptions()
+	if !opts.ConditionalCreate {
+		t.Error("expected ConditionalCreate true")
+	}
+	if !opts.ConditionalUpdate {
+		t.Error("expected ConditionalUpdate true")
+	}
+	if opts.ConditionalDelete != "single" {
+		t.Errorf("expected ConditionalDelete 'single', got %q", opts.ConditionalDelete)
+	}
+	if !opts.ReadHistory {
+		t.Error("expected ReadHistory true")
+	}
+	if opts.UpdateCreate {
+		t.Error("expected UpdateCreate false")
+	}
+	if len(opts.PatchFormats) != 2 {
+		t.Fatalf("expected 2 PatchFormats, got %d", len(opts.PatchFormats))
+	}
+	if opts.PatchFormats[0] != "application/json-patch+json" {
+		t.Errorf("expected first patch format 'application/json-patch+json', got %q", opts.PatchFormats[0])
+	}
+	if opts.PatchFormats[1] != "application/merge-patch+json" {
+		t.Errorf("expected second patch format 'application/merge-patch+json', got %q", opts.PatchFormats[1])
+	}
+	if opts.SearchInclude != nil {
+		t.Errorf("expected nil SearchInclude, got %v", opts.SearchInclude)
+	}
+	if opts.SearchRevInclude != nil {
+		t.Errorf("expected nil SearchRevInclude, got %v", opts.SearchRevInclude)
+	}
+}
+
+func TestSetResourceCapabilities_WithDefaults(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.AddResource("Patient", DefaultInteractions(), []SearchParam{
+		{Name: "name", Type: "string"},
+	})
+
+	opts := DefaultCapabilityOptions()
+	opts.SearchInclude = []string{"Patient:organization"}
+	opts.SearchRevInclude = []string{"Observation:patient"}
+	b.SetResourceCapabilities("Patient", opts)
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	res := resources[0]
+
+	// conditionalCreate
+	if res["conditionalCreate"] != true {
+		t.Error("expected conditionalCreate true")
+	}
+	// conditionalUpdate
+	if res["conditionalUpdate"] != true {
+		t.Error("expected conditionalUpdate true")
+	}
+	// conditionalDelete
+	if res["conditionalDelete"] != "single" {
+		t.Errorf("expected conditionalDelete 'single', got %v", res["conditionalDelete"])
+	}
+	// readHistory
+	if res["readHistory"] != true {
+		t.Error("expected readHistory true")
+	}
+	// updateCreate
+	if res["updateCreate"] != false {
+		t.Error("expected updateCreate false")
+	}
+	// patchFormats
+	pf, ok := res["patchFormats"].([]string)
+	if !ok {
+		t.Fatal("expected patchFormats to be set")
+	}
+	if len(pf) != 2 {
+		t.Fatalf("expected 2 patchFormats, got %d", len(pf))
+	}
+	if pf[0] != "application/json-patch+json" {
+		t.Errorf("unexpected first patchFormat: %s", pf[0])
+	}
+	// searchInclude
+	si, ok := res["searchInclude"].([]string)
+	if !ok {
+		t.Fatal("expected searchInclude to be set")
+	}
+	if len(si) != 1 || si[0] != "Patient:organization" {
+		t.Errorf("unexpected searchInclude: %v", si)
+	}
+	// searchRevInclude
+	sri, ok := res["searchRevInclude"].([]string)
+	if !ok {
+		t.Fatal("expected searchRevInclude to be set")
+	}
+	if len(sri) != 1 || sri[0] != "Observation:patient" {
+		t.Errorf("unexpected searchRevInclude: %v", sri)
+	}
+}
+
+func TestSetResourceCapabilities_NonExistentResource(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	// Do NOT register "Ghost" resource first
+	b.SetResourceCapabilities("Ghost", DefaultCapabilityOptions())
+
+	// Should be no-op; builder has no resources
+	if b.ResourceCount() != 0 {
+		t.Errorf("expected 0 resources, got %d", b.ResourceCount())
+	}
+}
+
+func TestBuild_ConditionalDeleteOnly(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.AddResource("Observation", []string{"read"}, nil)
+	b.SetResourceCapabilities("Observation", ResourceCapabilityOptions{
+		ConditionalDelete: "multiple",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	res := resources[0]
+
+	if res["conditionalDelete"] != "multiple" {
+		t.Errorf("expected conditionalDelete 'multiple', got %v", res["conditionalDelete"])
+	}
+	// conditionalCreate and conditionalUpdate should NOT appear when false
+	if _, ok := res["conditionalCreate"]; ok {
+		t.Error("conditionalCreate should not be in output when false")
+	}
+	if _, ok := res["conditionalUpdate"]; ok {
+		t.Error("conditionalUpdate should not be in output when false")
+	}
+}
+
+func TestBuild_PatchFormatsOnly(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.AddResource("Condition", []string{"read", "patch"}, nil)
+	b.SetResourceCapabilities("Condition", ResourceCapabilityOptions{
+		PatchFormats: []string{"application/json-patch+json"},
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	res := resources[0]
+
+	pf, ok := res["patchFormats"].([]string)
+	if !ok {
+		t.Fatal("expected patchFormats to be present")
+	}
+	if len(pf) != 1 || pf[0] != "application/json-patch+json" {
+		t.Errorf("unexpected patchFormats: %v", pf)
+	}
+}
+
+func TestCapabilityBuilder_SetOAuthURIs_OnlyAuthorize(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.SetOAuthURIs("http://auth.example.com/auth", "")
+	b.AddResource("Patient", []string{"read"}, nil)
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	security := rest[0]["security"].(map[string]interface{})
+
+	extensions := security["extension"].([]map[string]interface{})
+	if len(extensions) != 1 {
+		t.Fatalf("expected 1 extension, got %d", len(extensions))
+	}
+	oauthExts := extensions[0]["extension"].([]map[string]string)
+	if len(oauthExts) != 1 {
+		t.Fatalf("expected 1 OAuth extension entry (authorize only), got %d", len(oauthExts))
+	}
+	if oauthExts[0]["url"] != "authorize" {
+		t.Errorf("expected authorize, got %s", oauthExts[0]["url"])
+	}
+}
+
+func TestCapabilityBuilder_SetOAuthURIs_OnlyToken(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.SetOAuthURIs("", "http://auth.example.com/token")
+	b.AddResource("Patient", []string{"read"}, nil)
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	security := rest[0]["security"].(map[string]interface{})
+
+	extensions := security["extension"].([]map[string]interface{})
+	if len(extensions) != 1 {
+		t.Fatalf("expected 1 extension, got %d", len(extensions))
+	}
+	oauthExts := extensions[0]["extension"].([]map[string]string)
+	if len(oauthExts) != 1 {
+		t.Fatalf("expected 1 OAuth extension entry (token only), got %d", len(oauthExts))
+	}
+	if oauthExts[0]["url"] != "token" {
+		t.Errorf("expected token, got %s", oauthExts[0]["url"])
+	}
+}
+
+func TestCapabilityBuilder_AddResourceWithProfile_DuplicateProfiles(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+
+	profile := "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
+	b.AddResourceWithProfile("Patient", DefaultInteractions(), nil, []string{profile})
+	b.AddResourceWithProfile("Patient", nil, nil, []string{profile, "http://example.com/profile"})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	profiles := resources[0]["supportedProfile"].([]string)
+
+	if len(profiles) != 2 {
+		t.Fatalf("expected 2 profiles (deduplicated), got %d: %v", len(profiles), profiles)
+	}
+}
+
+func TestCapabilityBuilder_Build_ImplementationSection(t *testing.T) {
+	b := NewCapabilityBuilder("http://example.com/fhir", "2.0.0")
+	b.AddResource("Patient", []string{"read"}, nil)
+
+	cs := b.Build()
+	impl := cs["implementation"].(map[string]string)
+	if impl["description"] != "Headless EHR FHIR R4 Server" {
+		t.Errorf("unexpected description: %s", impl["description"])
+	}
+	if impl["url"] != "http://example.com/fhir" {
+		t.Errorf("unexpected url: %s", impl["url"])
+	}
+}
+
+func TestCapabilityBuilder_Build_DateFormat(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	cs := b.Build()
+	date := cs["date"].(string)
+	// Date should be in YYYY-MM-DD format
+	if len(date) != 10 || date[4] != '-' || date[7] != '-' {
+		t.Errorf("date should be in YYYY-MM-DD format, got %q", date)
+	}
+}
+
+func TestCapabilityBuilder_AddResource_NoSearchParams(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.AddResource("Patient", []string{"read"}, nil)
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	if _, ok := resources[0]["searchParam"]; ok {
+		t.Error("searchParam should not be present when no search params are registered")
+	}
+}
+
+func TestCapabilityBuilder_AddResource_NoInteractions(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.AddResource("Patient", nil, nil)
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	if _, ok := resources[0]["interaction"]; ok {
+		t.Error("interaction should not be present when no interactions are registered")
+	}
+}
+
+func TestBuild_SearchIncludeRevIncludeOnly(t *testing.T) {
+	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
+	b.AddResource("Encounter", []string{"read", "search-type"}, nil)
+	b.SetResourceCapabilities("Encounter", ResourceCapabilityOptions{
+		SearchInclude:    []string{"Encounter:patient", "Encounter:practitioner"},
+		SearchRevInclude: []string{"Observation:encounter", "Condition:encounter"},
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	res := resources[0]
+
+	si := res["searchInclude"].([]string)
+	if len(si) != 2 {
+		t.Fatalf("expected 2 searchInclude, got %d", len(si))
+	}
+	if si[0] != "Encounter:patient" || si[1] != "Encounter:practitioner" {
+		t.Errorf("unexpected searchInclude: %v", si)
+	}
+
+	sri := res["searchRevInclude"].([]string)
+	if len(sri) != 2 {
+		t.Fatalf("expected 2 searchRevInclude, got %d", len(sri))
+	}
+	if sri[0] != "Observation:encounter" || sri[1] != "Condition:encounter" {
+		t.Errorf("unexpected searchRevInclude: %v", sri)
 	}
 }

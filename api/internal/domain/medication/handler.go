@@ -1,7 +1,10 @@
 package medication
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -68,9 +71,37 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "pharmacist"))
 	fhirWrite.POST("/Medication", h.CreateMedicationFHIR)
+	fhirWrite.PUT("/Medication/:id", h.UpdateMedicationFHIR)
+	fhirWrite.DELETE("/Medication/:id", h.DeleteMedicationFHIR)
+	fhirWrite.PATCH("/Medication/:id", h.PatchMedicationFHIR)
 	fhirWrite.POST("/MedicationRequest", h.CreateMedicationRequestFHIR)
+	fhirWrite.PUT("/MedicationRequest/:id", h.UpdateMedicationRequestFHIR)
+	fhirWrite.DELETE("/MedicationRequest/:id", h.DeleteMedicationRequestFHIR)
+	fhirWrite.PATCH("/MedicationRequest/:id", h.PatchMedicationRequestFHIR)
 	fhirWrite.POST("/MedicationAdministration", h.CreateMedicationAdministrationFHIR)
+	fhirWrite.PUT("/MedicationAdministration/:id", h.UpdateMedicationAdministrationFHIR)
+	fhirWrite.DELETE("/MedicationAdministration/:id", h.DeleteMedicationAdministrationFHIR)
+	fhirWrite.PATCH("/MedicationAdministration/:id", h.PatchMedicationAdministrationFHIR)
 	fhirWrite.POST("/MedicationDispense", h.CreateMedicationDispenseFHIR)
+	fhirWrite.PUT("/MedicationDispense/:id", h.UpdateMedicationDispenseFHIR)
+	fhirWrite.DELETE("/MedicationDispense/:id", h.DeleteMedicationDispenseFHIR)
+	fhirWrite.PATCH("/MedicationDispense/:id", h.PatchMedicationDispenseFHIR)
+
+	// FHIR POST _search endpoints
+	fhirRead.POST("/Medication/_search", h.SearchMedicationsFHIR)
+	fhirRead.POST("/MedicationRequest/_search", h.SearchMedicationRequestsFHIR)
+	fhirRead.POST("/MedicationAdministration/_search", h.SearchMedicationAdministrationsFHIR)
+	fhirRead.POST("/MedicationDispense/_search", h.SearchMedicationDispensesFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Medication/:id/_history/:vid", h.VreadMedicationFHIR)
+	fhirRead.GET("/Medication/:id/_history", h.HistoryMedicationFHIR)
+	fhirRead.GET("/MedicationRequest/:id/_history/:vid", h.VreadMedicationRequestFHIR)
+	fhirRead.GET("/MedicationRequest/:id/_history", h.HistoryMedicationRequestFHIR)
+	fhirRead.GET("/MedicationAdministration/:id/_history/:vid", h.VreadMedicationAdministrationFHIR)
+	fhirRead.GET("/MedicationAdministration/:id/_history", h.HistoryMedicationAdministrationFHIR)
+	fhirRead.GET("/MedicationDispense/:id/_history/:vid", h.VreadMedicationDispenseFHIR)
+	fhirRead.GET("/MedicationDispense/:id/_history", h.HistoryMedicationDispenseFHIR)
 }
 
 // -- Medication Handlers --
@@ -653,4 +684,415 @@ func (h *Handler) CreateMedicationDispenseFHIR(c echo.Context) error {
 	}
 	c.Response().Header().Set("Location", "/fhir/MedicationDispense/"+md.FHIRID)
 	return c.JSON(http.StatusCreated, md.ToFHIR())
+}
+
+// -- FHIR Update Endpoints --
+
+func (h *Handler) UpdateMedicationFHIR(c echo.Context) error {
+	var m Medication
+	if err := c.Bind(&m); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetMedicationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Medication", c.Param("id")))
+	}
+	m.ID = existing.ID
+	m.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateMedication(c.Request().Context(), &m); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, medicationToFHIR(&m))
+}
+
+func (h *Handler) UpdateMedicationRequestFHIR(c echo.Context) error {
+	var mr MedicationRequest
+	if err := c.Bind(&mr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetMedicationRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationRequest", c.Param("id")))
+	}
+	mr.ID = existing.ID
+	mr.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateMedicationRequest(c.Request().Context(), &mr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, mr.ToFHIR())
+}
+
+func (h *Handler) UpdateMedicationAdministrationFHIR(c echo.Context) error {
+	var ma MedicationAdministration
+	if err := c.Bind(&ma); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetMedicationAdministrationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationAdministration", c.Param("id")))
+	}
+	ma.ID = existing.ID
+	ma.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateMedicationAdministration(c.Request().Context(), &ma); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, ma.ToFHIR())
+}
+
+func (h *Handler) UpdateMedicationDispenseFHIR(c echo.Context) error {
+	var md MedicationDispense
+	if err := c.Bind(&md); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetMedicationDispenseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
+	}
+	md.ID = existing.ID
+	md.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateMedicationDispense(c.Request().Context(), &md); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, md.ToFHIR())
+}
+
+// -- FHIR Delete Endpoints --
+
+func (h *Handler) DeleteMedicationFHIR(c echo.Context) error {
+	existing, err := h.svc.GetMedicationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Medication", c.Param("id")))
+	}
+	if err := h.svc.DeleteMedication(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteMedicationRequestFHIR(c echo.Context) error {
+	existing, err := h.svc.GetMedicationRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationRequest", c.Param("id")))
+	}
+	if err := h.svc.DeleteMedicationRequest(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteMedicationAdministrationFHIR(c echo.Context) error {
+	existing, err := h.svc.GetMedicationAdministrationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationAdministration", c.Param("id")))
+	}
+	if err := h.svc.DeleteMedicationAdministration(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteMedicationDispenseFHIR(c echo.Context) error {
+	existing, err := h.svc.GetMedicationDispenseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
+	}
+	if err := h.svc.DeleteMedicationDispense(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PATCH Endpoints --
+
+func (h *Handler) PatchMedicationFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetMedicationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Medication", c.Param("id")))
+	}
+	currentResource := medicationToFHIR(existing)
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateMedication(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, medicationToFHIR(existing))
+}
+
+func (h *Handler) PatchMedicationRequestFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetMedicationRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationRequest", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateMedicationRequest(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) PatchMedicationAdministrationFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetMedicationAdministrationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationAdministration", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateMedicationAdministration(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) PatchMedicationDispenseFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetMedicationDispenseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	_ = patched
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if err := h.svc.UpdateMedicationDispense(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+// -- FHIR vread and history endpoints --
+
+func (h *Handler) VreadMedicationFHIR(c echo.Context) error {
+	m, err := h.svc.GetMedicationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Medication", c.Param("id")))
+	}
+	result := medicationToFHIR(m)
+	fhir.SetVersionHeaders(c, 1, m.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryMedicationFHIR(c echo.Context) error {
+	m, err := h.svc.GetMedicationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Medication", c.Param("id")))
+	}
+	result := medicationToFHIR(m)
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Medication", ResourceID: m.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: m.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadMedicationRequestFHIR(c echo.Context) error {
+	mr, err := h.svc.GetMedicationRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationRequest", c.Param("id")))
+	}
+	result := mr.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, mr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryMedicationRequestFHIR(c echo.Context) error {
+	mr, err := h.svc.GetMedicationRequestByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationRequest", c.Param("id")))
+	}
+	result := mr.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "MedicationRequest", ResourceID: mr.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: mr.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadMedicationAdministrationFHIR(c echo.Context) error {
+	ma, err := h.svc.GetMedicationAdministrationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationAdministration", c.Param("id")))
+	}
+	result := ma.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, ma.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryMedicationAdministrationFHIR(c echo.Context) error {
+	ma, err := h.svc.GetMedicationAdministrationByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationAdministration", c.Param("id")))
+	}
+	result := ma.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "MedicationAdministration", ResourceID: ma.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: ma.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadMedicationDispenseFHIR(c echo.Context) error {
+	md, err := h.svc.GetMedicationDispenseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
+	}
+	result := md.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, md.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryMedicationDispenseFHIR(c echo.Context) error {
+	md, err := h.svc.GetMedicationDispenseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
+	}
+	result := md.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "MedicationDispense", ResourceID: md.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: md.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// medicationToFHIR builds a FHIR resource map for Medication.
+func medicationToFHIR(m *Medication) map[string]interface{} {
+	result := map[string]interface{}{
+		"resourceType": "Medication",
+		"id":           m.FHIRID,
+		"status":       m.Status,
+		"code": fhir.CodeableConcept{
+			Coding: []fhir.Coding{{System: strVal(m.CodeSystem), Code: m.CodeValue, Display: m.CodeDisplay}},
+		},
+		"meta": fhir.Meta{LastUpdated: m.UpdatedAt},
+	}
+	if m.FormCode != nil {
+		result["form"] = fhir.CodeableConcept{
+			Coding: []fhir.Coding{{Code: *m.FormCode, Display: strVal(m.FormDisplay)}},
+		}
+	}
+	return result
 }

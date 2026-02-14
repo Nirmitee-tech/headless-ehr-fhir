@@ -460,6 +460,14 @@ func TestService_GetEnrollment(t *testing.T) {
 	}
 }
 
+func TestService_GetEnrollment_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetEnrollment(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
 func TestService_UpdateEnrollment(t *testing.T) {
 	svc := newTestService()
 	e := &ResearchEnrollment{StudyID: uuid.New(), PatientID: uuid.New()}
@@ -565,6 +573,14 @@ func TestService_GetAdverseEvent(t *testing.T) {
 	}
 }
 
+func TestService_GetAdverseEvent_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetAdverseEvent(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
 func TestService_UpdateAdverseEvent(t *testing.T) {
 	svc := newTestService()
 	ae := &ResearchAdverseEvent{EnrollmentID: uuid.New(), Description: "Nausea"}
@@ -640,6 +656,14 @@ func TestService_GetDeviation(t *testing.T) {
 	}
 	if got.Description != "Wrong dosage" {
 		t.Errorf("expected 'Wrong dosage', got %s", got.Description)
+	}
+}
+
+func TestService_GetDeviation_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetDeviation(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
 	}
 }
 

@@ -25,6 +25,9 @@ type coverageRepoPG struct{ pool *pgxpool.Pool }
 func NewCoverageRepoPG(pool *pgxpool.Pool) CoverageRepository { return &coverageRepoPG{pool: pool} }
 
 func (r *coverageRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -189,6 +192,9 @@ type claimRepoPG struct{ pool *pgxpool.Pool }
 func NewClaimRepoPG(pool *pgxpool.Pool) ClaimRepository { return &claimRepoPG{pool: pool} }
 
 func (r *claimRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -451,6 +457,9 @@ func NewClaimResponseRepoPG(pool *pgxpool.Pool) ClaimResponseRepository {
 }
 
 func (r *claimResponseRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -578,6 +587,9 @@ type invoiceRepoPG struct{ pool *pgxpool.Pool }
 func NewInvoiceRepoPG(pool *pgxpool.Pool) InvoiceRepository { return &invoiceRepoPG{pool: pool} }
 
 func (r *invoiceRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

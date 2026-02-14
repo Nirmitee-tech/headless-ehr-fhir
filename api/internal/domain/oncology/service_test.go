@@ -718,3 +718,421 @@ func TestDeleteTumorBoardReview(t *testing.T) {
 		t.Error("expected error after deletion")
 	}
 }
+
+// =========== Additional Cancer Diagnosis Tests ===========
+
+func TestGetCancerDiagnosis_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetCancerDiagnosis(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateCancerDiagnosis(t *testing.T) {
+	svc := newTestService()
+	d := &CancerDiagnosis{PatientID: uuid.New(), DiagnosisDate: time.Now()}
+	svc.CreateCancerDiagnosis(context.Background(), d)
+	d.CurrentStatus = "remission"
+	err := svc.UpdateCancerDiagnosis(context.Background(), d)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateCancerDiagnosis_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	d := &CancerDiagnosis{PatientID: uuid.New(), DiagnosisDate: time.Now()}
+	svc.CreateCancerDiagnosis(context.Background(), d)
+	d.CurrentStatus = "bogus"
+	err := svc.UpdateCancerDiagnosis(context.Background(), d)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListCancerDiagnoses(t *testing.T) {
+	svc := newTestService()
+	svc.CreateCancerDiagnosis(context.Background(), &CancerDiagnosis{PatientID: uuid.New(), DiagnosisDate: time.Now()})
+	svc.CreateCancerDiagnosis(context.Background(), &CancerDiagnosis{PatientID: uuid.New(), DiagnosisDate: time.Now()})
+	items, total, err := svc.ListCancerDiagnoses(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+func TestListCancerDiagnosesByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateCancerDiagnosis(context.Background(), &CancerDiagnosis{PatientID: pid, DiagnosisDate: time.Now()})
+	svc.CreateCancerDiagnosis(context.Background(), &CancerDiagnosis{PatientID: uuid.New(), DiagnosisDate: time.Now()})
+	items, total, err := svc.ListCancerDiagnosesByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestCreateCancerDiagnosis_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active-treatment", "surveillance", "remission", "progression", "deceased", "lost-to-followup"} {
+		svc := newTestService()
+		d := &CancerDiagnosis{PatientID: uuid.New(), DiagnosisDate: time.Now(), CurrentStatus: s}
+		if err := svc.CreateCancerDiagnosis(context.Background(), d); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+// =========== Additional Treatment Protocol Tests ===========
+
+func TestGetTreatmentProtocol(t *testing.T) {
+	svc := newTestService()
+	p := &TreatmentProtocol{CancerDiagnosisID: uuid.New(), ProtocolName: "FOLFOX"}
+	svc.CreateTreatmentProtocol(context.Background(), p)
+	got, err := svc.GetTreatmentProtocol(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ProtocolName != "FOLFOX" {
+		t.Errorf("expected 'FOLFOX', got %s", got.ProtocolName)
+	}
+}
+
+func TestGetTreatmentProtocol_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetTreatmentProtocol(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateTreatmentProtocol(t *testing.T) {
+	svc := newTestService()
+	p := &TreatmentProtocol{CancerDiagnosisID: uuid.New(), ProtocolName: "FOLFOX"}
+	svc.CreateTreatmentProtocol(context.Background(), p)
+	p.Status = "active"
+	err := svc.UpdateTreatmentProtocol(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteTreatmentProtocol(t *testing.T) {
+	svc := newTestService()
+	p := &TreatmentProtocol{CancerDiagnosisID: uuid.New(), ProtocolName: "FOLFOX"}
+	svc.CreateTreatmentProtocol(context.Background(), p)
+	err := svc.DeleteTreatmentProtocol(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetTreatmentProtocol(context.Background(), p.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListTreatmentProtocols(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTreatmentProtocol(context.Background(), &TreatmentProtocol{CancerDiagnosisID: uuid.New(), ProtocolName: "FOLFOX"})
+	svc.CreateTreatmentProtocol(context.Background(), &TreatmentProtocol{CancerDiagnosisID: uuid.New(), ProtocolName: "R-CHOP"})
+	items, total, err := svc.ListTreatmentProtocols(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+func TestGetProtocolDrugs(t *testing.T) {
+	svc := newTestService()
+	p := &TreatmentProtocol{CancerDiagnosisID: uuid.New(), ProtocolName: "FOLFOX"}
+	svc.CreateTreatmentProtocol(context.Background(), p)
+	svc.AddProtocolDrug(context.Background(), &TreatmentProtocolDrug{ProtocolID: p.ID, DrugName: "Oxaliplatin"})
+	svc.AddProtocolDrug(context.Background(), &TreatmentProtocolDrug{ProtocolID: p.ID, DrugName: "5-FU"})
+	drugs, err := svc.GetProtocolDrugs(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(drugs) != 2 {
+		t.Errorf("expected 2 drugs, got %d", len(drugs))
+	}
+}
+
+// =========== Additional Chemo Cycle Tests ===========
+
+func TestGetChemoCycle(t *testing.T) {
+	svc := newTestService()
+	c := &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1}
+	svc.CreateChemoCycle(context.Background(), c)
+	got, err := svc.GetChemoCycle(context.Background(), c.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.CycleNumber != 1 {
+		t.Errorf("expected cycle_number 1, got %d", got.CycleNumber)
+	}
+}
+
+func TestGetChemoCycle_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetChemoCycle(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateChemoCycle(t *testing.T) {
+	svc := newTestService()
+	c := &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1}
+	svc.CreateChemoCycle(context.Background(), c)
+	c.Status = "completed"
+	err := svc.UpdateChemoCycle(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateChemoCycle_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	c := &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1}
+	svc.CreateChemoCycle(context.Background(), c)
+	c.Status = "bogus"
+	err := svc.UpdateChemoCycle(context.Background(), c)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteChemoCycle(t *testing.T) {
+	svc := newTestService()
+	c := &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1}
+	svc.CreateChemoCycle(context.Background(), c)
+	err := svc.DeleteChemoCycle(context.Background(), c.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetChemoCycle(context.Background(), c.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListChemoCycles(t *testing.T) {
+	svc := newTestService()
+	svc.CreateChemoCycle(context.Background(), &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1})
+	svc.CreateChemoCycle(context.Background(), &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 2})
+	items, total, err := svc.ListChemoCycles(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+func TestCreateChemoCycle_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"planned", "active", "completed", "held", "cancelled", "modified"} {
+		svc := newTestService()
+		c := &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1, Status: s}
+		if err := svc.CreateChemoCycle(context.Background(), c); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetChemoAdministrations(t *testing.T) {
+	svc := newTestService()
+	c := &ChemoCycle{ProtocolID: uuid.New(), CycleNumber: 1}
+	svc.CreateChemoCycle(context.Background(), c)
+	svc.AddChemoAdministration(context.Background(), &ChemoAdministration{CycleID: c.ID, DrugName: "Cisplatin"})
+	admins, err := svc.GetChemoAdministrations(context.Background(), c.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(admins) != 1 {
+		t.Errorf("expected 1, got %d", len(admins))
+	}
+}
+
+// =========== Additional Radiation Therapy Tests ===========
+
+func TestGetRadiationTherapy(t *testing.T) {
+	svc := newTestService()
+	r := &RadiationTherapy{CancerDiagnosisID: uuid.New()}
+	svc.CreateRadiationTherapy(context.Background(), r)
+	got, err := svc.GetRadiationTherapy(context.Background(), r.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != r.ID {
+		t.Errorf("expected ID %v, got %v", r.ID, got.ID)
+	}
+}
+
+func TestGetRadiationTherapy_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetRadiationTherapy(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateRadiationTherapy(t *testing.T) {
+	svc := newTestService()
+	r := &RadiationTherapy{CancerDiagnosisID: uuid.New()}
+	svc.CreateRadiationTherapy(context.Background(), r)
+	r.Status = "completed"
+	err := svc.UpdateRadiationTherapy(context.Background(), r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateRadiationTherapy_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	r := &RadiationTherapy{CancerDiagnosisID: uuid.New()}
+	svc.CreateRadiationTherapy(context.Background(), r)
+	r.Status = "bogus"
+	err := svc.UpdateRadiationTherapy(context.Background(), r)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteRadiationTherapy(t *testing.T) {
+	svc := newTestService()
+	r := &RadiationTherapy{CancerDiagnosisID: uuid.New()}
+	svc.CreateRadiationTherapy(context.Background(), r)
+	err := svc.DeleteRadiationTherapy(context.Background(), r.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetRadiationTherapy(context.Background(), r.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListRadiationTherapies(t *testing.T) {
+	svc := newTestService()
+	svc.CreateRadiationTherapy(context.Background(), &RadiationTherapy{CancerDiagnosisID: uuid.New()})
+	svc.CreateRadiationTherapy(context.Background(), &RadiationTherapy{CancerDiagnosisID: uuid.New()})
+	items, total, err := svc.ListRadiationTherapies(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+func TestCreateRadiationTherapy_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"planned", "in-progress", "completed", "cancelled"} {
+		svc := newTestService()
+		r := &RadiationTherapy{CancerDiagnosisID: uuid.New(), Status: s}
+		if err := svc.CreateRadiationTherapy(context.Background(), r); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetRadiationSessions(t *testing.T) {
+	svc := newTestService()
+	r := &RadiationTherapy{CancerDiagnosisID: uuid.New()}
+	svc.CreateRadiationTherapy(context.Background(), r)
+	svc.AddRadiationSession(context.Background(), &RadiationSession{RadiationTherapyID: r.ID, SessionNumber: 1})
+	svc.AddRadiationSession(context.Background(), &RadiationSession{RadiationTherapyID: r.ID, SessionNumber: 2})
+	sessions, err := svc.GetRadiationSessions(context.Background(), r.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Errorf("expected 2 sessions, got %d", len(sessions))
+	}
+}
+
+// =========== Additional Tumor Marker Tests ===========
+
+func TestGetTumorMarker(t *testing.T) {
+	svc := newTestService()
+	m := &TumorMarker{PatientID: uuid.New(), MarkerName: "PSA"}
+	svc.CreateTumorMarker(context.Background(), m)
+	got, err := svc.GetTumorMarker(context.Background(), m.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.MarkerName != "PSA" {
+		t.Errorf("expected 'PSA', got %s", got.MarkerName)
+	}
+}
+
+func TestGetTumorMarker_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetTumorMarker(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateTumorMarker(t *testing.T) {
+	svc := newTestService()
+	m := &TumorMarker{PatientID: uuid.New(), MarkerName: "PSA"}
+	svc.CreateTumorMarker(context.Background(), m)
+	m.MarkerName = "CEA"
+	err := svc.UpdateTumorMarker(context.Background(), m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListTumorMarkers(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTumorMarker(context.Background(), &TumorMarker{PatientID: uuid.New(), MarkerName: "PSA"})
+	svc.CreateTumorMarker(context.Background(), &TumorMarker{PatientID: uuid.New(), MarkerName: "CEA"})
+	items, total, err := svc.ListTumorMarkers(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+// =========== Additional Tumor Board Review Tests ===========
+
+func TestGetTumorBoardReview_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetTumorBoardReview(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateTumorBoardReview(t *testing.T) {
+	svc := newTestService()
+	r := &TumorBoardReview{CancerDiagnosisID: uuid.New(), PatientID: uuid.New()}
+	svc.CreateTumorBoardReview(context.Background(), r)
+	err := svc.UpdateTumorBoardReview(context.Background(), r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListTumorBoardReviews(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTumorBoardReview(context.Background(), &TumorBoardReview{CancerDiagnosisID: uuid.New(), PatientID: uuid.New()})
+	svc.CreateTumorBoardReview(context.Background(), &TumorBoardReview{CancerDiagnosisID: uuid.New(), PatientID: uuid.New()})
+	items, total, err := svc.ListTumorBoardReviews(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}

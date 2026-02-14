@@ -23,6 +23,9 @@ func NewPatientRepo(pool *pgxpool.Pool) PatientRepository {
 }
 
 func (r *patientRepoPG) conn(ctx context.Context) querier {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -340,6 +343,9 @@ func NewPractitionerRepo(pool *pgxpool.Pool) PractitionerRepository {
 }
 
 func (r *practRepoPG) conn(ctx context.Context) querier {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

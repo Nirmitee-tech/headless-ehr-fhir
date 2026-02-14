@@ -2,6 +2,7 @@ package hipaa
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -159,5 +160,118 @@ func TestNewDeleteEvent(t *testing.T) {
 	}
 	if event.Recorded.IsZero() {
 		t.Error("expected recorded timestamp to be set")
+	}
+}
+
+func TestNewAuditLogger(t *testing.T) {
+	logger := NewAuditLogger(nil)
+	if logger == nil {
+		t.Fatal("expected non-nil AuditLogger")
+	}
+	if logger.pool != nil {
+		t.Error("expected nil pool when passed nil")
+	}
+}
+
+func TestNewReadEvent_UniqueIDs(t *testing.T) {
+	agentID := uuid.New()
+	entityID := uuid.New()
+
+	event1 := NewReadEvent(agentID, "Dr. Smith", "Patient", entityID)
+	event2 := NewReadEvent(agentID, "Dr. Smith", "Patient", entityID)
+
+	if event1.FHIRId == event2.FHIRId {
+		t.Error("expected unique FHIR IDs for each event")
+	}
+}
+
+func TestNewWriteEvent_Fields(t *testing.T) {
+	agentID := uuid.New()
+	entityID := uuid.New()
+
+	event := NewWriteEvent(agentID, "Nurse", "Observation", entityID)
+
+	// Verify it doesn't share the same FHIRId with any other event factory
+	if event.SubtypeCode != "create" {
+		t.Errorf("expected SubtypeCode 'create', got %q", event.SubtypeCode)
+	}
+	if event.SubtypeDisplay != "Create" {
+		t.Errorf("expected SubtypeDisplay 'Create', got %q", event.SubtypeDisplay)
+	}
+	if event.Action != "C" {
+		t.Errorf("expected Action 'C', got %q", event.Action)
+	}
+}
+
+func TestNewDeleteEvent_Fields(t *testing.T) {
+	agentID := uuid.New()
+	entityID := uuid.New()
+
+	event := NewDeleteEvent(agentID, "Admin", "MedicationRequest", entityID)
+
+	if event.SubtypeCode != "delete" {
+		t.Errorf("expected SubtypeCode 'delete', got %q", event.SubtypeCode)
+	}
+	if event.Action != "D" {
+		t.Errorf("expected Action 'D', got %q", event.Action)
+	}
+	if event.EntityWhatType != "MedicationRequest" {
+		t.Errorf("expected EntityWhatType 'MedicationRequest', got %q", event.EntityWhatType)
+	}
+}
+
+func TestAuditEvent_DefaultTimestamp(t *testing.T) {
+	agentID := uuid.New()
+	entityID := uuid.New()
+
+	event := NewReadEvent(agentID, "Dr. Smith", "Patient", entityID)
+
+	if event.Recorded.IsZero() {
+		t.Error("expected Recorded to be set automatically")
+	}
+	// Recorded should be recent
+	if time.Since(event.Recorded) > time.Second {
+		t.Errorf("Recorded timestamp too old: %v", event.Recorded)
+	}
+}
+
+func TestAuditEvent_FieldDefaults(t *testing.T) {
+	agentID := uuid.New()
+	entityID := uuid.New()
+
+	event := NewReadEvent(agentID, "Dr. Smith", "Patient", entityID)
+
+	// Check fields common to all event factory functions
+	if event.TypeCode != "rest" {
+		t.Errorf("TypeCode = %q, want 'rest'", event.TypeCode)
+	}
+	if event.TypeDisplay != "RESTful Operation" {
+		t.Errorf("TypeDisplay = %q, want 'RESTful Operation'", event.TypeDisplay)
+	}
+	if event.Outcome != "0" {
+		t.Errorf("Outcome = %q, want '0'", event.Outcome)
+	}
+	if !event.AgentRequestor {
+		t.Error("AgentRequestor should be true")
+	}
+	if event.PurposeCode != "TREAT" {
+		t.Errorf("PurposeCode = %q, want 'TREAT'", event.PurposeCode)
+	}
+	if event.PurposeDisplay != "Treatment" {
+		t.Errorf("PurposeDisplay = %q, want 'Treatment'", event.PurposeDisplay)
+	}
+}
+
+func TestPHIAccessLog_Struct(t *testing.T) {
+	// Verify the PHIAccessLog struct can be instantiated and has expected zero values
+	log := PHIAccessLog{}
+	if log.IsBreakGlass {
+		t.Error("expected IsBreakGlass to default to false")
+	}
+	if !log.AccessedAt.IsZero() {
+		t.Error("expected AccessedAt to be zero")
+	}
+	if log.Action != "" {
+		t.Error("expected Action to be empty")
 	}
 }

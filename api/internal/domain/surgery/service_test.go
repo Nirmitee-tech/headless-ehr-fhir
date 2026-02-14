@@ -575,3 +575,394 @@ func TestCreateImplantLog_TypeRequired(t *testing.T) {
 		t.Error("expected error for missing implant_type")
 	}
 }
+
+// -- Additional OR Room Tests --
+
+func TestUpdateORRoom(t *testing.T) {
+	svc := newTestService()
+	r := &ORRoom{Name: "OR-1"}
+	svc.CreateORRoom(context.Background(), r)
+	r.Status = "in-use"
+	err := svc.UpdateORRoom(context.Background(), r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateORRoom_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	r := &ORRoom{Name: "OR-1"}
+	svc.CreateORRoom(context.Background(), r)
+	r.Status = "bogus"
+	err := svc.UpdateORRoom(context.Background(), r)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListORRooms(t *testing.T) {
+	svc := newTestService()
+	svc.CreateORRoom(context.Background(), &ORRoom{Name: "OR-1"})
+	svc.CreateORRoom(context.Background(), &ORRoom{Name: "OR-2"})
+	rooms, total, err := svc.ListORRooms(context.Background(), 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(rooms) != 2 {
+		t.Errorf("expected 2 rooms, got %d", len(rooms))
+	}
+}
+
+func TestSearchORRooms(t *testing.T) {
+	svc := newTestService()
+	svc.CreateORRoom(context.Background(), &ORRoom{Name: "OR-1"})
+	rooms, total, err := svc.SearchORRooms(context.Background(), map[string]string{"status": "available"}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(rooms) < 1 {
+		t.Error("expected rooms")
+	}
+}
+
+// -- Additional Surgical Case Tests --
+
+func TestGetSurgicalCase(t *testing.T) {
+	svc := newTestService()
+	sc := &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()}
+	svc.CreateSurgicalCase(context.Background(), sc)
+	fetched, err := svc.GetSurgicalCase(context.Background(), sc.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != sc.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetSurgicalCase_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSurgicalCase(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateSurgicalCase(t *testing.T) {
+	svc := newTestService()
+	sc := &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()}
+	svc.CreateSurgicalCase(context.Background(), sc)
+	sc.Status = "in-or"
+	err := svc.UpdateSurgicalCase(context.Background(), sc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateSurgicalCase_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	sc := &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()}
+	svc.CreateSurgicalCase(context.Background(), sc)
+	sc.Status = "bogus"
+	err := svc.UpdateSurgicalCase(context.Background(), sc)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteSurgicalCase(t *testing.T) {
+	svc := newTestService()
+	sc := &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()}
+	svc.CreateSurgicalCase(context.Background(), sc)
+	err := svc.DeleteSurgicalCase(context.Background(), sc.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetSurgicalCase(context.Background(), sc.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListSurgicalCases(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSurgicalCase(context.Background(), &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()})
+	cases, total, err := svc.ListSurgicalCases(context.Background(), 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(cases) != 1 {
+		t.Errorf("expected 1 case, got %d", len(cases))
+	}
+}
+
+func TestListSurgicalCasesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateSurgicalCase(context.Background(), &SurgicalCase{PatientID: patientID, PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()})
+	svc.CreateSurgicalCase(context.Background(), &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()})
+	cases, total, err := svc.ListSurgicalCasesByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(cases) != 1 {
+		t.Errorf("expected 1 case, got %d", len(cases))
+	}
+}
+
+func TestSearchSurgicalCases(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSurgicalCase(context.Background(), &SurgicalCase{PatientID: uuid.New(), PrimarySurgeonID: uuid.New(), ScheduledDate: time.Now()})
+	cases, total, err := svc.SearchSurgicalCases(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(cases) < 1 {
+		t.Error("expected cases")
+	}
+}
+
+// -- Additional Sub-Resource Tests --
+
+func TestRemoveCaseProcedure(t *testing.T) {
+	svc := newTestService()
+	caseID := uuid.New()
+	p := &SurgicalCaseProcedure{SurgicalCaseID: caseID, ProcedureCode: "12345"}
+	svc.AddCaseProcedure(context.Background(), p)
+	err := svc.RemoveCaseProcedure(context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	procs, _ := svc.GetCaseProcedures(context.Background(), caseID)
+	if len(procs) != 0 {
+		t.Errorf("expected 0 procedures after removal, got %d", len(procs))
+	}
+}
+
+func TestRemoveCaseTeamMember(t *testing.T) {
+	svc := newTestService()
+	caseID := uuid.New()
+	tm := &SurgicalCaseTeam{SurgicalCaseID: caseID, PractitionerID: uuid.New(), Role: "surgeon"}
+	svc.AddCaseTeamMember(context.Background(), tm)
+	err := svc.RemoveCaseTeamMember(context.Background(), tm.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	members, _ := svc.GetCaseTeamMembers(context.Background(), caseID)
+	if len(members) != 0 {
+		t.Errorf("expected 0 members after removal, got %d", len(members))
+	}
+}
+
+func TestGetCaseTimeEvents(t *testing.T) {
+	svc := newTestService()
+	caseID := uuid.New()
+	svc.AddCaseTimeEvent(context.Background(), &SurgicalTimeEvent{SurgicalCaseID: caseID, EventType: "incision"})
+	events, err := svc.GetCaseTimeEvents(context.Background(), caseID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Errorf("expected 1 event, got %d", len(events))
+	}
+}
+
+func TestGetCaseCounts(t *testing.T) {
+	svc := newTestService()
+	caseID := uuid.New()
+	svc.AddCaseCount(context.Background(), &SurgicalCount{SurgicalCaseID: caseID, ItemName: "sponge", ExpectedCount: 10, ActualCount: 10})
+	counts, err := svc.GetCaseCounts(context.Background(), caseID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(counts) != 1 {
+		t.Errorf("expected 1 count, got %d", len(counts))
+	}
+}
+
+func TestGetCaseSupplies(t *testing.T) {
+	svc := newTestService()
+	caseID := uuid.New()
+	svc.AddCaseSupply(context.Background(), &SurgicalSupplyUsed{SurgicalCaseID: caseID, SupplyName: "gauze"})
+	supplies, err := svc.GetCaseSupplies(context.Background(), caseID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(supplies) != 1 {
+		t.Errorf("expected 1 supply, got %d", len(supplies))
+	}
+}
+
+// -- Additional Preference Card Tests --
+
+func TestGetPreferenceCard(t *testing.T) {
+	svc := newTestService()
+	pc := &SurgicalPreferenceCard{SurgeonID: uuid.New(), ProcedureCode: "12345"}
+	svc.CreatePreferenceCard(context.Background(), pc)
+	fetched, err := svc.GetPreferenceCard(context.Background(), pc.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != pc.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetPreferenceCard_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPreferenceCard(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdatePreferenceCard(t *testing.T) {
+	svc := newTestService()
+	pc := &SurgicalPreferenceCard{SurgeonID: uuid.New(), ProcedureCode: "12345"}
+	svc.CreatePreferenceCard(context.Background(), pc)
+	pc.ProcedureCode = "67890"
+	err := svc.UpdatePreferenceCard(context.Background(), pc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeletePreferenceCard(t *testing.T) {
+	svc := newTestService()
+	pc := &SurgicalPreferenceCard{SurgeonID: uuid.New(), ProcedureCode: "12345"}
+	svc.CreatePreferenceCard(context.Background(), pc)
+	err := svc.DeletePreferenceCard(context.Background(), pc.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetPreferenceCard(context.Background(), pc.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListPreferenceCardsBySurgeon(t *testing.T) {
+	svc := newTestService()
+	surgeonID := uuid.New()
+	svc.CreatePreferenceCard(context.Background(), &SurgicalPreferenceCard{SurgeonID: surgeonID, ProcedureCode: "111"})
+	svc.CreatePreferenceCard(context.Background(), &SurgicalPreferenceCard{SurgeonID: surgeonID, ProcedureCode: "222"})
+	cards, total, err := svc.ListPreferenceCardsBySurgeon(context.Background(), surgeonID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(cards) != 2 {
+		t.Errorf("expected 2 cards, got %d", len(cards))
+	}
+}
+
+func TestSearchPreferenceCards(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePreferenceCard(context.Background(), &SurgicalPreferenceCard{SurgeonID: uuid.New(), ProcedureCode: "111"})
+	cards, total, err := svc.SearchPreferenceCards(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(cards) < 1 {
+		t.Error("expected cards")
+	}
+}
+
+// -- Additional Implant Log Tests --
+
+func TestGetImplantLog(t *testing.T) {
+	svc := newTestService()
+	il := &ImplantLog{PatientID: uuid.New(), ImplantType: "knee"}
+	svc.CreateImplantLog(context.Background(), il)
+	fetched, err := svc.GetImplantLog(context.Background(), il.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != il.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetImplantLog_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetImplantLog(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateImplantLog(t *testing.T) {
+	svc := newTestService()
+	il := &ImplantLog{PatientID: uuid.New(), ImplantType: "knee"}
+	svc.CreateImplantLog(context.Background(), il)
+	il.ImplantType = "hip"
+	err := svc.UpdateImplantLog(context.Background(), il)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteImplantLog(t *testing.T) {
+	svc := newTestService()
+	il := &ImplantLog{PatientID: uuid.New(), ImplantType: "knee"}
+	svc.CreateImplantLog(context.Background(), il)
+	err := svc.DeleteImplantLog(context.Background(), il.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetImplantLog(context.Background(), il.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListImplantLogsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateImplantLog(context.Background(), &ImplantLog{PatientID: patientID, ImplantType: "knee"})
+	logs, total, err := svc.ListImplantLogsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(logs) != 1 {
+		t.Errorf("expected 1 log, got %d", len(logs))
+	}
+}
+
+func TestSearchImplantLogs(t *testing.T) {
+	svc := newTestService()
+	svc.CreateImplantLog(context.Background(), &ImplantLog{PatientID: uuid.New(), ImplantType: "knee"})
+	logs, total, err := svc.SearchImplantLogs(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(logs) < 1 {
+		t.Error("expected logs")
+	}
+}

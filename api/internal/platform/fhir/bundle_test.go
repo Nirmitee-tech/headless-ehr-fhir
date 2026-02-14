@@ -3,6 +3,7 @@ package fhir
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -606,5 +607,282 @@ func TestResourceCapability(t *testing.T) {
 	}
 	if rc.Versioning != "versioned" {
 		t.Errorf("expected versioned, got %s", rc.Versioning)
+	}
+}
+
+func TestToMap_MapStringInterface(t *testing.T) {
+	input := map[string]interface{}{"resourceType": "Patient", "id": "123"}
+	m, ok := toMap(input)
+	if !ok {
+		t.Fatal("toMap should return true for map[string]interface{}")
+	}
+	if m["resourceType"] != "Patient" {
+		t.Errorf("expected resourceType=Patient, got %v", m["resourceType"])
+	}
+	if m["id"] != "123" {
+		t.Errorf("expected id=123, got %v", m["id"])
+	}
+}
+
+func TestToMap_Struct(t *testing.T) {
+	type testResource struct {
+		ResourceType string `json:"resourceType"`
+		ID           string `json:"id"`
+		Active       bool   `json:"active"`
+	}
+	input := testResource{ResourceType: "Patient", ID: "struct-1", Active: true}
+	m, ok := toMap(input)
+	if !ok {
+		t.Fatal("toMap should return true for a JSON-serializable struct")
+	}
+	if m["resourceType"] != "Patient" {
+		t.Errorf("expected resourceType=Patient, got %v", m["resourceType"])
+	}
+	if m["id"] != "struct-1" {
+		t.Errorf("expected id=struct-1, got %v", m["id"])
+	}
+	if m["active"] != true {
+		t.Errorf("expected active=true, got %v", m["active"])
+	}
+}
+
+func TestToMap_UnmarshalableType(t *testing.T) {
+	// Channels cannot be marshaled to JSON
+	ch := make(chan int)
+	_, ok := toMap(ch)
+	if ok {
+		t.Error("toMap should return false for an unmarshalable type like a channel")
+	}
+}
+
+func TestToMap_MapStringString(t *testing.T) {
+	input := map[string]string{"resourceType": "Observation", "id": "obs-5"}
+	m, ok := toMap(input)
+	if !ok {
+		t.Fatal("toMap should return true for map[string]string")
+	}
+	if m["resourceType"] != "Observation" {
+		t.Errorf("expected resourceType=Observation, got %v", m["resourceType"])
+	}
+	if m["id"] != "obs-5" {
+		t.Errorf("expected id=obs-5, got %v", m["id"])
+	}
+}
+
+func TestExtractFullURL_EmptyResourceType(t *testing.T) {
+	resource := map[string]interface{}{"id": "123"}
+	got := extractFullURL(resource, "/fhir/Patient")
+	if got != "" {
+		t.Errorf("expected empty fullUrl when resourceType is missing, got %q", got)
+	}
+}
+
+func TestExtractFullURL_EmptyID(t *testing.T) {
+	resource := map[string]interface{}{"resourceType": "Patient"}
+	got := extractFullURL(resource, "/fhir/Patient")
+	if got != "" {
+		t.Errorf("expected empty fullUrl when id is missing, got %q", got)
+	}
+}
+
+func TestExtractFullURL_StructInput(t *testing.T) {
+	type testResource struct {
+		ResourceType string `json:"resourceType"`
+		ID           string `json:"id"`
+	}
+	resource := testResource{ResourceType: "Condition", ID: "cond-99"}
+	got := extractFullURL(resource, "/fhir/Condition")
+	if got != "Condition/cond-99" {
+		t.Errorf("expected fullUrl 'Condition/cond-99', got %q", got)
+	}
+}
+
+func TestExtractFullURL_UnmarshalableType(t *testing.T) {
+	ch := make(chan int)
+	got := extractFullURL(ch, "/fhir/Patient")
+	if got != "" {
+		t.Errorf("expected empty fullUrl for unmarshalable type, got %q", got)
+	}
+}
+
+func TestFormatReference_EdgeCases(t *testing.T) {
+	tests := []struct {
+		resourceType string
+		id           string
+		want         string
+	}{
+		{"Patient", "123", "Patient/123"},
+		{"Observation", "obs-1", "Observation/obs-1"},
+		{"", "123", "/123"},
+		{"Patient", "", "Patient/"},
+	}
+
+	for _, tt := range tests {
+		got := FormatReference(tt.resourceType, tt.id)
+		if got != tt.want {
+			t.Errorf("FormatReference(%q, %q) = %q, want %q", tt.resourceType, tt.id, got, tt.want)
+		}
+	}
+}
+
+func TestNewSearchBundle_NilResources(t *testing.T) {
+	bundle := NewSearchBundle(nil, 0, "/fhir/Patient")
+	if bundle.ResourceType != "Bundle" {
+		t.Errorf("expected Bundle, got %s", bundle.ResourceType)
+	}
+	if bundle.Type != "searchset" {
+		t.Errorf("expected searchset, got %s", bundle.Type)
+	}
+	if len(bundle.Entry) != 0 {
+		t.Errorf("expected 0 entries for nil resources, got %d", len(bundle.Entry))
+	}
+}
+
+func TestNewSearchBundleWithLinks_PreviousOffsetNeverNegative(t *testing.T) {
+	// When offset is less than count, previous should go to 0
+	params := SearchBundleParams{
+		BaseURL:  "/fhir/Patient",
+		QueryStr: "",
+		Count:    10,
+		Offset:   5,
+		Total:    20,
+	}
+
+	bundle := NewSearchBundleWithLinks(nil, params)
+
+	relations := map[string]string{}
+	for _, l := range bundle.Link {
+		relations[l.Relation] = l.URL
+	}
+
+	prevURL, ok := relations["previous"]
+	if !ok {
+		t.Fatal("expected previous link")
+	}
+	// Previous offset should be 0 (not -5)
+	if !strings.Contains(prevURL, "_offset=0") {
+		t.Errorf("previous URL should have _offset=0, got %q", prevURL)
+	}
+}
+
+func TestNewBatchResponse_Timestamp(t *testing.T) {
+	bundle := NewBatchResponse(nil)
+	if bundle.Timestamp == nil {
+		t.Error("expected timestamp to be set")
+	}
+	if bundle.Type != "batch-response" {
+		t.Errorf("expected type batch-response, got %s", bundle.Type)
+	}
+}
+
+func TestNewTransactionResponse_Timestamp(t *testing.T) {
+	bundle := NewTransactionResponse(nil)
+	if bundle.Timestamp == nil {
+		t.Error("expected timestamp to be set")
+	}
+	if bundle.Type != "transaction-response" {
+		t.Errorf("expected type transaction-response, got %s", bundle.Type)
+	}
+}
+
+func TestNewSearchBundle_MultipleEntriesFullURL(t *testing.T) {
+	resources := []interface{}{
+		map[string]interface{}{"resourceType": "Patient", "id": "p1"},
+		map[string]interface{}{"resourceType": "Patient", "id": "p2"},
+		map[string]interface{}{"resourceType": "Patient", "id": "p3"},
+	}
+
+	bundle := NewSearchBundle(resources, 3, "/fhir/Patient")
+
+	if len(bundle.Entry) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(bundle.Entry))
+	}
+
+	expectedURLs := []string{"Patient/p1", "Patient/p2", "Patient/p3"}
+	for i, entry := range bundle.Entry {
+		if entry.FullURL != expectedURLs[i] {
+			t.Errorf("entry[%d].FullURL = %q, want %q", i, entry.FullURL, expectedURLs[i])
+		}
+	}
+}
+
+func TestBuildPaginationLinks_PreviousOffsetClampedToZero(t *testing.T) {
+	params := SearchBundleParams{
+		BaseURL:  "/fhir/Patient",
+		QueryStr: "",
+		Count:    20,
+		Offset:   5,
+		Total:    30,
+	}
+
+	links := buildPaginationLinks(params)
+
+	relations := map[string]string{}
+	for _, l := range links {
+		relations[l.Relation] = l.URL
+	}
+
+	prevURL, ok := relations["previous"]
+	if !ok {
+		t.Fatal("expected previous link")
+	}
+	if !strings.Contains(prevURL, "_offset=0") {
+		t.Errorf("previous offset should be 0, got %q", prevURL)
+	}
+}
+
+func TestNewBundleHandler(t *testing.T) {
+	proc := &DefaultBundleProcessor{}
+	handler := NewBundleHandler(proc)
+	if handler == nil {
+		t.Fatal("expected non-nil BundleHandler")
+	}
+	if handler.processor == nil {
+		t.Error("expected processor to be set")
+	}
+	if handler.validator == nil {
+		t.Error("expected validator to be set")
+	}
+}
+
+func TestDefaultBundleProcessor_Location(t *testing.T) {
+	proc := &DefaultBundleProcessor{}
+
+	entry, err := proc.ProcessEntry(nil, "POST", "Patient", "123", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry.Response.Location != "Patient/123" {
+		t.Errorf("expected location Patient/123, got %q", entry.Response.Location)
+	}
+
+	entry, err = proc.ProcessEntry(nil, "DELETE", "Patient", "123", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry.Response.Location != "" {
+		t.Errorf("expected empty location for DELETE, got %q", entry.Response.Location)
+	}
+}
+
+func TestDefaultBundleProcessor_LastModified(t *testing.T) {
+	proc := &DefaultBundleProcessor{}
+
+	entry, err := proc.ProcessEntry(nil, "GET", "Patient", "123", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry.Response.LastModified == nil {
+		t.Error("expected lastModified to be set")
+	}
+}
+
+func TestParseEntryRequest_MethodCaseNormalization(t *testing.T) {
+	entry := BundleEntry{
+		Request: &BundleRequest{Method: "put", URL: "Patient/123"},
+	}
+	method, _, _ := parseEntryRequest(entry)
+	if method != "PUT" {
+		t.Errorf("expected method PUT (uppercase), got %q", method)
 	}
 }

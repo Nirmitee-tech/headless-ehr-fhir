@@ -656,3 +656,618 @@ func TestMedicationDispenseToFHIR(t *testing.T) {
 		t.Errorf("expected md-123, got %v", fhirRes["id"])
 	}
 }
+
+// =========== Additional Medication Tests ===========
+
+func TestGetMedication_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedication(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetMedicationByFHIRID(t *testing.T) {
+	svc := newTestService()
+	m := &Medication{CodeValue: "12345", CodeDisplay: "Aspirin"}
+	svc.CreateMedication(context.Background(), m)
+	got, err := svc.GetMedicationByFHIRID(context.Background(), m.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != m.ID {
+		t.Errorf("expected ID %v, got %v", m.ID, got.ID)
+	}
+}
+
+func TestGetMedicationByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateMedication(t *testing.T) {
+	svc := newTestService()
+	m := &Medication{CodeValue: "12345", CodeDisplay: "Aspirin"}
+	svc.CreateMedication(context.Background(), m)
+	m.Status = "inactive"
+	err := svc.UpdateMedication(context.Background(), m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateMedication_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	m := &Medication{CodeValue: "12345", CodeDisplay: "Aspirin"}
+	svc.CreateMedication(context.Background(), m)
+	m.Status = "bogus"
+	err := svc.UpdateMedication(context.Background(), m)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestUpdateMedication_NotFound(t *testing.T) {
+	svc := newTestService()
+	m := &Medication{ID: uuid.New(), Status: "active"}
+	err := svc.UpdateMedication(context.Background(), m)
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestCreateMedication_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active", "inactive", "entered-in-error"} {
+		svc := newTestService()
+		m := &Medication{CodeValue: "12345", CodeDisplay: "Aspirin", Status: s}
+		if err := svc.CreateMedication(context.Background(), m); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestRemoveIngredient(t *testing.T) {
+	svc := newTestService()
+	m := &Medication{CodeValue: "12345", CodeDisplay: "Aspirin"}
+	svc.CreateMedication(context.Background(), m)
+	ing := &MedicationIngredient{MedicationID: m.ID, ItemDisplay: "Acetylsalicylic acid"}
+	svc.AddIngredient(context.Background(), ing)
+	err := svc.RemoveIngredient(context.Background(), ing.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ings, _ := svc.GetIngredients(context.Background(), m.ID)
+	if len(ings) != 0 {
+		t.Errorf("expected 0 ingredients after remove, got %d", len(ings))
+	}
+}
+
+// =========== Additional MedicationRequest Tests ===========
+
+func TestCreateMedicationRequest_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New(), Status: "bogus"}
+	err := svc.CreateMedicationRequest(context.Background(), mr)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestCreateMedicationRequest_InvalidIntent(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New(), Intent: "bogus"}
+	err := svc.CreateMedicationRequest(context.Background(), mr)
+	if err == nil {
+		t.Error("expected error for invalid intent")
+	}
+}
+
+func TestCreateMedicationRequest_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active", "on-hold", "cancelled", "completed", "entered-in-error", "stopped", "draft", "unknown"} {
+		svc := newTestService()
+		mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New(), Status: s}
+		if err := svc.CreateMedicationRequest(context.Background(), mr); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetMedicationRequest(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()}
+	svc.CreateMedicationRequest(context.Background(), mr)
+	got, err := svc.GetMedicationRequest(context.Background(), mr.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != mr.ID {
+		t.Errorf("expected ID %v, got %v", mr.ID, got.ID)
+	}
+}
+
+func TestGetMedicationRequest_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationRequest(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetMedicationRequestByFHIRID(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()}
+	svc.CreateMedicationRequest(context.Background(), mr)
+	got, err := svc.GetMedicationRequestByFHIRID(context.Background(), mr.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != mr.ID {
+		t.Errorf("expected ID %v, got %v", mr.ID, got.ID)
+	}
+}
+
+func TestGetMedicationRequestByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationRequestByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateMedicationRequest(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()}
+	svc.CreateMedicationRequest(context.Background(), mr)
+	mr.Status = "active"
+	err := svc.UpdateMedicationRequest(context.Background(), mr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateMedicationRequest_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()}
+	svc.CreateMedicationRequest(context.Background(), mr)
+	mr.Status = "bogus"
+	err := svc.UpdateMedicationRequest(context.Background(), mr)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteMedicationRequest(t *testing.T) {
+	svc := newTestService()
+	mr := &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()}
+	svc.CreateMedicationRequest(context.Background(), mr)
+	err := svc.DeleteMedicationRequest(context.Background(), mr.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetMedicationRequest(context.Background(), mr.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListMedicationRequestsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateMedicationRequest(context.Background(), &MedicationRequest{PatientID: pid, MedicationID: uuid.New(), RequesterID: uuid.New()})
+	svc.CreateMedicationRequest(context.Background(), &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()})
+	items, total, err := svc.ListMedicationRequestsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestSearchMedicationRequests(t *testing.T) {
+	svc := newTestService()
+	svc.CreateMedicationRequest(context.Background(), &MedicationRequest{PatientID: uuid.New(), MedicationID: uuid.New(), RequesterID: uuid.New()})
+	items, total, err := svc.SearchMedicationRequests(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 || len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// =========== Additional MedicationAdministration Tests ===========
+
+func TestCreateMedicationAdministration_MedicationIDRequired(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New()}
+	err := svc.CreateMedicationAdministration(context.Background(), ma)
+	if err == nil {
+		t.Error("expected error for missing medication_id")
+	}
+}
+
+func TestCreateMedicationAdministration_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New(), Status: "bogus"}
+	err := svc.CreateMedicationAdministration(context.Background(), ma)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestCreateMedicationAdministration_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"in-progress", "not-done", "on-hold", "completed", "entered-in-error", "stopped", "unknown"} {
+		svc := newTestService()
+		ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New(), Status: s}
+		if err := svc.CreateMedicationAdministration(context.Background(), ma); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetMedicationAdministration(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationAdministration(context.Background(), ma)
+	got, err := svc.GetMedicationAdministration(context.Background(), ma.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != ma.ID {
+		t.Errorf("expected ID %v, got %v", ma.ID, got.ID)
+	}
+}
+
+func TestGetMedicationAdministration_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationAdministration(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetMedicationAdministrationByFHIRID(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationAdministration(context.Background(), ma)
+	got, err := svc.GetMedicationAdministrationByFHIRID(context.Background(), ma.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != ma.ID {
+		t.Errorf("expected ID %v, got %v", ma.ID, got.ID)
+	}
+}
+
+func TestGetMedicationAdministrationByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationAdministrationByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateMedicationAdministration(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationAdministration(context.Background(), ma)
+	ma.Status = "completed"
+	err := svc.UpdateMedicationAdministration(context.Background(), ma)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateMedicationAdministration_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationAdministration(context.Background(), ma)
+	ma.Status = "bogus"
+	err := svc.UpdateMedicationAdministration(context.Background(), ma)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteMedicationAdministration(t *testing.T) {
+	svc := newTestService()
+	ma := &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationAdministration(context.Background(), ma)
+	err := svc.DeleteMedicationAdministration(context.Background(), ma.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetMedicationAdministration(context.Background(), ma.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListMedicationAdministrationsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateMedicationAdministration(context.Background(), &MedicationAdministration{PatientID: pid, MedicationID: uuid.New()})
+	svc.CreateMedicationAdministration(context.Background(), &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()})
+	items, total, err := svc.ListMedicationAdministrationsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestSearchMedicationAdministrations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateMedicationAdministration(context.Background(), &MedicationAdministration{PatientID: uuid.New(), MedicationID: uuid.New()})
+	items, total, err := svc.SearchMedicationAdministrations(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 || len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// =========== Additional MedicationDispense Tests ===========
+
+func TestCreateMedicationDispense_MedicationIDRequired(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New()}
+	err := svc.CreateMedicationDispense(context.Background(), md)
+	if err == nil {
+		t.Error("expected error for missing medication_id")
+	}
+}
+
+func TestCreateMedicationDispense_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New(), Status: "bogus"}
+	err := svc.CreateMedicationDispense(context.Background(), md)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestCreateMedicationDispense_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"preparation", "in-progress", "cancelled", "on-hold", "completed", "entered-in-error", "stopped", "declined", "unknown"} {
+		svc := newTestService()
+		md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New(), Status: s}
+		if err := svc.CreateMedicationDispense(context.Background(), md); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetMedicationDispense(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationDispense(context.Background(), md)
+	got, err := svc.GetMedicationDispense(context.Background(), md.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != md.ID {
+		t.Errorf("expected ID %v, got %v", md.ID, got.ID)
+	}
+}
+
+func TestGetMedicationDispense_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationDispense(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetMedicationDispenseByFHIRID(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationDispense(context.Background(), md)
+	got, err := svc.GetMedicationDispenseByFHIRID(context.Background(), md.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != md.ID {
+		t.Errorf("expected ID %v, got %v", md.ID, got.ID)
+	}
+}
+
+func TestGetMedicationDispenseByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationDispenseByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateMedicationDispense(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationDispense(context.Background(), md)
+	md.Status = "completed"
+	err := svc.UpdateMedicationDispense(context.Background(), md)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateMedicationDispense_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationDispense(context.Background(), md)
+	md.Status = "bogus"
+	err := svc.UpdateMedicationDispense(context.Background(), md)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteMedicationDispense(t *testing.T) {
+	svc := newTestService()
+	md := &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()}
+	svc.CreateMedicationDispense(context.Background(), md)
+	err := svc.DeleteMedicationDispense(context.Background(), md.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetMedicationDispense(context.Background(), md.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListMedicationDispensesByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateMedicationDispense(context.Background(), &MedicationDispense{PatientID: pid, MedicationID: uuid.New()})
+	svc.CreateMedicationDispense(context.Background(), &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()})
+	items, total, err := svc.ListMedicationDispensesByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestSearchMedicationDispenses(t *testing.T) {
+	svc := newTestService()
+	svc.CreateMedicationDispense(context.Background(), &MedicationDispense{PatientID: uuid.New(), MedicationID: uuid.New()})
+	items, total, err := svc.SearchMedicationDispenses(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 || len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// =========== Additional MedicationStatement Tests ===========
+
+func TestCreateMedicationStatement_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	ms := &MedicationStatement{PatientID: uuid.New(), Status: "bogus"}
+	err := svc.CreateMedicationStatement(context.Background(), ms)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestCreateMedicationStatement_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active", "completed", "entered-in-error", "intended", "stopped", "on-hold", "unknown", "not-taken"} {
+		svc := newTestService()
+		ms := &MedicationStatement{PatientID: uuid.New(), Status: s}
+		if err := svc.CreateMedicationStatement(context.Background(), ms); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetMedicationStatement(t *testing.T) {
+	svc := newTestService()
+	ms := &MedicationStatement{PatientID: uuid.New()}
+	svc.CreateMedicationStatement(context.Background(), ms)
+	got, err := svc.GetMedicationStatement(context.Background(), ms.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != ms.ID {
+		t.Errorf("expected ID %v, got %v", ms.ID, got.ID)
+	}
+}
+
+func TestGetMedicationStatement_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationStatement(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestGetMedicationStatementByFHIRID(t *testing.T) {
+	svc := newTestService()
+	ms := &MedicationStatement{PatientID: uuid.New()}
+	svc.CreateMedicationStatement(context.Background(), ms)
+	got, err := svc.GetMedicationStatementByFHIRID(context.Background(), ms.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != ms.ID {
+		t.Errorf("expected ID %v, got %v", ms.ID, got.ID)
+	}
+}
+
+func TestGetMedicationStatementByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetMedicationStatementByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateMedicationStatement(t *testing.T) {
+	svc := newTestService()
+	ms := &MedicationStatement{PatientID: uuid.New()}
+	svc.CreateMedicationStatement(context.Background(), ms)
+	ms.Status = "completed"
+	err := svc.UpdateMedicationStatement(context.Background(), ms)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateMedicationStatement_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	ms := &MedicationStatement{PatientID: uuid.New()}
+	svc.CreateMedicationStatement(context.Background(), ms)
+	ms.Status = "bogus"
+	err := svc.UpdateMedicationStatement(context.Background(), ms)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestDeleteMedicationStatement(t *testing.T) {
+	svc := newTestService()
+	ms := &MedicationStatement{PatientID: uuid.New()}
+	svc.CreateMedicationStatement(context.Background(), ms)
+	err := svc.DeleteMedicationStatement(context.Background(), ms.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetMedicationStatement(context.Background(), ms.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListMedicationStatementsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateMedicationStatement(context.Background(), &MedicationStatement{PatientID: pid})
+	svc.CreateMedicationStatement(context.Background(), &MedicationStatement{PatientID: uuid.New()})
+	items, total, err := svc.ListMedicationStatementsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestSearchMedicationStatements(t *testing.T) {
+	svc := newTestService()
+	svc.CreateMedicationStatement(context.Background(), &MedicationStatement{PatientID: uuid.New()})
+	items, total, err := svc.SearchMedicationStatements(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 || len(items) < 1 {
+		t.Error("expected items")
+	}
+}

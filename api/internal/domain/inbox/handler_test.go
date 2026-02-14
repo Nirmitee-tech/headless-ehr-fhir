@@ -441,6 +441,277 @@ func TestHandler_GetHandoff_NotFound(t *testing.T) {
 	}
 }
 
+// -- Additional MessagePool Handler Tests --
+
+func TestHandler_ListMessagePools(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListMessagePools(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_UpdateMessagePool(t *testing.T) {
+	h, e := newTestHandler()
+	p := &MessagePool{PoolName: "Test", PoolType: "shared"}
+	h.svc.CreateMessagePool(nil, p)
+	body := `{"pool_name":"Updated Pool"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(p.ID.String())
+	if err := h.UpdateMessagePool(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_GetPoolMembers(t *testing.T) {
+	h, e := newTestHandler()
+	poolID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(poolID.String())
+	if err := h.GetPoolMembers(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_RemovePoolMember(t *testing.T) {
+	h, e := newTestHandler()
+	p := &MessagePool{PoolName: "Test", PoolType: "shared"}
+	h.svc.CreateMessagePool(nil, p)
+	member := &MessagePoolMember{PoolID: p.ID, UserID: uuid.New()}
+	h.svc.AddPoolMember(nil, member)
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "memberID")
+	c.SetParamValues(p.ID.String(), member.ID.String())
+	if err := h.RemovePoolMember(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusNoContent { t.Errorf("expected 204, got %d", rec.Code) }
+}
+
+// -- Additional InboxMessage Handler Tests --
+
+func TestHandler_ListInboxMessages(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListInboxMessages(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListInboxMessages_ByRecipient(t *testing.T) {
+	h, e := newTestHandler()
+	recipientID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?recipient_id="+recipientID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListInboxMessages(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListInboxMessages_ByPatient(t *testing.T) {
+	h, e := newTestHandler()
+	patientID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?patient_id="+patientID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListInboxMessages(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_UpdateInboxMessage(t *testing.T) {
+	h, e := newTestHandler()
+	m := &InboxMessage{MessageType: "result", Subject: "Lab"}
+	h.svc.CreateInboxMessage(nil, m)
+	body := `{"subject":"Updated Subject"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(m.ID.String())
+	if err := h.UpdateInboxMessage(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+// -- Additional CosignRequest Handler Tests --
+
+func TestHandler_ListCosignRequests_ByCosigner(t *testing.T) {
+	h, e := newTestHandler()
+	cosignerID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?cosigner_id="+cosignerID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListCosignRequests(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListCosignRequests_ByRequester(t *testing.T) {
+	h, e := newTestHandler()
+	requesterID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?requester_id="+requesterID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListCosignRequests(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListCosignRequests_MissingParam(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListCosignRequests(c)
+	if err == nil { t.Error("expected error for missing cosigner_id/requester_id") }
+}
+
+func TestHandler_UpdateCosignRequest(t *testing.T) {
+	h, e := newTestHandler()
+	r := &CosignRequest{DocumentType: "progress_note", RequesterID: uuid.New(), CosignerID: uuid.New()}
+	h.svc.CreateCosignRequest(nil, r)
+	body := `{"status":"cosigned"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(r.ID.String())
+	if err := h.UpdateCosignRequest(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+// -- Additional PatientList Handler Tests --
+
+func TestHandler_ListPatientLists(t *testing.T) {
+	h, e := newTestHandler()
+	ownerID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?owner_id="+ownerID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListPatientLists(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListPatientLists_MissingOwner(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListPatientLists(c)
+	if err == nil { t.Error("expected error for missing owner_id") }
+}
+
+func TestHandler_UpdatePatientList(t *testing.T) {
+	h, e := newTestHandler()
+	l := &PatientList{ListName: "Test", ListType: "personal", OwnerID: uuid.New()}
+	h.svc.CreatePatientList(nil, l)
+	body := `{"list_name":"Updated List"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(l.ID.String())
+	if err := h.UpdatePatientList(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_GetPatientListMembers(t *testing.T) {
+	h, e := newTestHandler()
+	listID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(listID.String())
+	if err := h.GetPatientListMembers(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_UpdatePatientListMember(t *testing.T) {
+	h, e := newTestHandler()
+	l := &PatientList{ListName: "Test", ListType: "personal", OwnerID: uuid.New()}
+	h.svc.CreatePatientList(nil, l)
+	member := &PatientListMember{ListID: l.ID, PatientID: uuid.New()}
+	h.svc.AddPatientListMember(nil, member)
+	body := `{"priority":2}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "memberID")
+	c.SetParamValues(l.ID.String(), member.ID.String())
+	if err := h.UpdatePatientListMember(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_RemovePatientListMember(t *testing.T) {
+	h, e := newTestHandler()
+	l := &PatientList{ListName: "Test", ListType: "personal", OwnerID: uuid.New()}
+	h.svc.CreatePatientList(nil, l)
+	member := &PatientListMember{ListID: l.ID, PatientID: uuid.New()}
+	h.svc.AddPatientListMember(nil, member)
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "memberID")
+	c.SetParamValues(l.ID.String(), member.ID.String())
+	if err := h.RemovePatientListMember(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusNoContent { t.Errorf("expected 204, got %d", rec.Code) }
+}
+
+// -- Additional Handoff Handler Tests --
+
+func TestHandler_ListHandoffs_ByPatient(t *testing.T) {
+	h, e := newTestHandler()
+	patientID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?patient_id="+patientID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListHandoffs(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListHandoffs_ByProvider(t *testing.T) {
+	h, e := newTestHandler()
+	providerID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/?provider_id="+providerID.String(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	if err := h.ListHandoffs(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
+func TestHandler_ListHandoffs_MissingParam(t *testing.T) {
+	h, e := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	err := h.ListHandoffs(c)
+	if err == nil { t.Error("expected error for missing patient_id/provider_id") }
+}
+
+func TestHandler_UpdateHandoff(t *testing.T) {
+	h, e := newTestHandler()
+	ho := &HandoffRecord{PatientID: uuid.New(), FromProviderID: uuid.New(), ToProviderID: uuid.New()}
+	h.svc.CreateHandoff(nil, ho)
+	body := `{"status":"completed"}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(ho.ID.String())
+	if err := h.UpdateHandoff(c); err != nil { t.Fatalf("unexpected error: %v", err) }
+	if rec.Code != http.StatusOK { t.Errorf("expected 200, got %d", rec.Code) }
+}
+
 // -- Route Registration --
 
 func TestHandler_RegisterRoutes(t *testing.T) {

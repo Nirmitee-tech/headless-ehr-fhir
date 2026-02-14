@@ -24,6 +24,9 @@ type cdsRuleRepoPG struct{ pool *pgxpool.Pool }
 func NewCDSRuleRepoPG(pool *pgxpool.Pool) CDSRuleRepository { return &cdsRuleRepoPG{pool: pool} }
 
 func (r *cdsRuleRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -104,6 +107,9 @@ type cdsAlertRepoPG struct{ pool *pgxpool.Pool }
 func NewCDSAlertRepoPG(pool *pgxpool.Pool) CDSAlertRepository { return &cdsAlertRepoPG{pool: pool} }
 
 func (r *cdsAlertRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -227,6 +233,9 @@ func NewDrugInteractionRepoPG(pool *pgxpool.Pool) DrugInteractionRepository {
 }
 
 func (r *drugInteractionRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -301,6 +310,9 @@ type orderSetRepoPG struct{ pool *pgxpool.Pool }
 func NewOrderSetRepoPG(pool *pgxpool.Pool) OrderSetRepository { return &orderSetRepoPG{pool: pool} }
 
 func (r *orderSetRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -432,6 +444,9 @@ func NewClinicalPathwayRepoPG(pool *pgxpool.Pool) ClinicalPathwayRepository {
 }
 
 func (r *clinicalPathwayRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -531,6 +546,9 @@ func NewPatientPathwayEnrollmentRepoPG(pool *pgxpool.Pool) PatientPathwayEnrollm
 }
 
 func (r *patientPathwayEnrollmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -624,6 +642,9 @@ type formularyRepoPG struct{ pool *pgxpool.Pool }
 func NewFormularyRepoPG(pool *pgxpool.Pool) FormularyRepository { return &formularyRepoPG{pool: pool} }
 
 func (r *formularyRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -727,6 +748,9 @@ func NewMedReconciliationRepoPG(pool *pgxpool.Pool) MedReconciliationRepository 
 }
 
 func (r *medReconcRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

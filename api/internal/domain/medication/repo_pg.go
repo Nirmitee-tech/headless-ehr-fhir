@@ -27,6 +27,9 @@ func NewMedicationRepoPG(pool *pgxpool.Pool) MedicationRepository {
 }
 
 func (r *medicationRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -207,6 +210,9 @@ func NewMedicationRequestRepoPG(pool *pgxpool.Pool) MedicationRequestRepository 
 }
 
 func (r *medRequestRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -403,6 +409,9 @@ func NewMedicationAdministrationRepoPG(pool *pgxpool.Pool) MedicationAdministrat
 }
 
 func (r *medAdminRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -569,6 +578,9 @@ func NewMedicationDispenseRepoPG(pool *pgxpool.Pool) MedicationDispenseRepositor
 }
 
 func (r *medDispenseRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -729,6 +741,9 @@ func NewMedicationStatementRepoPG(pool *pgxpool.Pool) MedicationStatementReposit
 }
 
 func (r *medStatementRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

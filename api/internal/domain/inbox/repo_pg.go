@@ -27,6 +27,9 @@ func NewMessagePoolRepoPG(pool *pgxpool.Pool) MessagePoolRepository {
 }
 
 func (r *messagePoolRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -103,6 +106,9 @@ func NewInboxMessageRepoPG(pool *pgxpool.Pool) InboxMessageRepository {
 }
 
 func (r *inboxMessageRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -302,6 +308,9 @@ func NewCosignRequestRepoPG(pool *pgxpool.Pool) CosignRequestRepository {
 }
 
 func (r *cosignRequestRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -393,6 +402,9 @@ func NewPatientListRepoPG(pool *pgxpool.Pool) PatientListRepository {
 }
 
 func (r *patientListRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -516,6 +528,9 @@ func NewHandoffRepoPG(pool *pgxpool.Pool) HandoffRepository {
 }
 
 func (r *handoffRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

@@ -116,3 +116,112 @@ func TestCreateTenantSchema_InvalidID(t *testing.T) {
 		t.Error("expected error for invalid tenant ID")
 	}
 }
+
+func TestTxFromContext_Nil(t *testing.T) {
+	tx := TxFromContext(context.Background())
+	if tx != nil {
+		t.Error("expected nil tx from empty context")
+	}
+}
+
+func TestWithTx_NoConnection(t *testing.T) {
+	ctx := context.Background()
+	_, _, err := WithTx(ctx)
+	if err == nil {
+		t.Error("expected error when no connection in context")
+	}
+	if err.Error() != "no database connection in context" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestExtractTenantID_HeaderPriorityOverQuery(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/?tenant_id=query_tenant", nil)
+	req.Header.Set("X-Tenant-ID", "header_tenant")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	tid := extractTenantID(c, "default")
+	if tid != "header_tenant" {
+		t.Errorf("expected header_tenant (header has priority over query), got %s", tid)
+	}
+}
+
+func TestExtractTenantID_EmptyJWT(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Tenant-ID", "header_tenant")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	// Set jwt_tenant_id to empty string -- should fall through
+	c.Set("jwt_tenant_id", "")
+
+	tid := extractTenantID(c, "default")
+	if tid != "header_tenant" {
+		t.Errorf("expected header_tenant when JWT is empty, got %s", tid)
+	}
+}
+
+func TestTenantIDPattern_Comprehensive(t *testing.T) {
+	tests := []struct {
+		input string
+		valid bool
+	}{
+		{"abc", true},
+		{"ABC", true},
+		{"abc123", true},
+		{"tenant_1", true},
+		{"a", true},
+		{"A1B2C3", true},
+		{"a-b", false},
+		{"a.b", false},
+		{"a b", false},
+		{"a/b", false},
+		{"", false},
+		{"$pecial", false},
+		{"tenant@1", false},
+	}
+
+	for _, tt := range tests {
+		got := tenantIDPattern.MatchString(tt.input)
+		if got != tt.valid {
+			t.Errorf("tenantIDPattern.MatchString(%q) = %v, want %v", tt.input, got, tt.valid)
+		}
+	}
+}
+
+func TestCreateTenantSchema_VariousInvalidIDs(t *testing.T) {
+	invalidIDs := []string{"tenant-with-dash", "tenant.with.dot", "ten ant", "drop;table"}
+	for _, id := range invalidIDs {
+		err := CreateTenantSchema(context.Background(), nil, id, "")
+		if err == nil {
+			t.Errorf("expected error for invalid tenant ID %q", id)
+		}
+	}
+}
+
+func TestConnFromContext_WithValue(t *testing.T) {
+	// Verify ConnFromContext returns nil for wrong type in context
+	ctx := context.WithValue(context.Background(), DBConnKey, "not-a-conn")
+	conn := ConnFromContext(ctx)
+	if conn != nil {
+		t.Error("expected nil when context value is wrong type")
+	}
+}
+
+func TestTxFromContext_WithWrongType(t *testing.T) {
+	ctx := context.WithValue(context.Background(), DBTxKey, "not-a-tx")
+	tx := TxFromContext(ctx)
+	if tx != nil {
+		t.Error("expected nil when context value is wrong type")
+	}
+}
+
+func TestTenantFromContext_WithWrongType(t *testing.T) {
+	ctx := context.WithValue(context.Background(), TenantIDKey, 12345)
+	tid := TenantFromContext(ctx)
+	if tid != "" {
+		t.Errorf("expected empty string when context value is wrong type, got %q", tid)
+	}
+}

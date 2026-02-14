@@ -816,3 +816,575 @@ func TestDeleteIntakeOutput(t *testing.T) {
 		t.Error("expected error after deletion")
 	}
 }
+
+// =========== Additional Template Tests ===========
+
+func TestGetTemplate_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetTemplate(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateTemplate(t *testing.T) {
+	svc := newTestService()
+	tmpl := &FlowsheetTemplate{Name: "Vitals"}
+	svc.CreateTemplate(context.Background(), tmpl)
+	tmpl.Name = "Vitals v2"
+	err := svc.UpdateTemplate(context.Background(), tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListTemplates(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTemplate(context.Background(), &FlowsheetTemplate{Name: "Vitals"})
+	svc.CreateTemplate(context.Background(), &FlowsheetTemplate{Name: "Neuro"})
+	items, total, err := svc.ListTemplates(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2 templates, got %d", total)
+	}
+}
+
+func TestGetTemplateRows(t *testing.T) {
+	svc := newTestService()
+	tmpl := &FlowsheetTemplate{Name: "Vitals"}
+	svc.CreateTemplate(context.Background(), tmpl)
+	svc.AddTemplateRow(context.Background(), &FlowsheetRow{TemplateID: tmpl.ID, Label: "HR"})
+	svc.AddTemplateRow(context.Background(), &FlowsheetRow{TemplateID: tmpl.ID, Label: "BP"})
+
+	rows, err := svc.GetTemplateRows(context.Background(), tmpl.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Errorf("expected 2 rows, got %d", len(rows))
+	}
+}
+
+// =========== Additional Entry Tests ===========
+
+func TestCreateEntry_RowRequired(t *testing.T) {
+	svc := newTestService()
+	e := &FlowsheetEntry{TemplateID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New(), RecordedByID: uuid.New()}
+	err := svc.CreateEntry(context.Background(), e)
+	if err == nil {
+		t.Error("expected error for missing row_id")
+	}
+}
+
+func TestCreateEntry_EncounterRequired(t *testing.T) {
+	svc := newTestService()
+	e := &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), RecordedByID: uuid.New()}
+	err := svc.CreateEntry(context.Background(), e)
+	if err == nil {
+		t.Error("expected error for missing encounter_id")
+	}
+}
+
+func TestCreateEntry_RecordedByRequired(t *testing.T) {
+	svc := newTestService()
+	e := &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New()}
+	err := svc.CreateEntry(context.Background(), e)
+	if err == nil {
+		t.Error("expected error for missing recorded_by_id")
+	}
+}
+
+func TestGetEntry(t *testing.T) {
+	svc := newTestService()
+	e := &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New(), RecordedByID: uuid.New()}
+	svc.CreateEntry(context.Background(), e)
+	got, err := svc.GetEntry(context.Background(), e.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != e.ID {
+		t.Errorf("expected ID %v, got %v", e.ID, got.ID)
+	}
+}
+
+func TestGetEntry_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetEntry(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestDeleteEntry(t *testing.T) {
+	svc := newTestService()
+	e := &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New(), RecordedByID: uuid.New()}
+	svc.CreateEntry(context.Background(), e)
+	err := svc.DeleteEntry(context.Background(), e.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetEntry(context.Background(), e.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListEntriesByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateEntry(context.Background(), &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: pid, EncounterID: uuid.New(), RecordedByID: uuid.New()})
+	svc.CreateEntry(context.Background(), &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New(), RecordedByID: uuid.New()})
+	items, total, err := svc.ListEntriesByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestListEntriesByEncounter(t *testing.T) {
+	svc := newTestService()
+	eid := uuid.New()
+	svc.CreateEntry(context.Background(), &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: eid, RecordedByID: uuid.New()})
+	svc.CreateEntry(context.Background(), &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New(), RecordedByID: uuid.New()})
+	items, total, err := svc.ListEntriesByEncounter(context.Background(), eid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestSearchEntries(t *testing.T) {
+	svc := newTestService()
+	svc.CreateEntry(context.Background(), &FlowsheetEntry{TemplateID: uuid.New(), RowID: uuid.New(), PatientID: uuid.New(), EncounterID: uuid.New(), RecordedByID: uuid.New()})
+	items, total, err := svc.SearchEntries(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 || len(items) < 1 {
+		t.Error("expected items")
+	}
+}
+
+// =========== Additional Assessment Tests ===========
+
+func TestCreateAssessment_EncounterRequired(t *testing.T) {
+	svc := newTestService()
+	a := &NursingAssessment{PatientID: uuid.New(), NurseID: uuid.New(), AssessmentType: "admission"}
+	err := svc.CreateAssessment(context.Background(), a)
+	if err == nil {
+		t.Error("expected error for missing encounter_id")
+	}
+}
+
+func TestCreateAssessment_NurseRequired(t *testing.T) {
+	svc := newTestService()
+	a := &NursingAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), AssessmentType: "admission"}
+	err := svc.CreateAssessment(context.Background(), a)
+	if err == nil {
+		t.Error("expected error for missing nurse_id")
+	}
+}
+
+func TestGetAssessment(t *testing.T) {
+	svc := newTestService()
+	a := &NursingAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), NurseID: uuid.New(), AssessmentType: "admission"}
+	svc.CreateAssessment(context.Background(), a)
+	got, err := svc.GetAssessment(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != a.ID {
+		t.Errorf("expected ID %v, got %v", a.ID, got.ID)
+	}
+}
+
+func TestGetAssessment_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetAssessment(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateAssessment(t *testing.T) {
+	svc := newTestService()
+	a := &NursingAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), NurseID: uuid.New(), AssessmentType: "admission"}
+	svc.CreateAssessment(context.Background(), a)
+	a.Status = "completed"
+	err := svc.UpdateAssessment(context.Background(), a)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListAssessmentsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateAssessment(context.Background(), &NursingAssessment{PatientID: pid, EncounterID: uuid.New(), NurseID: uuid.New(), AssessmentType: "admission"})
+	svc.CreateAssessment(context.Background(), &NursingAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), NurseID: uuid.New(), AssessmentType: "shift"})
+	items, total, err := svc.ListAssessmentsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestListAssessmentsByEncounter(t *testing.T) {
+	svc := newTestService()
+	eid := uuid.New()
+	svc.CreateAssessment(context.Background(), &NursingAssessment{PatientID: uuid.New(), EncounterID: eid, NurseID: uuid.New(), AssessmentType: "admission"})
+	svc.CreateAssessment(context.Background(), &NursingAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), NurseID: uuid.New(), AssessmentType: "shift"})
+	items, total, err := svc.ListAssessmentsByEncounter(context.Background(), eid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Fall Risk Tests ===========
+
+func TestGetFallRisk(t *testing.T) {
+	svc := newTestService()
+	a := &FallRiskAssessment{PatientID: uuid.New(), AssessedByID: uuid.New()}
+	svc.CreateFallRisk(context.Background(), a)
+	got, err := svc.GetFallRisk(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != a.ID {
+		t.Errorf("expected ID %v, got %v", a.ID, got.ID)
+	}
+}
+
+func TestGetFallRisk_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetFallRisk(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestListFallRiskByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateFallRisk(context.Background(), &FallRiskAssessment{PatientID: pid, AssessedByID: uuid.New()})
+	svc.CreateFallRisk(context.Background(), &FallRiskAssessment{PatientID: uuid.New(), AssessedByID: uuid.New()})
+	items, total, err := svc.ListFallRiskByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Skin Assessment Tests ===========
+
+func TestCreateSkinAssessment_AssessedByRequired(t *testing.T) {
+	svc := newTestService()
+	a := &SkinAssessment{PatientID: uuid.New()}
+	err := svc.CreateSkinAssessment(context.Background(), a)
+	if err == nil {
+		t.Error("expected error for missing assessed_by_id")
+	}
+}
+
+func TestGetSkinAssessment(t *testing.T) {
+	svc := newTestService()
+	a := &SkinAssessment{PatientID: uuid.New(), AssessedByID: uuid.New()}
+	svc.CreateSkinAssessment(context.Background(), a)
+	got, err := svc.GetSkinAssessment(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != a.ID {
+		t.Errorf("expected ID %v, got %v", a.ID, got.ID)
+	}
+}
+
+func TestGetSkinAssessment_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSkinAssessment(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestListSkinAssessmentsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateSkinAssessment(context.Background(), &SkinAssessment{PatientID: pid, AssessedByID: uuid.New()})
+	svc.CreateSkinAssessment(context.Background(), &SkinAssessment{PatientID: uuid.New(), AssessedByID: uuid.New()})
+	items, total, err := svc.ListSkinAssessmentsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Pain Assessment Tests ===========
+
+func TestCreatePainAssessment_AssessedByRequired(t *testing.T) {
+	svc := newTestService()
+	a := &PainAssessment{PatientID: uuid.New()}
+	err := svc.CreatePainAssessment(context.Background(), a)
+	if err == nil {
+		t.Error("expected error for missing assessed_by_id")
+	}
+}
+
+func TestGetPainAssessment(t *testing.T) {
+	svc := newTestService()
+	a := &PainAssessment{PatientID: uuid.New(), AssessedByID: uuid.New()}
+	svc.CreatePainAssessment(context.Background(), a)
+	got, err := svc.GetPainAssessment(context.Background(), a.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != a.ID {
+		t.Errorf("expected ID %v, got %v", a.ID, got.ID)
+	}
+}
+
+func TestGetPainAssessment_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPainAssessment(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestListPainAssessmentsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreatePainAssessment(context.Background(), &PainAssessment{PatientID: pid, AssessedByID: uuid.New()})
+	svc.CreatePainAssessment(context.Background(), &PainAssessment{PatientID: uuid.New(), AssessedByID: uuid.New()})
+	items, total, err := svc.ListPainAssessmentsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Lines/Drains Tests ===========
+
+func TestCreateLinesDrains_EncounterRequired(t *testing.T) {
+	svc := newTestService()
+	l := &LinesDrainsAirways{PatientID: uuid.New(), Type: "IV"}
+	err := svc.CreateLinesDrains(context.Background(), l)
+	if err == nil {
+		t.Error("expected error for missing encounter_id")
+	}
+}
+
+func TestCreateLinesDrains_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active", "removed", "replaced", "capped"} {
+		svc := newTestService()
+		l := &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: uuid.New(), Type: "IV", Status: s}
+		if err := svc.CreateLinesDrains(context.Background(), l); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+func TestGetLinesDrains(t *testing.T) {
+	svc := newTestService()
+	l := &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: uuid.New(), Type: "IV"}
+	svc.CreateLinesDrains(context.Background(), l)
+	got, err := svc.GetLinesDrains(context.Background(), l.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != l.ID {
+		t.Errorf("expected ID %v, got %v", l.ID, got.ID)
+	}
+}
+
+func TestGetLinesDrains_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetLinesDrains(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateLinesDrains(t *testing.T) {
+	svc := newTestService()
+	l := &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: uuid.New(), Type: "IV"}
+	svc.CreateLinesDrains(context.Background(), l)
+	l.Status = "removed"
+	err := svc.UpdateLinesDrains(context.Background(), l)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateLinesDrains_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	l := &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: uuid.New(), Type: "IV"}
+	svc.CreateLinesDrains(context.Background(), l)
+	l.Status = "bogus"
+	err := svc.UpdateLinesDrains(context.Background(), l)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListLinesDrainsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateLinesDrains(context.Background(), &LinesDrainsAirways{PatientID: pid, EncounterID: uuid.New(), Type: "IV"})
+	svc.CreateLinesDrains(context.Background(), &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: uuid.New(), Type: "Drain"})
+	items, total, err := svc.ListLinesDrainsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestListLinesDrainsByEncounter(t *testing.T) {
+	svc := newTestService()
+	eid := uuid.New()
+	svc.CreateLinesDrains(context.Background(), &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: eid, Type: "IV"})
+	svc.CreateLinesDrains(context.Background(), &LinesDrainsAirways{PatientID: uuid.New(), EncounterID: uuid.New(), Type: "Drain"})
+	items, total, err := svc.ListLinesDrainsByEncounter(context.Background(), eid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Restraint Tests ===========
+
+func TestGetRestraint(t *testing.T) {
+	svc := newTestService()
+	r := &RestraintRecord{PatientID: uuid.New(), RestraintType: "wrist", AppliedByID: uuid.New()}
+	svc.CreateRestraint(context.Background(), r)
+	got, err := svc.GetRestraint(context.Background(), r.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != r.ID {
+		t.Errorf("expected ID %v, got %v", r.ID, got.ID)
+	}
+}
+
+func TestGetRestraint_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetRestraint(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateRestraint(t *testing.T) {
+	svc := newTestService()
+	r := &RestraintRecord{PatientID: uuid.New(), RestraintType: "wrist", AppliedByID: uuid.New()}
+	svc.CreateRestraint(context.Background(), r)
+	r.RestraintType = "vest"
+	err := svc.UpdateRestraint(context.Background(), r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListRestraintsByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateRestraint(context.Background(), &RestraintRecord{PatientID: pid, RestraintType: "wrist", AppliedByID: uuid.New()})
+	svc.CreateRestraint(context.Background(), &RestraintRecord{PatientID: uuid.New(), RestraintType: "vest", AppliedByID: uuid.New()})
+	items, total, err := svc.ListRestraintsByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Intake/Output Tests ===========
+
+func TestCreateIntakeOutput_EncounterRequired(t *testing.T) {
+	svc := newTestService()
+	r := &IntakeOutputRecord{PatientID: uuid.New(), Category: "intake", RecordedByID: uuid.New()}
+	err := svc.CreateIntakeOutput(context.Background(), r)
+	if err == nil {
+		t.Error("expected error for missing encounter_id")
+	}
+}
+
+func TestCreateIntakeOutput_RecordedByRequired(t *testing.T) {
+	svc := newTestService()
+	r := &IntakeOutputRecord{PatientID: uuid.New(), EncounterID: uuid.New(), Category: "intake"}
+	err := svc.CreateIntakeOutput(context.Background(), r)
+	if err == nil {
+		t.Error("expected error for missing recorded_by_id")
+	}
+}
+
+func TestGetIntakeOutput(t *testing.T) {
+	svc := newTestService()
+	r := &IntakeOutputRecord{PatientID: uuid.New(), EncounterID: uuid.New(), Category: "intake", RecordedByID: uuid.New()}
+	svc.CreateIntakeOutput(context.Background(), r)
+	got, err := svc.GetIntakeOutput(context.Background(), r.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != r.ID {
+		t.Errorf("expected ID %v, got %v", r.ID, got.ID)
+	}
+}
+
+func TestGetIntakeOutput_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetIntakeOutput(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestListIntakeOutputByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreateIntakeOutput(context.Background(), &IntakeOutputRecord{PatientID: pid, EncounterID: uuid.New(), Category: "intake", RecordedByID: uuid.New()})
+	svc.CreateIntakeOutput(context.Background(), &IntakeOutputRecord{PatientID: uuid.New(), EncounterID: uuid.New(), Category: "output", RecordedByID: uuid.New()})
+	items, total, err := svc.ListIntakeOutputByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestListIntakeOutputByEncounter(t *testing.T) {
+	svc := newTestService()
+	eid := uuid.New()
+	svc.CreateIntakeOutput(context.Background(), &IntakeOutputRecord{PatientID: uuid.New(), EncounterID: eid, Category: "intake", RecordedByID: uuid.New()})
+	svc.CreateIntakeOutput(context.Background(), &IntakeOutputRecord{PatientID: uuid.New(), EncounterID: uuid.New(), Category: "output", RecordedByID: uuid.New()})
+	items, total, err := svc.ListIntakeOutputByEncounter(context.Background(), eid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}

@@ -976,3 +976,104 @@ func TestService_ListPatientCheckinsByPatient(t *testing.T) {
 		t.Errorf("expected 1, got %d", len(items))
 	}
 }
+
+// ── Additional NotFound Tests ──
+
+func TestService_GetPortalMessage_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPortalMessage(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_GetQuestionnaire_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetQuestionnaire(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_GetQuestionnaireByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetQuestionnaireByFHIRID(nil, "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_GetQuestionnaireResponse_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetQuestionnaireResponse(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_GetQuestionnaireResponseByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetQuestionnaireResponseByFHIRID(nil, "nonexistent")
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_GetPatientCheckin_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPatientCheckin(nil, uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_CreatePortalMessage_ValidStatuses(t *testing.T) {
+	statuses := []string{"sent", "delivered", "read", "replied", "closed", "archived"}
+	for _, status := range statuses {
+		svc := newTestService()
+		m := &PortalMessage{PatientID: uuid.New(), Body: "Hi", Status: status}
+		if err := svc.CreatePortalMessage(nil, m); err != nil {
+			t.Errorf("status %q should be valid, got error: %v", status, err)
+		}
+	}
+}
+
+func TestService_UpdatePortalAccount_NotFound(t *testing.T) {
+	svc := newTestService()
+	a := &PortalAccount{ID: uuid.New(), Status: "active"}
+	if err := svc.UpdatePortalAccount(nil, a); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdatePortalMessage_NotFound(t *testing.T) {
+	svc := newTestService()
+	m := &PortalMessage{ID: uuid.New(), Status: "read"}
+	if err := svc.UpdatePortalMessage(nil, m); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdateQuestionnaire_NotFound(t *testing.T) {
+	svc := newTestService()
+	q := &Questionnaire{ID: uuid.New(), Status: "active"}
+	if err := svc.UpdateQuestionnaire(nil, q); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdateQuestionnaireResponse_NotFound(t *testing.T) {
+	svc := newTestService()
+	qr := &QuestionnaireResponse{ID: uuid.New(), Status: "completed"}
+	if err := svc.UpdateQuestionnaireResponse(nil, qr); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdatePatientCheckin_NotFound(t *testing.T) {
+	svc := newTestService()
+	c := &PatientCheckin{ID: uuid.New(), Status: "completed"}
+	if err := svc.UpdatePatientCheckin(nil, c); err == nil {
+		t.Error("expected error for not found")
+	}
+}

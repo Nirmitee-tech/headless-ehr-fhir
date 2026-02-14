@@ -1217,3 +1217,258 @@ func TestService_GetMedReconciliationItems(t *testing.T) {
 		t.Errorf("expected 2, got %d", len(items))
 	}
 }
+
+// ── Additional CDS Rule Tests ──
+
+func TestService_UpdateCDSRule(t *testing.T) {
+	svc := newTestService()
+	r := &CDSRule{RuleName: "Drug Allergy", RuleType: "allergy-check"}
+	svc.CreateCDSRule(nil, r)
+	r.RuleName = "Updated Rule"
+	if err := svc.UpdateCDSRule(nil, r); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := svc.GetCDSRule(nil, r.ID)
+	if got.RuleName != "Updated Rule" {
+		t.Errorf("expected 'Updated Rule', got %s", got.RuleName)
+	}
+}
+
+func TestService_UpdateCDSRule_NotFound(t *testing.T) {
+	svc := newTestService()
+	r := &CDSRule{ID: uuid.New(), RuleName: "X", RuleType: "t"}
+	if err := svc.UpdateCDSRule(nil, r); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+// ── Additional CDS Alert Tests ──
+
+func TestService_GetCDSAlert_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetCDSAlert(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_ListCDSAlerts(t *testing.T) {
+	svc := newTestService()
+	svc.CreateCDSAlert(nil, &CDSAlert{RuleID: uuid.New(), PatientID: uuid.New(), Summary: "A1"})
+	svc.CreateCDSAlert(nil, &CDSAlert{RuleID: uuid.New(), PatientID: uuid.New(), Summary: "A2"})
+	items, total, err := svc.ListCDSAlerts(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+// ── Additional Drug Interaction Tests ──
+
+func TestService_GetDrugInteraction_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetDrugInteraction(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdateDrugInteraction(t *testing.T) {
+	svc := newTestService()
+	d := &DrugInteraction{MedicationAName: "Warfarin", MedicationBName: "Aspirin", Severity: "high"}
+	svc.CreateDrugInteraction(nil, d)
+	d.Severity = "moderate"
+	if err := svc.UpdateDrugInteraction(nil, d); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := svc.GetDrugInteraction(nil, d.ID)
+	if got.Severity != "moderate" {
+		t.Errorf("expected 'moderate', got %s", got.Severity)
+	}
+}
+
+func TestService_ListDrugInteractions(t *testing.T) {
+	svc := newTestService()
+	svc.CreateDrugInteraction(nil, &DrugInteraction{MedicationAName: "A", MedicationBName: "B", Severity: "high"})
+	svc.CreateDrugInteraction(nil, &DrugInteraction{MedicationAName: "C", MedicationBName: "D", Severity: "low"})
+	items, total, err := svc.ListDrugInteractions(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+// ── Additional Order Set Tests ──
+
+func TestService_GetOrderSet_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetOrderSet(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdateOrderSet(t *testing.T) {
+	svc := newTestService()
+	o := &OrderSet{Name: "Sepsis Bundle"}
+	svc.CreateOrderSet(nil, o)
+	o.Name = "Updated Bundle"
+	if err := svc.UpdateOrderSet(nil, o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := svc.GetOrderSet(nil, o.ID)
+	if got.Name != "Updated Bundle" {
+		t.Errorf("expected 'Updated Bundle', got %s", got.Name)
+	}
+}
+
+func TestService_ListOrderSets(t *testing.T) {
+	svc := newTestService()
+	svc.CreateOrderSet(nil, &OrderSet{Name: "O1"})
+	svc.CreateOrderSet(nil, &OrderSet{Name: "O2"})
+	items, total, err := svc.ListOrderSets(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+// ── Additional Clinical Pathway Tests ──
+
+func TestService_GetClinicalPathway_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetClinicalPathway(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdateClinicalPathway(t *testing.T) {
+	svc := newTestService()
+	p := &ClinicalPathway{Name: "Heart Failure"}
+	svc.CreateClinicalPathway(nil, p)
+	p.Name = "Updated HF"
+	if err := svc.UpdateClinicalPathway(nil, p); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := svc.GetClinicalPathway(nil, p.ID)
+	if got.Name != "Updated HF" {
+		t.Errorf("expected 'Updated HF', got %s", got.Name)
+	}
+}
+
+func TestService_ListClinicalPathways(t *testing.T) {
+	svc := newTestService()
+	svc.CreateClinicalPathway(nil, &ClinicalPathway{Name: "P1"})
+	svc.CreateClinicalPathway(nil, &ClinicalPathway{Name: "P2"})
+	items, total, err := svc.ListClinicalPathways(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+// ── Additional Pathway Enrollment Tests ──
+
+func TestService_GetPathwayEnrollment_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetPathwayEnrollment(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_ListPathwayEnrollments(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePathwayEnrollment(nil, &PatientPathwayEnrollment{PathwayID: uuid.New(), PatientID: uuid.New()})
+	svc.CreatePathwayEnrollment(nil, &PatientPathwayEnrollment{PathwayID: uuid.New(), PatientID: uuid.New()})
+	items, total, err := svc.ListPathwayEnrollments(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+// ── Additional Formulary Tests ──
+
+func TestService_GetFormulary_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetFormulary(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_UpdateFormulary(t *testing.T) {
+	svc := newTestService()
+	f := &Formulary{Name: "2025 Formulary"}
+	svc.CreateFormulary(nil, f)
+	f.Name = "2026 Formulary"
+	if err := svc.UpdateFormulary(nil, f); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := svc.GetFormulary(nil, f.ID)
+	if got.Name != "2026 Formulary" {
+		t.Errorf("expected '2026 Formulary', got %s", got.Name)
+	}
+}
+
+func TestService_ListFormularies(t *testing.T) {
+	svc := newTestService()
+	svc.CreateFormulary(nil, &Formulary{Name: "F1"})
+	svc.CreateFormulary(nil, &Formulary{Name: "F2"})
+	items, total, err := svc.ListFormularies(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}
+
+// ── Additional Med Reconciliation Tests ──
+
+func TestService_GetMedReconciliation_NotFound(t *testing.T) {
+	svc := newTestService()
+	if _, err := svc.GetMedReconciliation(nil, uuid.New()); err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestService_ListMedReconciliations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateMedReconciliation(nil, &MedicationReconciliation{PatientID: uuid.New()})
+	svc.CreateMedReconciliation(nil, &MedicationReconciliation{PatientID: uuid.New()})
+	items, total, err := svc.ListMedReconciliations(nil, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2, got %d", len(items))
+	}
+}

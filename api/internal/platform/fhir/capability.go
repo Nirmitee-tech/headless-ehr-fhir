@@ -30,10 +30,18 @@ type CapabilityBuilder struct {
 
 // resourceEntry holds the accumulated information for a single FHIR resource type.
 type resourceEntry struct {
-	resourceType string
-	interactions []string
-	searchParams []SearchParam
-	profiles     []string
+	resourceType      string
+	interactions      []string
+	searchParams      []SearchParam
+	profiles          []string
+	searchInclude     []string
+	searchRevInclude  []string
+	conditionalCreate bool
+	conditionalUpdate bool
+	conditionalDelete string // "not-supported", "single", "multiple"
+	readHistory       bool
+	updateCreate      bool
+	patchFormats      []string
 }
 
 // NewCapabilityBuilder creates a new builder. The baseURL is the FHIR server
@@ -133,8 +141,26 @@ func (b *CapabilityBuilder) Build() map[string]interface{} {
 	for _, rt := range types {
 		entry := b.resources[rt]
 		res := map[string]interface{}{
-			"type":       entry.resourceType,
-			"versioning": "versioned",
+			"type":        entry.resourceType,
+			"versioning":  "versioned",
+			"readHistory": entry.readHistory,
+			"updateCreate": entry.updateCreate,
+		}
+
+		// Conditional operations
+		if entry.conditionalCreate {
+			res["conditionalCreate"] = true
+		}
+		if entry.conditionalUpdate {
+			res["conditionalUpdate"] = true
+		}
+		if entry.conditionalDelete != "" {
+			res["conditionalDelete"] = entry.conditionalDelete
+		}
+
+		// Patch formats
+		if len(entry.patchFormats) > 0 {
+			res["patchFormats"] = entry.patchFormats
 		}
 
 		// Interactions
@@ -160,6 +186,14 @@ func (b *CapabilityBuilder) Build() map[string]interface{} {
 				params[i] = p
 			}
 			res["searchParam"] = params
+		}
+
+		// Search include/revinclude
+		if len(entry.searchInclude) > 0 {
+			res["searchInclude"] = entry.searchInclude
+		}
+		if len(entry.searchRevInclude) > 0 {
+			res["searchRevInclude"] = entry.searchRevInclude
 		}
 
 		// Supported profiles
@@ -257,10 +291,57 @@ func (b *CapabilityBuilder) ResourceCount() int {
 // resource type. This is a convenience for domain modules that support all
 // standard operations.
 func DefaultInteractions() []string {
-	return []string{"read", "vread", "search-type", "create", "update", "delete"}
+	return []string{"read", "vread", "search-type", "create", "update", "patch", "delete", "history-instance", "history-type"}
 }
 
 // ReadOnlyInteractions returns interactions for read-only resources.
 func ReadOnlyInteractions() []string {
 	return []string{"read", "vread", "search-type"}
+}
+
+// SetResourceCapabilities sets advanced capability flags for a resource type.
+func (b *CapabilityBuilder) SetResourceCapabilities(resourceType string, opts ResourceCapabilityOptions) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	entry, ok := b.resources[resourceType]
+	if !ok {
+		return
+	}
+	entry.conditionalCreate = opts.ConditionalCreate
+	entry.conditionalUpdate = opts.ConditionalUpdate
+	entry.conditionalDelete = opts.ConditionalDelete
+	entry.readHistory = opts.ReadHistory
+	entry.updateCreate = opts.UpdateCreate
+	entry.patchFormats = opts.PatchFormats
+	entry.searchInclude = opts.SearchInclude
+	entry.searchRevInclude = opts.SearchRevInclude
+}
+
+// ResourceCapabilityOptions defines the advanced capability flags for a resource type.
+type ResourceCapabilityOptions struct {
+	ConditionalCreate bool
+	ConditionalUpdate bool
+	ConditionalDelete string
+	ReadHistory       bool
+	UpdateCreate      bool
+	PatchFormats      []string
+	SearchInclude     []string
+	SearchRevInclude  []string
+}
+
+// DefaultCapabilityOptions returns the standard capability options for a fully
+// FHIR R4 conformant resource.
+func DefaultCapabilityOptions() ResourceCapabilityOptions {
+	return ResourceCapabilityOptions{
+		ConditionalCreate: true,
+		ConditionalUpdate: true,
+		ConditionalDelete: "single",
+		ReadHistory:       true,
+		UpdateCreate:      false,
+		PatchFormats: []string{
+			"application/json-patch+json",
+			"application/merge-patch+json",
+		},
+	}
 }

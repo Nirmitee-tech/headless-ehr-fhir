@@ -25,6 +25,9 @@ type orRoomRepoPG struct{ pool *pgxpool.Pool }
 func NewORRoomRepoPG(pool *pgxpool.Pool) ORRoomRepository { return &orRoomRepoPG{pool: pool} }
 
 func (r *orRoomRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -140,6 +143,9 @@ func NewSurgicalCaseRepoPG(pool *pgxpool.Pool) SurgicalCaseRepository {
 }
 
 func (r *surgicalCaseRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -474,6 +480,9 @@ func NewPreferenceCardRepoPG(pool *pgxpool.Pool) PreferenceCardRepository {
 }
 
 func (r *preferenceCardRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -603,6 +612,9 @@ func NewImplantLogRepoPG(pool *pgxpool.Pool) ImplantLogRepository {
 }
 
 func (r *implantLogRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

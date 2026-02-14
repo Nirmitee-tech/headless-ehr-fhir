@@ -27,6 +27,9 @@ func NewFlowsheetTemplateRepoPG(pool *pgxpool.Pool) FlowsheetTemplateRepository 
 }
 
 func (r *flowsheetTemplateRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -125,6 +128,9 @@ func NewFlowsheetEntryRepoPG(pool *pgxpool.Pool) FlowsheetEntryRepository {
 }
 
 func (r *flowsheetEntryRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -260,6 +266,9 @@ func NewNursingAssessmentRepoPG(pool *pgxpool.Pool) NursingAssessmentRepository 
 }
 
 func (r *nursingAssessmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -354,6 +363,9 @@ func NewFallRiskRepoPG(pool *pgxpool.Pool) FallRiskRepository {
 }
 
 func (r *fallRiskRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -415,6 +427,9 @@ func NewSkinAssessmentRepoPG(pool *pgxpool.Pool) SkinAssessmentRepository {
 }
 
 func (r *skinAssessmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -480,6 +495,9 @@ func NewPainAssessmentRepoPG(pool *pgxpool.Pool) PainAssessmentRepository {
 }
 
 func (r *painAssessmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -545,6 +563,9 @@ func NewLinesDrainsRepoPG(pool *pgxpool.Pool) LinesDrainsRepository {
 }
 
 func (r *linesDrainsRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -640,6 +661,9 @@ func NewRestraintRepoPG(pool *pgxpool.Pool) RestraintRepository {
 }
 
 func (r *restraintRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -713,6 +737,9 @@ func NewIntakeOutputRepoPG(pool *pgxpool.Pool) IntakeOutputRepository {
 }
 
 func (r *intakeOutputRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

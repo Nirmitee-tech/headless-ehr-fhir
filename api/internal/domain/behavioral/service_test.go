@@ -363,3 +363,271 @@ func TestAddGroupTherapyAttendance_PatientRequired(t *testing.T) {
 	err := svc.AddGroupTherapyAttendance(context.Background(), a)
 	if err == nil { t.Error("expected error for missing patient_id") }
 }
+
+// -- Additional PsychAssessment Tests --
+
+func TestUpdatePsychAssessment(t *testing.T) {
+	svc := newTestService()
+	a := &PsychiatricAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), AssessorID: uuid.New()}
+	svc.CreatePsychAssessment(context.Background(), a)
+	err := svc.UpdatePsychAssessment(context.Background(), a)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+}
+
+func TestListPsychAssessmentsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreatePsychAssessment(context.Background(), &PsychiatricAssessment{PatientID: patientID, EncounterID: uuid.New(), AssessorID: uuid.New()})
+	items, total, err := svc.ListPsychAssessmentsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total != 1 { t.Errorf("expected 1, got %d", total) }
+	if len(items) != 1 { t.Errorf("expected 1 item, got %d", len(items)) }
+}
+
+func TestSearchPsychAssessments(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePsychAssessment(context.Background(), &PsychiatricAssessment{PatientID: uuid.New(), EncounterID: uuid.New(), AssessorID: uuid.New()})
+	items, total, err := svc.SearchPsychAssessments(context.Background(), map[string]string{}, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total < 1 { t.Errorf("expected at least 1, got %d", total) }
+	if len(items) < 1 { t.Error("expected items") }
+}
+
+// -- Additional SafetyPlan Tests --
+
+func TestGetSafetyPlan(t *testing.T) {
+	svc := newTestService()
+	sp := &SafetyPlan{PatientID: uuid.New(), CreatedByID: uuid.New()}
+	svc.CreateSafetyPlan(context.Background(), sp)
+	fetched, err := svc.GetSafetyPlan(context.Background(), sp.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if fetched.ID != sp.ID { t.Error("unexpected ID mismatch") }
+}
+
+func TestGetSafetyPlan_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSafetyPlan(context.Background(), uuid.New())
+	if err == nil { t.Error("expected error for not found") }
+}
+
+func TestUpdateSafetyPlan(t *testing.T) {
+	svc := newTestService()
+	sp := &SafetyPlan{PatientID: uuid.New(), CreatedByID: uuid.New()}
+	svc.CreateSafetyPlan(context.Background(), sp)
+	sp.Status = "superseded"
+	err := svc.UpdateSafetyPlan(context.Background(), sp)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+}
+
+func TestUpdateSafetyPlan_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	sp := &SafetyPlan{PatientID: uuid.New(), CreatedByID: uuid.New()}
+	svc.CreateSafetyPlan(context.Background(), sp)
+	sp.Status = "bogus"
+	err := svc.UpdateSafetyPlan(context.Background(), sp)
+	if err == nil { t.Error("expected error for invalid status") }
+}
+
+func TestDeleteSafetyPlan(t *testing.T) {
+	svc := newTestService()
+	sp := &SafetyPlan{PatientID: uuid.New(), CreatedByID: uuid.New()}
+	svc.CreateSafetyPlan(context.Background(), sp)
+	err := svc.DeleteSafetyPlan(context.Background(), sp.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	_, err = svc.GetSafetyPlan(context.Background(), sp.ID)
+	if err == nil { t.Error("expected error after deletion") }
+}
+
+func TestListSafetyPlansByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateSafetyPlan(context.Background(), &SafetyPlan{PatientID: patientID, CreatedByID: uuid.New()})
+	items, total, err := svc.ListSafetyPlansByPatient(context.Background(), patientID, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total != 1 { t.Errorf("expected 1, got %d", total) }
+	if len(items) != 1 { t.Errorf("expected 1 item, got %d", len(items)) }
+}
+
+func TestSearchSafetyPlans(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSafetyPlan(context.Background(), &SafetyPlan{PatientID: uuid.New(), CreatedByID: uuid.New()})
+	items, total, err := svc.SearchSafetyPlans(context.Background(), map[string]string{}, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total < 1 { t.Errorf("expected at least 1, got %d", total) }
+	if len(items) < 1 { t.Error("expected items") }
+}
+
+// -- Additional LegalHold Tests --
+
+func TestGetLegalHold(t *testing.T) {
+	svc := newTestService()
+	h := &LegalHold{PatientID: uuid.New(), InitiatedByID: uuid.New(), HoldType: "5150", Reason: "danger"}
+	svc.CreateLegalHold(context.Background(), h)
+	fetched, err := svc.GetLegalHold(context.Background(), h.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if fetched.ID != h.ID { t.Error("unexpected ID mismatch") }
+}
+
+func TestGetLegalHold_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetLegalHold(context.Background(), uuid.New())
+	if err == nil { t.Error("expected error for not found") }
+}
+
+func TestUpdateLegalHold(t *testing.T) {
+	svc := newTestService()
+	h := &LegalHold{PatientID: uuid.New(), InitiatedByID: uuid.New(), HoldType: "5150", Reason: "danger"}
+	svc.CreateLegalHold(context.Background(), h)
+	h.Status = "expired"
+	err := svc.UpdateLegalHold(context.Background(), h)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+}
+
+func TestUpdateLegalHold_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	h := &LegalHold{PatientID: uuid.New(), InitiatedByID: uuid.New(), HoldType: "5150", Reason: "danger"}
+	svc.CreateLegalHold(context.Background(), h)
+	h.Status = "bogus"
+	err := svc.UpdateLegalHold(context.Background(), h)
+	if err == nil { t.Error("expected error for invalid status") }
+}
+
+func TestDeleteLegalHold(t *testing.T) {
+	svc := newTestService()
+	h := &LegalHold{PatientID: uuid.New(), InitiatedByID: uuid.New(), HoldType: "5150", Reason: "danger"}
+	svc.CreateLegalHold(context.Background(), h)
+	err := svc.DeleteLegalHold(context.Background(), h.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	_, err = svc.GetLegalHold(context.Background(), h.ID)
+	if err == nil { t.Error("expected error after deletion") }
+}
+
+func TestListLegalHoldsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateLegalHold(context.Background(), &LegalHold{PatientID: patientID, InitiatedByID: uuid.New(), HoldType: "5150", Reason: "danger"})
+	items, total, err := svc.ListLegalHoldsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total != 1 { t.Errorf("expected 1, got %d", total) }
+	if len(items) != 1 { t.Errorf("expected 1 item, got %d", len(items)) }
+}
+
+func TestSearchLegalHolds(t *testing.T) {
+	svc := newTestService()
+	svc.CreateLegalHold(context.Background(), &LegalHold{PatientID: uuid.New(), InitiatedByID: uuid.New(), HoldType: "5150", Reason: "danger"})
+	items, total, err := svc.SearchLegalHolds(context.Background(), map[string]string{}, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total < 1 { t.Errorf("expected at least 1, got %d", total) }
+	if len(items) < 1 { t.Error("expected items") }
+}
+
+// -- Additional SeclusionRestraint Tests --
+
+func TestGetSeclusionRestraint(t *testing.T) {
+	svc := newTestService()
+	e := &SeclusionRestraintEvent{PatientID: uuid.New(), OrderedByID: uuid.New(), EventType: "seclusion", Reason: "agitated"}
+	svc.CreateSeclusionRestraint(context.Background(), e)
+	fetched, err := svc.GetSeclusionRestraint(context.Background(), e.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if fetched.ID != e.ID { t.Error("unexpected ID mismatch") }
+}
+
+func TestGetSeclusionRestraint_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetSeclusionRestraint(context.Background(), uuid.New())
+	if err == nil { t.Error("expected error for not found") }
+}
+
+func TestUpdateSeclusionRestraint(t *testing.T) {
+	svc := newTestService()
+	e := &SeclusionRestraintEvent{PatientID: uuid.New(), OrderedByID: uuid.New(), EventType: "seclusion", Reason: "agitated"}
+	svc.CreateSeclusionRestraint(context.Background(), e)
+	err := svc.UpdateSeclusionRestraint(context.Background(), e)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+}
+
+func TestDeleteSeclusionRestraint(t *testing.T) {
+	svc := newTestService()
+	e := &SeclusionRestraintEvent{PatientID: uuid.New(), OrderedByID: uuid.New(), EventType: "seclusion", Reason: "agitated"}
+	svc.CreateSeclusionRestraint(context.Background(), e)
+	err := svc.DeleteSeclusionRestraint(context.Background(), e.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	_, err = svc.GetSeclusionRestraint(context.Background(), e.ID)
+	if err == nil { t.Error("expected error after deletion") }
+}
+
+func TestListSeclusionRestraintsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateSeclusionRestraint(context.Background(), &SeclusionRestraintEvent{PatientID: patientID, OrderedByID: uuid.New(), EventType: "seclusion", Reason: "agitated"})
+	items, total, err := svc.ListSeclusionRestraintsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total != 1 { t.Errorf("expected 1, got %d", total) }
+	if len(items) != 1 { t.Errorf("expected 1 item, got %d", len(items)) }
+}
+
+func TestSearchSeclusionRestraints(t *testing.T) {
+	svc := newTestService()
+	svc.CreateSeclusionRestraint(context.Background(), &SeclusionRestraintEvent{PatientID: uuid.New(), OrderedByID: uuid.New(), EventType: "seclusion", Reason: "agitated"})
+	items, total, err := svc.SearchSeclusionRestraints(context.Background(), map[string]string{}, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total < 1 { t.Errorf("expected at least 1, got %d", total) }
+	if len(items) < 1 { t.Error("expected items") }
+}
+
+// -- Additional GroupTherapy Tests --
+
+func TestGetGroupTherapySession(t *testing.T) {
+	svc := newTestService()
+	gs := &GroupTherapySession{SessionName: "CBT Group", FacilitatorID: uuid.New()}
+	svc.CreateGroupTherapySession(context.Background(), gs)
+	fetched, err := svc.GetGroupTherapySession(context.Background(), gs.ID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if fetched.ID != gs.ID { t.Error("unexpected ID mismatch") }
+}
+
+func TestUpdateGroupTherapySession(t *testing.T) {
+	svc := newTestService()
+	gs := &GroupTherapySession{SessionName: "CBT Group", FacilitatorID: uuid.New()}
+	svc.CreateGroupTherapySession(context.Background(), gs)
+	gs.Status = "completed"
+	err := svc.UpdateGroupTherapySession(context.Background(), gs)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+}
+
+func TestUpdateGroupTherapySession_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	gs := &GroupTherapySession{SessionName: "CBT Group", FacilitatorID: uuid.New()}
+	svc.CreateGroupTherapySession(context.Background(), gs)
+	gs.Status = "bogus"
+	err := svc.UpdateGroupTherapySession(context.Background(), gs)
+	if err == nil { t.Error("expected error for invalid status") }
+}
+
+func TestListGroupTherapySessions(t *testing.T) {
+	svc := newTestService()
+	svc.CreateGroupTherapySession(context.Background(), &GroupTherapySession{SessionName: "Group A", FacilitatorID: uuid.New()})
+	svc.CreateGroupTherapySession(context.Background(), &GroupTherapySession{SessionName: "Group B", FacilitatorID: uuid.New()})
+	items, total, err := svc.ListGroupTherapySessions(context.Background(), 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total != 2 { t.Errorf("expected 2, got %d", total) }
+	if len(items) != 2 { t.Errorf("expected 2, got %d", len(items)) }
+}
+
+func TestSearchGroupTherapySessions(t *testing.T) {
+	svc := newTestService()
+	svc.CreateGroupTherapySession(context.Background(), &GroupTherapySession{SessionName: "CBT", FacilitatorID: uuid.New()})
+	items, total, err := svc.SearchGroupTherapySessions(context.Background(), map[string]string{}, 20, 0)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if total < 1 { t.Errorf("expected at least 1, got %d", total) }
+	if len(items) < 1 { t.Error("expected items") }
+}
+
+func TestGetGroupTherapyAttendance(t *testing.T) {
+	svc := newTestService()
+	sessionID := uuid.New()
+	svc.AddGroupTherapyAttendance(context.Background(), &GroupTherapyAttendance{SessionID: sessionID, PatientID: uuid.New()})
+	attendance, err := svc.GetGroupTherapyAttendance(context.Background(), sessionID)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if len(attendance) != 1 { t.Errorf("expected 1 attendance, got %d", len(attendance)) }
+}

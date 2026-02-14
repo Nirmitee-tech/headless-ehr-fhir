@@ -22,6 +22,9 @@ type loincRepoPG struct{ pool *pgxpool.Pool }
 func NewLOINCRepoPG(pool *pgxpool.Pool) LOINCRepository { return &loincRepoPG{pool: pool} }
 
 func (r *loincRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -126,6 +129,9 @@ type snomedRepoPG struct{ pool *pgxpool.Pool }
 func NewSNOMEDRepoPG(pool *pgxpool.Pool) SNOMEDRepository { return &snomedRepoPG{pool: pool} }
 
 func (r *snomedRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -178,6 +184,9 @@ type rxnormRepoPG struct{ pool *pgxpool.Pool }
 func NewRxNormRepoPG(pool *pgxpool.Pool) RxNormRepository { return &rxnormRepoPG{pool: pool} }
 
 func (r *rxnormRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -232,6 +241,9 @@ type cptRepoPG struct{ pool *pgxpool.Pool }
 func NewCPTRepoPG(pool *pgxpool.Pool) CPTRepository { return &cptRepoPG{pool: pool} }
 
 func (r *cptRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

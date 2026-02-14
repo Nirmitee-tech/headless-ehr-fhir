@@ -665,6 +665,313 @@ func TestAddInvoiceLineItem_InvoiceIDRequired(t *testing.T) {
 	}
 }
 
+// -- Coverage: GetByFHIRID, Update, List, Search --
+
+func TestGetCoverageByFHIRID(t *testing.T) {
+	svc := newTestService()
+	payorName := "Blue Cross"
+	c := &Coverage{PatientID: uuid.New(), PayorName: &payorName}
+	svc.CreateCoverage(context.Background(), c)
+
+	fetched, err := svc.GetCoverageByFHIRID(context.Background(), c.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != c.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetCoverageByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetCoverageByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent FHIR ID")
+	}
+}
+
+func TestUpdateCoverage(t *testing.T) {
+	svc := newTestService()
+	payorName := "Blue Cross"
+	c := &Coverage{PatientID: uuid.New(), PayorName: &payorName}
+	svc.CreateCoverage(context.Background(), c)
+
+	c.Status = "cancelled"
+	err := svc.UpdateCoverage(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fetched, _ := svc.GetCoverage(context.Background(), c.ID)
+	if fetched.Status != "cancelled" {
+		t.Errorf("expected status 'cancelled', got %s", fetched.Status)
+	}
+}
+
+func TestUpdateCoverage_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	c := &Coverage{Status: "bogus"}
+	err := svc.UpdateCoverage(context.Background(), c)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListCoveragesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	payorName := "Blue Cross"
+	svc.CreateCoverage(context.Background(), &Coverage{PatientID: patientID, PayorName: &payorName})
+	svc.CreateCoverage(context.Background(), &Coverage{PatientID: patientID, PayorName: &payorName})
+	svc.CreateCoverage(context.Background(), &Coverage{PatientID: uuid.New(), PayorName: &payorName})
+
+	results, total, err := svc.ListCoveragesByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestSearchCoverages(t *testing.T) {
+	svc := newTestService()
+	payorName := "Blue Cross"
+	svc.CreateCoverage(context.Background(), &Coverage{PatientID: uuid.New(), PayorName: &payorName})
+
+	results, total, err := svc.SearchCoverages(context.Background(), map[string]string{"status": "active"}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(results) < 1 {
+		t.Error("expected at least 1 result")
+	}
+}
+
+// -- Claim: GetByFHIRID, Update, List, Search --
+
+func TestGetClaimByFHIRID(t *testing.T) {
+	svc := newTestService()
+	c := &Claim{PatientID: uuid.New()}
+	svc.CreateClaim(context.Background(), c)
+
+	fetched, err := svc.GetClaimByFHIRID(context.Background(), c.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != c.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetClaimByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetClaimByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent FHIR ID")
+	}
+}
+
+func TestUpdateClaim(t *testing.T) {
+	svc := newTestService()
+	c := &Claim{PatientID: uuid.New()}
+	svc.CreateClaim(context.Background(), c)
+
+	c.Status = "active"
+	err := svc.UpdateClaim(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateClaim_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	c := &Claim{Status: "bogus"}
+	err := svc.UpdateClaim(context.Background(), c)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListClaimsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateClaim(context.Background(), &Claim{PatientID: patientID})
+	svc.CreateClaim(context.Background(), &Claim{PatientID: patientID})
+	svc.CreateClaim(context.Background(), &Claim{PatientID: uuid.New()})
+
+	results, total, err := svc.ListClaimsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestSearchClaims(t *testing.T) {
+	svc := newTestService()
+	svc.CreateClaim(context.Background(), &Claim{PatientID: uuid.New()})
+
+	results, total, err := svc.SearchClaims(context.Background(), map[string]string{"status": "draft"}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(results) < 1 {
+		t.Error("expected at least 1 result")
+	}
+}
+
+// -- ClaimResponse: GetByFHIRID, ListByClaim, Search --
+
+func TestGetClaimResponseByFHIRID(t *testing.T) {
+	svc := newTestService()
+	cr := &ClaimResponse{ClaimID: uuid.New()}
+	svc.CreateClaimResponse(context.Background(), cr)
+
+	fetched, err := svc.GetClaimResponseByFHIRID(context.Background(), cr.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != cr.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetClaimResponseByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetClaimResponseByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent FHIR ID")
+	}
+}
+
+func TestListClaimResponsesByClaim(t *testing.T) {
+	svc := newTestService()
+	claimID := uuid.New()
+	svc.CreateClaimResponse(context.Background(), &ClaimResponse{ClaimID: claimID})
+	svc.CreateClaimResponse(context.Background(), &ClaimResponse{ClaimID: claimID})
+	svc.CreateClaimResponse(context.Background(), &ClaimResponse{ClaimID: uuid.New()})
+
+	results, total, err := svc.ListClaimResponsesByClaim(context.Background(), claimID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestSearchClaimResponses(t *testing.T) {
+	svc := newTestService()
+	svc.CreateClaimResponse(context.Background(), &ClaimResponse{ClaimID: uuid.New()})
+
+	results, total, err := svc.SearchClaimResponses(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(results) < 1 {
+		t.Error("expected at least 1 result")
+	}
+}
+
+// -- Invoice: GetByFHIRID, Update, List, Search --
+
+func TestGetInvoiceByFHIRID(t *testing.T) {
+	svc := newTestService()
+	inv := &Invoice{PatientID: uuid.New()}
+	svc.CreateInvoice(context.Background(), inv)
+
+	fetched, err := svc.GetInvoiceByFHIRID(context.Background(), inv.FHIRID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != inv.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetInvoiceByFHIRID_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetInvoiceByFHIRID(context.Background(), "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent FHIR ID")
+	}
+}
+
+func TestUpdateInvoice(t *testing.T) {
+	svc := newTestService()
+	inv := &Invoice{PatientID: uuid.New()}
+	svc.CreateInvoice(context.Background(), inv)
+
+	inv.Status = "issued"
+	err := svc.UpdateInvoice(context.Background(), inv)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateInvoice_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	inv := &Invoice{Status: "bogus"}
+	err := svc.UpdateInvoice(context.Background(), inv)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListInvoicesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateInvoice(context.Background(), &Invoice{PatientID: patientID})
+	svc.CreateInvoice(context.Background(), &Invoice{PatientID: patientID})
+	svc.CreateInvoice(context.Background(), &Invoice{PatientID: uuid.New()})
+
+	results, total, err := svc.ListInvoicesByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestSearchInvoices(t *testing.T) {
+	svc := newTestService()
+	svc.CreateInvoice(context.Background(), &Invoice{PatientID: uuid.New()})
+
+	results, total, err := svc.SearchInvoices(context.Background(), map[string]string{}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(results) < 1 {
+		t.Error("expected at least 1 result")
+	}
+}
+
 // -- ToFHIR Tests --
 
 func TestCoverageToFHIR(t *testing.T) {

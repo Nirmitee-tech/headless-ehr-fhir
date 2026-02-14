@@ -25,6 +25,9 @@ type consentRepoPG struct{ pool *pgxpool.Pool }
 func NewConsentRepoPG(pool *pgxpool.Pool) ConsentRepository { return &consentRepoPG{pool: pool} }
 
 func (r *consentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -175,6 +178,9 @@ func NewDocumentReferenceRepoPG(pool *pgxpool.Pool) DocumentReferenceRepository 
 }
 
 func (r *docRefRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -329,6 +335,9 @@ func NewClinicalNoteRepoPG(pool *pgxpool.Pool) ClinicalNoteRepository {
 }
 
 func (r *noteRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -434,6 +443,9 @@ func NewCompositionRepoPG(pool *pgxpool.Pool) CompositionRepository {
 }
 
 func (r *compRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

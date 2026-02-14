@@ -25,6 +25,9 @@ type scheduleRepoPG struct{ pool *pgxpool.Pool }
 func NewScheduleRepoPG(pool *pgxpool.Pool) ScheduleRepository { return &scheduleRepoPG{pool: pool} }
 
 func (r *scheduleRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -160,6 +163,9 @@ type slotRepoPG struct{ pool *pgxpool.Pool }
 func NewSlotRepoPG(pool *pgxpool.Pool) SlotRepository { return &slotRepoPG{pool: pool} }
 
 func (r *slotRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -302,6 +308,9 @@ func NewAppointmentRepoPG(pool *pgxpool.Pool) AppointmentRepository {
 }
 
 func (r *appointmentRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}
@@ -528,6 +537,9 @@ type waitlistRepoPG struct{ pool *pgxpool.Pool }
 func NewWaitlistRepoPG(pool *pgxpool.Pool) WaitlistRepository { return &waitlistRepoPG{pool: pool} }
 
 func (r *waitlistRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
 	if c := db.ConnFromContext(ctx); c != nil {
 		return c
 	}

@@ -386,3 +386,17 @@ func ptrTime(t time.Time) *time.Time { return &t }
 
 // ptrUUID returns a pointer to the given UUID.
 func ptrUUID(u uuid.UUID) *uuid.UUID { return &u }
+
+// Helper to create a test system user (for inbox FK references)
+func createTestSystemUser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID, username string) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	err := execWithSchema(ctx, pool, tenantID,
+		`INSERT INTO "system_user" (id, username, user_type, status)
+		 VALUES ($1, $2, $3, $4)`,
+		id, username, "clinician", "active")
+	if err != nil {
+		t.Fatalf("create test system user: %v", err)
+	}
+	return id
+}

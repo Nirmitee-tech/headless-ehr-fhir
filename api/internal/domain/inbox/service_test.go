@@ -722,3 +722,286 @@ func TestGetHandoff(t *testing.T) {
 		t.Error("unexpected ID mismatch")
 	}
 }
+
+// -- Additional MessagePool Tests --
+
+func TestUpdateMessagePool(t *testing.T) {
+	svc := newTestService()
+	p := &MessagePool{PoolName: "Test Pool", PoolType: "shared"}
+	svc.CreateMessagePool(context.Background(), p)
+	p.PoolName = "Updated Pool"
+	err := svc.UpdateMessagePool(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fetched, _ := svc.GetMessagePool(context.Background(), p.ID)
+	if fetched.PoolName != "Updated Pool" {
+		t.Errorf("expected 'Updated Pool', got %s", fetched.PoolName)
+	}
+}
+
+func TestListMessagePools(t *testing.T) {
+	svc := newTestService()
+	svc.CreateMessagePool(context.Background(), &MessagePool{PoolName: "Pool A", PoolType: "department"})
+	svc.CreateMessagePool(context.Background(), &MessagePool{PoolName: "Pool B", PoolType: "shared"})
+	pools, total, err := svc.ListMessagePools(context.Background(), 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(pools) != 2 {
+		t.Errorf("expected 2 pools, got %d", len(pools))
+	}
+}
+
+// -- Additional InboxMessage Tests --
+
+func TestUpdateInboxMessage(t *testing.T) {
+	svc := newTestService()
+	m := &InboxMessage{MessageType: "result", Subject: "Lab"}
+	svc.CreateInboxMessage(context.Background(), m)
+	m.Status = "read"
+	err := svc.UpdateInboxMessage(context.Background(), m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateInboxMessage_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	m := &InboxMessage{MessageType: "result", Subject: "Lab"}
+	svc.CreateInboxMessage(context.Background(), m)
+	m.Status = "bogus"
+	err := svc.UpdateInboxMessage(context.Background(), m)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListInboxMessagesByRecipient(t *testing.T) {
+	svc := newTestService()
+	recipientID := uuid.New()
+	m := &InboxMessage{MessageType: "result", Subject: "Lab", RecipientID: &recipientID}
+	svc.CreateInboxMessage(context.Background(), m)
+	msgs, total, err := svc.ListInboxMessagesByRecipient(context.Background(), recipientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("expected 1 message, got %d", len(msgs))
+	}
+}
+
+func TestListInboxMessagesByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	m := &InboxMessage{MessageType: "result", Subject: "Lab", PatientID: &patientID}
+	svc.CreateInboxMessage(context.Background(), m)
+	msgs, total, err := svc.ListInboxMessagesByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("expected 1 message, got %d", len(msgs))
+	}
+}
+
+func TestSearchInboxMessages(t *testing.T) {
+	svc := newTestService()
+	svc.CreateInboxMessage(context.Background(), &InboxMessage{MessageType: "result", Subject: "Lab"})
+	msgs, total, err := svc.SearchInboxMessages(context.Background(), map[string]string{"type": "result"}, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(msgs) < 1 {
+		t.Error("expected messages")
+	}
+}
+
+// -- Additional Pool Member Tests --
+
+func TestRemovePoolMember(t *testing.T) {
+	svc := newTestService()
+	p := &MessagePool{PoolName: "Test Pool", PoolType: "shared"}
+	svc.CreateMessagePool(context.Background(), p)
+	member := &MessagePoolMember{PoolID: p.ID, UserID: uuid.New()}
+	svc.AddPoolMember(context.Background(), member)
+	err := svc.RemovePoolMember(context.Background(), member.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	members, _ := svc.GetPoolMembers(context.Background(), p.ID)
+	if len(members) != 0 {
+		t.Errorf("expected 0 members after removal, got %d", len(members))
+	}
+}
+
+// -- Additional CosignRequest Tests --
+
+func TestUpdateCosignRequest(t *testing.T) {
+	svc := newTestService()
+	r := &CosignRequest{DocumentType: "progress_note", RequesterID: uuid.New(), CosignerID: uuid.New()}
+	svc.CreateCosignRequest(context.Background(), r)
+	r.Status = "cosigned"
+	err := svc.UpdateCosignRequest(context.Background(), r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateCosignRequest_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	r := &CosignRequest{DocumentType: "progress_note", RequesterID: uuid.New(), CosignerID: uuid.New()}
+	svc.CreateCosignRequest(context.Background(), r)
+	r.Status = "bogus"
+	err := svc.UpdateCosignRequest(context.Background(), r)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListCosignRequestsByCosigner(t *testing.T) {
+	svc := newTestService()
+	cosignerID := uuid.New()
+	svc.CreateCosignRequest(context.Background(), &CosignRequest{DocumentType: "note", RequesterID: uuid.New(), CosignerID: cosignerID})
+	items, total, err := svc.ListCosignRequestsByCosigner(context.Background(), cosignerID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1 item, got %d", len(items))
+	}
+}
+
+func TestListCosignRequestsByRequester(t *testing.T) {
+	svc := newTestService()
+	requesterID := uuid.New()
+	svc.CreateCosignRequest(context.Background(), &CosignRequest{DocumentType: "note", RequesterID: requesterID, CosignerID: uuid.New()})
+	items, total, err := svc.ListCosignRequestsByRequester(context.Background(), requesterID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1 item, got %d", len(items))
+	}
+}
+
+// -- Additional PatientList Tests --
+
+func TestUpdatePatientList(t *testing.T) {
+	svc := newTestService()
+	l := &PatientList{ListName: "Test List", ListType: "personal", OwnerID: uuid.New()}
+	svc.CreatePatientList(context.Background(), l)
+	l.ListName = "Updated List"
+	err := svc.UpdatePatientList(context.Background(), l)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListPatientListsByOwner(t *testing.T) {
+	svc := newTestService()
+	ownerID := uuid.New()
+	svc.CreatePatientList(context.Background(), &PatientList{ListName: "List A", ListType: "personal", OwnerID: ownerID})
+	svc.CreatePatientList(context.Background(), &PatientList{ListName: "List B", ListType: "personal", OwnerID: ownerID})
+	lists, total, err := svc.ListPatientListsByOwner(context.Background(), ownerID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(lists) != 2 {
+		t.Errorf("expected 2 lists, got %d", len(lists))
+	}
+}
+
+func TestRemovePatientListMember(t *testing.T) {
+	svc := newTestService()
+	l := &PatientList{ListName: "Test", ListType: "personal", OwnerID: uuid.New()}
+	svc.CreatePatientList(context.Background(), l)
+	member := &PatientListMember{ListID: l.ID, PatientID: uuid.New()}
+	svc.AddPatientListMember(context.Background(), member)
+	err := svc.RemovePatientListMember(context.Background(), member.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	members, _, _ := svc.GetPatientListMembers(context.Background(), l.ID, 20, 0)
+	if len(members) != 0 {
+		t.Errorf("expected 0 members after removal, got %d", len(members))
+	}
+}
+
+func TestUpdatePatientListMember(t *testing.T) {
+	svc := newTestService()
+	l := &PatientList{ListName: "Test", ListType: "personal", OwnerID: uuid.New()}
+	svc.CreatePatientList(context.Background(), l)
+	member := &PatientListMember{ListID: l.ID, PatientID: uuid.New()}
+	svc.AddPatientListMember(context.Background(), member)
+	err := svc.UpdatePatientListMember(context.Background(), member)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// -- Additional Handoff Tests --
+
+func TestUpdateHandoff(t *testing.T) {
+	svc := newTestService()
+	h := &HandoffRecord{PatientID: uuid.New(), FromProviderID: uuid.New(), ToProviderID: uuid.New()}
+	svc.CreateHandoff(context.Background(), h)
+	h.Status = "completed"
+	err := svc.UpdateHandoff(context.Background(), h)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListHandoffsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateHandoff(context.Background(), &HandoffRecord{PatientID: patientID, FromProviderID: uuid.New(), ToProviderID: uuid.New()})
+	items, total, err := svc.ListHandoffsByPatient(context.Background(), patientID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1 item, got %d", len(items))
+	}
+}
+
+func TestListHandoffsByProvider(t *testing.T) {
+	svc := newTestService()
+	providerID := uuid.New()
+	svc.CreateHandoff(context.Background(), &HandoffRecord{PatientID: uuid.New(), FromProviderID: providerID, ToProviderID: uuid.New()})
+	items, total, err := svc.ListHandoffsByProvider(context.Background(), providerID, 20, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(items) != 1 {
+		t.Errorf("expected 1 item, got %d", len(items))
+	}
+}

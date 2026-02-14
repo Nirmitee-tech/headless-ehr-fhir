@@ -305,6 +305,282 @@ func TestAddEDStatusHistory_StatusRequired(t *testing.T) {
 	}
 }
 
+func TestUpdateTriageRecord(t *testing.T) {
+	svc := newTestService()
+	tr := &TriageRecord{PatientID: uuid.New(), EncounterID: uuid.New(), TriageNurseID: uuid.New(), ChiefComplaint: "pain"}
+	svc.CreateTriageRecord(context.Background(), tr)
+
+	tr.ChiefComplaint = "severe pain"
+	err := svc.UpdateTriageRecord(context.Background(), tr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListTriageRecords(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTriageRecord(context.Background(), &TriageRecord{PatientID: uuid.New(), EncounterID: uuid.New(), TriageNurseID: uuid.New(), ChiefComplaint: "pain"})
+	svc.CreateTriageRecord(context.Background(), &TriageRecord{PatientID: uuid.New(), EncounterID: uuid.New(), TriageNurseID: uuid.New(), ChiefComplaint: "fever"})
+
+	result, total, err := svc.ListTriageRecords(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestListTriageRecordsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateTriageRecord(context.Background(), &TriageRecord{PatientID: patientID, EncounterID: uuid.New(), TriageNurseID: uuid.New(), ChiefComplaint: "pain"})
+	svc.CreateTriageRecord(context.Background(), &TriageRecord{PatientID: uuid.New(), EncounterID: uuid.New(), TriageNurseID: uuid.New(), ChiefComplaint: "fever"})
+
+	result, total, err := svc.ListTriageRecordsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchTriageRecords(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTriageRecord(context.Background(), &TriageRecord{PatientID: uuid.New(), EncounterID: uuid.New(), TriageNurseID: uuid.New(), ChiefComplaint: "pain"})
+
+	result, total, err := svc.SearchTriageRecords(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestGetEDTracking(t *testing.T) {
+	svc := newTestService()
+	ed := &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()}
+	svc.CreateEDTracking(context.Background(), ed)
+
+	fetched, err := svc.GetEDTracking(context.Background(), ed.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ID != ed.ID {
+		t.Error("unexpected ID mismatch")
+	}
+}
+
+func TestGetEDTracking_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetEDTracking(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateEDTracking(t *testing.T) {
+	svc := newTestService()
+	ed := &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()}
+	svc.CreateEDTracking(context.Background(), ed)
+
+	ed.CurrentStatus = "triaged"
+	err := svc.UpdateEDTracking(context.Background(), ed)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteEDTracking(t *testing.T) {
+	svc := newTestService()
+	ed := &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()}
+	svc.CreateEDTracking(context.Background(), ed)
+	err := svc.DeleteEDTracking(context.Background(), ed.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetEDTracking(context.Background(), ed.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListEDTrackings(t *testing.T) {
+	svc := newTestService()
+	svc.CreateEDTracking(context.Background(), &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()})
+	svc.CreateEDTracking(context.Background(), &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()})
+
+	result, total, err := svc.ListEDTrackings(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestListEDTrackingsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateEDTracking(context.Background(), &EDTracking{PatientID: patientID, EncounterID: uuid.New()})
+	svc.CreateEDTracking(context.Background(), &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()})
+
+	result, total, err := svc.ListEDTrackingsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchEDTrackings(t *testing.T) {
+	svc := newTestService()
+	svc.CreateEDTracking(context.Background(), &EDTracking{PatientID: uuid.New(), EncounterID: uuid.New()})
+
+	result, total, err := svc.SearchEDTrackings(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
+func TestGetEDStatusHistory(t *testing.T) {
+	svc := newTestService()
+	trackingID := uuid.New()
+	svc.AddEDStatusHistory(context.Background(), &EDStatusHistory{EDTrackingID: trackingID, Status: "triaged"})
+	svc.AddEDStatusHistory(context.Background(), &EDStatusHistory{EDTrackingID: trackingID, Status: "in-progress"})
+
+	history, err := svc.GetEDStatusHistory(context.Background(), trackingID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(history) != 2 {
+		t.Errorf("expected 2 history entries, got %d", len(history))
+	}
+}
+
+func TestGetTraumaActivation(t *testing.T) {
+	svc := newTestService()
+	ta := &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-1"}
+	svc.CreateTraumaActivation(context.Background(), ta)
+
+	fetched, err := svc.GetTraumaActivation(context.Background(), ta.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fetched.ActivationLevel != "level-1" {
+		t.Errorf("expected level-1, got %s", fetched.ActivationLevel)
+	}
+}
+
+func TestGetTraumaActivation_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetTraumaActivation(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateTraumaActivation(t *testing.T) {
+	svc := newTestService()
+	ta := &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-1"}
+	svc.CreateTraumaActivation(context.Background(), ta)
+
+	ta.ActivationLevel = "level-2"
+	err := svc.UpdateTraumaActivation(context.Background(), ta)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteTraumaActivation(t *testing.T) {
+	svc := newTestService()
+	ta := &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-1"}
+	svc.CreateTraumaActivation(context.Background(), ta)
+	err := svc.DeleteTraumaActivation(context.Background(), ta.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetTraumaActivation(context.Background(), ta.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListTraumaActivations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTraumaActivation(context.Background(), &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-1"})
+	svc.CreateTraumaActivation(context.Background(), &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-2"})
+
+	result, total, err := svc.ListTraumaActivations(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("expected 2 results, got %d", len(result))
+	}
+}
+
+func TestListTraumaActivationsByPatient(t *testing.T) {
+	svc := newTestService()
+	patientID := uuid.New()
+	svc.CreateTraumaActivation(context.Background(), &TraumaActivation{PatientID: patientID, ActivationLevel: "level-1"})
+	svc.CreateTraumaActivation(context.Background(), &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-2"})
+
+	result, total, err := svc.ListTraumaActivationsByPatient(context.Background(), patientID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
+	}
+}
+
+func TestSearchTraumaActivations(t *testing.T) {
+	svc := newTestService()
+	svc.CreateTraumaActivation(context.Background(), &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-1"})
+
+	result, total, err := svc.SearchTraumaActivations(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total < 1 {
+		t.Errorf("expected at least 1, got %d", total)
+	}
+	if len(result) < 1 {
+		t.Error("expected results")
+	}
+}
+
 func TestCreateTraumaActivation(t *testing.T) {
 	svc := newTestService()
 	ta := &TraumaActivation{PatientID: uuid.New(), ActivationLevel: "level-1"}

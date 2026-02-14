@@ -318,6 +318,25 @@ func TestLookupICD10_NotFound(t *testing.T) {
 	}
 }
 
+func TestLookupICD10_EmptyCode(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.LookupICD10(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty code")
+	}
+}
+
+func TestSearchICD10_DefaultLimit(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchICD10(context.Background(), "diabetes", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results == nil {
+		t.Error("expected non-nil results")
+	}
+}
+
 // =========== SNOMED Tests ===========
 
 func TestSearchSNOMED_Success(t *testing.T) {
@@ -347,6 +366,33 @@ func TestLookupSNOMED_Success(t *testing.T) {
 	}
 	if code.Display != "Appendectomy" {
 		t.Errorf("expected 'Appendectomy', got %q", code.Display)
+	}
+}
+
+func TestLookupSNOMED_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.LookupSNOMED(context.Background(), "99999999")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestLookupSNOMED_EmptyCode(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.LookupSNOMED(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty code")
+	}
+}
+
+func TestSearchSNOMED_DefaultLimit(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchSNOMED(context.Background(), "appendectomy", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results == nil {
+		t.Error("expected non-nil results")
 	}
 }
 
@@ -382,6 +428,33 @@ func TestLookupRxNorm_Success(t *testing.T) {
 	}
 }
 
+func TestLookupRxNorm_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.LookupRxNorm(context.Background(), "99999999")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestLookupRxNorm_EmptyCode(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.LookupRxNorm(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty code")
+	}
+}
+
+func TestSearchRxNorm_DefaultLimit(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchRxNorm(context.Background(), "metformin", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results == nil {
+		t.Error("expected non-nil results")
+	}
+}
+
 // =========== CPT Tests ===========
 
 func TestSearchCPT_Success(t *testing.T) {
@@ -411,6 +484,25 @@ func TestLookupCPT_Success(t *testing.T) {
 	}
 	if !strings.Contains(code.Display, "Office visit") {
 		t.Errorf("expected display to contain 'Office visit', got %q", code.Display)
+	}
+}
+
+func TestLookupCPT_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.LookupCPT(context.Background(), "00000")
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestSearchCPT_DefaultLimit(t *testing.T) {
+	svc := newTestService()
+	results, err := svc.SearchCPT(context.Background(), "office", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if results == nil {
+		t.Error("expected non-nil results")
 	}
 }
 

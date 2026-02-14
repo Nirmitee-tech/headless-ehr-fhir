@@ -795,3 +795,290 @@ func TestDeletePostpartum(t *testing.T) {
 		t.Error("expected error after deletion")
 	}
 }
+
+// =========== Additional Pregnancy Tests ===========
+
+func TestGetPregnancy_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPregnancy(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdatePregnancy(t *testing.T) {
+	svc := newTestService()
+	p := &Pregnancy{PatientID: uuid.New()}
+	svc.CreatePregnancy(context.Background(), p)
+	p.Status = "completed"
+	err := svc.UpdatePregnancy(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdatePregnancy_InvalidStatus(t *testing.T) {
+	svc := newTestService()
+	p := &Pregnancy{PatientID: uuid.New()}
+	svc.CreatePregnancy(context.Background(), p)
+	p.Status = "bogus"
+	err := svc.UpdatePregnancy(context.Background(), p)
+	if err == nil {
+		t.Error("expected error for invalid status")
+	}
+}
+
+func TestListPregnanciesByPatient(t *testing.T) {
+	svc := newTestService()
+	pid := uuid.New()
+	svc.CreatePregnancy(context.Background(), &Pregnancy{PatientID: pid})
+	svc.CreatePregnancy(context.Background(), &Pregnancy{PatientID: uuid.New()})
+	items, total, err := svc.ListPregnanciesByPatient(context.Background(), pid, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+func TestCreatePregnancy_ValidStatuses(t *testing.T) {
+	for _, s := range []string{"active", "completed", "ectopic", "molar", "miscarriage", "stillbirth", "terminated", "unknown"} {
+		svc := newTestService()
+		p := &Pregnancy{PatientID: uuid.New(), Status: s}
+		if err := svc.CreatePregnancy(context.Background(), p); err != nil {
+			t.Errorf("status %q should be valid: %v", s, err)
+		}
+	}
+}
+
+// =========== Additional Prenatal Visit Tests ===========
+
+func TestGetPrenatalVisit_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPrenatalVisit(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdatePrenatalVisit(t *testing.T) {
+	svc := newTestService()
+	v := &PrenatalVisit{PregnancyID: uuid.New()}
+	svc.CreatePrenatalVisit(context.Background(), v)
+	err := svc.UpdatePrenatalVisit(context.Background(), v)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListPrenatalVisitsByPregnancy(t *testing.T) {
+	svc := newTestService()
+	pregID := uuid.New()
+	svc.CreatePrenatalVisit(context.Background(), &PrenatalVisit{PregnancyID: pregID})
+	svc.CreatePrenatalVisit(context.Background(), &PrenatalVisit{PregnancyID: pregID})
+	svc.CreatePrenatalVisit(context.Background(), &PrenatalVisit{PregnancyID: uuid.New()})
+	items, total, err := svc.ListPrenatalVisitsByPregnancy(context.Background(), pregID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+// =========== Additional Labor Record Tests ===========
+
+func TestGetLaborRecord_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetLaborRecord(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateLaborRecord(t *testing.T) {
+	svc := newTestService()
+	l := &LaborRecord{PregnancyID: uuid.New()}
+	svc.CreateLaborRecord(context.Background(), l)
+	l.Status = "completed"
+	err := svc.UpdateLaborRecord(context.Background(), l)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListLaborRecords(t *testing.T) {
+	svc := newTestService()
+	svc.CreateLaborRecord(context.Background(), &LaborRecord{PregnancyID: uuid.New()})
+	svc.CreateLaborRecord(context.Background(), &LaborRecord{PregnancyID: uuid.New()})
+	items, total, err := svc.ListLaborRecords(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+func TestGetCervicalExams(t *testing.T) {
+	svc := newTestService()
+	l := &LaborRecord{PregnancyID: uuid.New()}
+	svc.CreateLaborRecord(context.Background(), l)
+	svc.AddCervicalExam(context.Background(), &LaborCervicalExam{LaborRecordID: l.ID})
+	svc.AddCervicalExam(context.Background(), &LaborCervicalExam{LaborRecordID: l.ID})
+	exams, err := svc.GetCervicalExams(context.Background(), l.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(exams) != 2 {
+		t.Errorf("expected 2, got %d", len(exams))
+	}
+}
+
+func TestGetFetalMonitoring(t *testing.T) {
+	svc := newTestService()
+	l := &LaborRecord{PregnancyID: uuid.New()}
+	svc.CreateLaborRecord(context.Background(), l)
+	svc.AddFetalMonitoring(context.Background(), &FetalMonitoring{LaborRecordID: l.ID})
+	monitors, err := svc.GetFetalMonitoring(context.Background(), l.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(monitors) != 1 {
+		t.Errorf("expected 1, got %d", len(monitors))
+	}
+}
+
+// =========== Additional Delivery Tests ===========
+
+func TestGetDelivery_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetDelivery(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateDelivery(t *testing.T) {
+	svc := newTestService()
+	d := &DeliveryRecord{
+		PregnancyID:          uuid.New(),
+		PatientID:            uuid.New(),
+		DeliveryDatetime:     time.Now(),
+		DeliveryMethod:       "vaginal",
+		DeliveringProviderID: uuid.New(),
+	}
+	svc.CreateDelivery(context.Background(), d)
+	d.DeliveryMethod = "cesarean"
+	err := svc.UpdateDelivery(context.Background(), d)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteDelivery(t *testing.T) {
+	svc := newTestService()
+	d := &DeliveryRecord{
+		PregnancyID:          uuid.New(),
+		PatientID:            uuid.New(),
+		DeliveryDatetime:     time.Now(),
+		DeliveryMethod:       "vaginal",
+		DeliveringProviderID: uuid.New(),
+	}
+	svc.CreateDelivery(context.Background(), d)
+	err := svc.DeleteDelivery(context.Background(), d.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = svc.GetDelivery(context.Background(), d.ID)
+	if err == nil {
+		t.Error("expected error after deletion")
+	}
+}
+
+func TestListDeliveriesByPregnancy(t *testing.T) {
+	svc := newTestService()
+	pregID := uuid.New()
+	svc.CreateDelivery(context.Background(), &DeliveryRecord{
+		PregnancyID: pregID, PatientID: uuid.New(), DeliveryDatetime: time.Now(),
+		DeliveryMethod: "vaginal", DeliveringProviderID: uuid.New(),
+	})
+	svc.CreateDelivery(context.Background(), &DeliveryRecord{
+		PregnancyID: uuid.New(), PatientID: uuid.New(), DeliveryDatetime: time.Now(),
+		DeliveryMethod: "cesarean", DeliveringProviderID: uuid.New(),
+	})
+	items, total, err := svc.ListDeliveriesByPregnancy(context.Background(), pregID, 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1, got %d", total)
+	}
+}
+
+// =========== Additional Newborn Tests ===========
+
+func TestGetNewborn_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetNewborn(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdateNewborn(t *testing.T) {
+	svc := newTestService()
+	n := &NewbornRecord{DeliveryID: uuid.New(), BirthDatetime: time.Now()}
+	svc.CreateNewborn(context.Background(), n)
+	err := svc.UpdateNewborn(context.Background(), n)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListNewborns(t *testing.T) {
+	svc := newTestService()
+	svc.CreateNewborn(context.Background(), &NewbornRecord{DeliveryID: uuid.New(), BirthDatetime: time.Now()})
+	svc.CreateNewborn(context.Background(), &NewbornRecord{DeliveryID: uuid.New(), BirthDatetime: time.Now()})
+	items, total, err := svc.ListNewborns(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
+
+// =========== Additional Postpartum Tests ===========
+
+func TestGetPostpartum_NotFound(t *testing.T) {
+	svc := newTestService()
+	_, err := svc.GetPostpartum(context.Background(), uuid.New())
+	if err == nil {
+		t.Error("expected error for not found")
+	}
+}
+
+func TestUpdatePostpartum(t *testing.T) {
+	svc := newTestService()
+	p := &PostpartumRecord{PregnancyID: uuid.New(), PatientID: uuid.New()}
+	svc.CreatePostpartum(context.Background(), p)
+	err := svc.UpdatePostpartum(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListPostpartumRecords(t *testing.T) {
+	svc := newTestService()
+	svc.CreatePostpartum(context.Background(), &PostpartumRecord{PregnancyID: uuid.New(), PatientID: uuid.New()})
+	svc.CreatePostpartum(context.Background(), &PostpartumRecord{PregnancyID: uuid.New(), PatientID: uuid.New()})
+	items, total, err := svc.ListPostpartumRecords(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 2 || len(items) != 2 {
+		t.Errorf("expected 2, got %d", total)
+	}
+}
