@@ -338,6 +338,14 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | GET | `/fhir/QuestionnaireResponse` | Search responses |
 | POST | `/fhir/QuestionnaireResponse` | Create response |
 
+**CDS Hooks** (HL7 CDS Hooks 2.0)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/cds-services` | Discovery -- list available CDS services |
+| POST | `/cds-services/:id` | Invoke a CDS hook |
+| POST | `/cds-services/:id/feedback` | Submit feedback on cards |
+
 ### Operational REST Endpoints
 
 All operational endpoints are prefixed with `/api/v1` and return standard JSON with pagination.

@@ -1927,6 +1927,241 @@ func runServer() error {
 	})
 	everythingHandler.RegisterRoutes(fhirGroup)
 
+	// CDS Hooks (HL7 CDS Hooks 2.0) — external clinical decision support
+	cdsHooksHandler := fhir.NewCDSHooksHandler()
+
+	// Service 1: patient-risk-alerts (hook: patient-view)
+	cdsHooksHandler.RegisterService(fhir.CDSService{
+		Hook:        "patient-view",
+		Title:       "Patient Risk Alerts",
+		Description: "Displays active CDS alerts when a patient chart is opened",
+		ID:          "patient-risk-alerts",
+		Prefetch: map[string]string{
+			"patient": "Patient/{{context.patientId}}",
+		},
+	}, func(ctx context.Context, req fhir.CDSHookRequest) (*fhir.CDSHookResponse, error) {
+		patientIDStr, _ := req.Context["patientId"].(string)
+		if patientIDStr == "" {
+			return &fhir.CDSHookResponse{Cards: []fhir.CDSCard{}}, nil
+		}
+		patientID, err := uuid.Parse(patientIDStr)
+		if err != nil {
+			return &fhir.CDSHookResponse{Cards: []fhir.CDSCard{}}, nil
+		}
+		alerts, _, err := cdsSvc.ListCDSAlertsByPatient(ctx, patientID, 100, 0)
+		if err != nil {
+			return nil, err
+		}
+		var cards []fhir.CDSCard
+		for _, a := range alerts {
+			if a.Status != "fired" {
+				continue
+			}
+			indicator := "info"
+			if a.Severity != nil {
+				switch *a.Severity {
+				case "critical", "high":
+					indicator = "critical"
+				case "moderate", "medium":
+					indicator = "warning"
+				}
+			}
+			card := fhir.CDSCard{
+				UUID:      a.ID.String(),
+				Summary:   a.Summary,
+				Indicator: indicator,
+				Source:    fhir.CDSSource{Label: "EHR CDS Engine"},
+			}
+			if a.Detail != nil {
+				card.Detail = *a.Detail
+			}
+			if a.SuggestedAction != nil {
+				card.Suggestions = []fhir.CDSSuggestion{
+					{Label: *a.SuggestedAction},
+				}
+			}
+			cards = append(cards, card)
+		}
+		if cards == nil {
+			cards = []fhir.CDSCard{}
+		}
+		return &fhir.CDSHookResponse{Cards: cards}, nil
+	})
+
+	// Service 2: drug-interaction-check (hook: order-select)
+	cdsHooksHandler.RegisterService(fhir.CDSService{
+		Hook:        "order-select",
+		Title:       "Drug Interaction Check",
+		Description: "Checks for drug-drug interactions when a medication is selected",
+		ID:          "drug-interaction-check",
+		Prefetch: map[string]string{
+			"patient": "Patient/{{context.patientId}}",
+		},
+	}, func(ctx context.Context, req fhir.CDSHookRequest) (*fhir.CDSHookResponse, error) {
+		interactions, _, err := cdsSvc.ListDrugInteractions(ctx, 1000, 0)
+		if err != nil {
+			return nil, err
+		}
+		// Extract medication name from context.draftOrders
+		var draftMedName string
+		if draftOrders, ok := req.Context["draftOrders"].(map[string]interface{}); ok {
+			if entries, ok := draftOrders["entry"].([]interface{}); ok {
+				for _, entry := range entries {
+					if e, ok := entry.(map[string]interface{}); ok {
+						if res, ok := e["resource"].(map[string]interface{}); ok {
+							if name, ok := res["medicationCodeableConcept"].(map[string]interface{}); ok {
+								if text, ok := name["text"].(string); ok {
+									draftMedName = text
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		var cards []fhir.CDSCard
+		if draftMedName != "" {
+			for _, ix := range interactions {
+				if !ix.Active {
+					continue
+				}
+				if ix.MedicationAName == draftMedName || ix.MedicationBName == draftMedName {
+					indicator := "warning"
+					if ix.Severity == "critical" || ix.Severity == "high" {
+						indicator = "critical"
+					}
+					otherMed := ix.MedicationBName
+					if ix.MedicationBName == draftMedName {
+						otherMed = ix.MedicationAName
+					}
+					card := fhir.CDSCard{
+						UUID:      ix.ID.String(),
+						Summary:   fmt.Sprintf("Potential interaction: %s + %s", draftMedName, otherMed),
+						Indicator: indicator,
+						Source:    fhir.CDSSource{Label: "EHR CDS Engine"},
+					}
+					if ix.Description != nil {
+						card.Detail = *ix.Description
+					}
+					if ix.Management != nil {
+						card.Suggestions = []fhir.CDSSuggestion{
+							{Label: *ix.Management},
+						}
+					}
+					cards = append(cards, card)
+				}
+			}
+		}
+		if cards == nil {
+			cards = []fhir.CDSCard{}
+		}
+		return &fhir.CDSHookResponse{Cards: cards}, nil
+	})
+
+	// Service 3: formulary-check (hook: order-select)
+	cdsHooksHandler.RegisterService(fhir.CDSService{
+		Hook:        "order-select",
+		Title:       "Formulary Check",
+		Description: "Checks formulary status when a medication is selected",
+		ID:          "formulary-check",
+		Prefetch: map[string]string{
+			"patient": "Patient/{{context.patientId}}",
+		},
+	}, func(ctx context.Context, req fhir.CDSHookRequest) (*fhir.CDSHookResponse, error) {
+		formularies, _, err := cdsSvc.ListFormularies(ctx, 100, 0)
+		if err != nil {
+			return nil, err
+		}
+		// Extract medication name from context.draftOrders
+		var draftMedName string
+		if draftOrders, ok := req.Context["draftOrders"].(map[string]interface{}); ok {
+			if entries, ok := draftOrders["entry"].([]interface{}); ok {
+				for _, entry := range entries {
+					if e, ok := entry.(map[string]interface{}); ok {
+						if res, ok := e["resource"].(map[string]interface{}); ok {
+							if name, ok := res["medicationCodeableConcept"].(map[string]interface{}); ok {
+								if text, ok := name["text"].(string); ok {
+									draftMedName = text
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		var cards []fhir.CDSCard
+		if draftMedName != "" {
+			for _, f := range formularies {
+				if !f.Active {
+					continue
+				}
+				items, err := cdsSvc.GetFormularyItems(ctx, f.ID)
+				if err != nil {
+					continue
+				}
+				for _, item := range items {
+					if item.MedicationName == draftMedName {
+						if item.RequiresPriorAuth {
+							cards = append(cards, fhir.CDSCard{
+								Summary:   fmt.Sprintf("%s requires prior authorization on %s", draftMedName, f.Name),
+								Indicator: "warning",
+								Source:    fhir.CDSSource{Label: "EHR CDS Engine"},
+							})
+						}
+						if item.PreferredStatus != nil && *item.PreferredStatus == "non-preferred" {
+							cards = append(cards, fhir.CDSCard{
+								Summary:   fmt.Sprintf("%s is non-preferred on %s", draftMedName, f.Name),
+								Indicator: "info",
+								Source:    fhir.CDSSource{Label: "EHR CDS Engine"},
+								Detail:    "Consider a preferred alternative.",
+							})
+						}
+					}
+				}
+			}
+		}
+		if cards == nil {
+			cards = []fhir.CDSCard{}
+		}
+		return &fhir.CDSHookResponse{Cards: cards}, nil
+	})
+
+	// Shared feedback handler for all CDS Hooks services
+	cdsFeedbackHandler := func(ctx context.Context, serviceID string, fb fhir.CDSFeedbackRequest) error {
+		action := fb.Outcome
+		if action == "" {
+			action = "acknowledged"
+		}
+		var reason *string
+		if len(fb.OverrideReasons) > 0 {
+			r := fb.OverrideReasons[0].Display
+			if r == "" {
+				r = fb.OverrideReasons[0].Code
+			}
+			reason = &r
+		}
+		comment := fmt.Sprintf("CDS Hooks feedback for service %s, card %s", serviceID, fb.Card)
+		resp := &cds.CDSAlertResponse{
+			ID:             uuid.New(),
+			AlertID:        uuid.New(),
+			PractitionerID: uuid.New(),
+			Action:         action,
+			Reason:         reason,
+			Comment:        &comment,
+		}
+		// Best-effort: if the card UUID is a valid alert ID, use it
+		if alertID, err := uuid.Parse(fb.Card); err == nil {
+			resp.AlertID = alertID
+		}
+		_ = cdsSvc.AddAlertResponse(ctx, resp)
+		return nil
+	}
+	cdsHooksHandler.RegisterFeedbackHandler("patient-risk-alerts", cdsFeedbackHandler)
+	cdsHooksHandler.RegisterFeedbackHandler("drug-interaction-check", cdsFeedbackHandler)
+	cdsHooksHandler.RegisterFeedbackHandler("formulary-check", cdsFeedbackHandler)
+
+	cdsHooksHandler.RegisterRoutes(e)
+
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))
 

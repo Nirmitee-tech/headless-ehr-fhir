@@ -443,6 +443,8 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **$export** (`POST /fhir/$export`, `POST /fhir/Patient/$export`) -- Asynchronous bulk data export using NDJSON format. Uses the `ExportManager` with registered `ResourceExporter` implementations.
 
+- **CDS Hooks** (`GET /cds-services`, `POST /cds-services/:id`, `POST /cds-services/:id/feedback`) -- HL7 CDS Hooks 2.0 interface. Uses a `CDSHooksHandler` with registered `ServiceHandler` functions per hook service. Ships with three built-in services: patient-risk-alerts (patient-view hook), drug-interaction-check (order-select hook), and formulary-check (order-select hook). Routes are registered at the root level (not under /fhir) per the CDS Hooks specification.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.
