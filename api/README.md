@@ -346,6 +346,18 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | POST | `/cds-services/:id` | Invoke a CDS hook |
 | POST | `/cds-services/:id/feedback` | Submit feedback on cards |
 
+**Bulk Data Export** (FHIR Bulk Data Access IG)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/$export` | System-level bulk export kick-off |
+| POST | `/fhir/Patient/$export` | Patient-level bulk export (all patients) |
+| POST | `/fhir/Patient/:id/$export` | Patient-level bulk export by patient ID |
+| POST | `/fhir/Group/:id/$export` | Group-level bulk export |
+| GET | `/fhir/$export-status/:id` | Poll export job status |
+| GET | `/fhir/$export-data/:id/:type` | Download NDJSON export data |
+| DELETE | `/fhir/$export-status/:id` | Cancel/delete export job |
+
 ### Operational REST Endpoints
 
 All operational endpoints are prefixed with `/api/v1` and return standard JSON with pagination.

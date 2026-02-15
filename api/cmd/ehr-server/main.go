@@ -1242,7 +1242,13 @@ func runServer() error {
 	openAPIGen.RegisterRoutes(apiV1)
 
 	// FHIR $export — register service adapters for real data export
-	exportManager := fhir.NewExportManager()
+	exportManager := fhir.NewExportManagerWithOptions(fhir.ExportOptions{
+		MaxConcurrentJobs: 10,
+		JobTTL:            time.Hour,
+	})
+	exportCleanupCtx, exportCleanupCancel := context.WithCancel(ctx)
+	defer exportCleanupCancel()
+	exportManager.StartCleanup(exportCleanupCtx)
 
 	exportManager.RegisterExporter("Patient", &fhir.ServiceExporter{
 		ResourceType: "Patient",
@@ -1482,6 +1488,313 @@ func runServer() error {
 				return nil, err
 			}
 			items, _, err := dxSvc.ListServiceRequestsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+
+	exportManager.RegisterExporter("Practitioner", &fhir.ServiceExporter{
+		ResourceType: "Practitioner",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := identitySvc.ListPractitioners(ctx, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("MedicationDispense", &fhir.ServiceExporter{
+		ResourceType: "MedicationDispense",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := medSvc.SearchMedicationDispenses(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := medSvc.ListMedicationDispensesByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("ImagingStudy", &fhir.ServiceExporter{
+		ResourceType: "ImagingStudy",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := dxSvc.ListImagingStudiesByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Specimen", &fhir.ServiceExporter{
+		ResourceType: "Specimen",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := dxSvc.ListSpecimensByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("ImmunizationRecommendation", &fhir.ServiceExporter{
+		ResourceType: "ImmunizationRecommendation",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := immSvc.ListRecommendationsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Goal", &fhir.ServiceExporter{
+		ResourceType: "Goal",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := cpSvc.ListGoalsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("CareTeam", &fhir.ServiceExporter{
+		ResourceType: "CareTeam",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := ctSvc.SearchCareTeams(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := ctSvc.ListCareTeamsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Claim", &fhir.ServiceExporter{
+		ResourceType: "Claim",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := billSvc.SearchClaims(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := billSvc.ListClaimsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Consent", &fhir.ServiceExporter{
+		ResourceType: "Consent",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := docSvc.SearchConsents(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := docSvc.ListConsentsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Composition", &fhir.ServiceExporter{
+		ResourceType: "Composition",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := docSvc.ListCompositionsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("FamilyMemberHistory", &fhir.ServiceExporter{
+		ResourceType: "FamilyMemberHistory",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := fmhSvc.ListFamilyMemberHistoriesByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("RelatedPerson", &fhir.ServiceExporter{
+		ResourceType: "RelatedPerson",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := rpSvc.ListRelatedPersonsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Appointment", &fhir.ServiceExporter{
+		ResourceType: "Appointment",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := schedSvc.ListAppointmentsByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Device", &fhir.ServiceExporter{
+		ResourceType: "Device",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := devSvc.SearchDevices(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Task", &fhir.ServiceExporter{
+		ResourceType: "Task",
+		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
+			pid, err := uuid.Parse(patientID)
+			if err != nil {
+				return nil, err
+			}
+			items, _, err := taskSvc.ListTasksByPatient(ctx, pid, 10000, 0)
 			if err != nil {
 				return nil, err
 			}

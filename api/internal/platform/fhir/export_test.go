@@ -881,6 +881,7 @@ func TestExportHandler_ExportStatus_InProgress(t *testing.T) {
 		ResourceTypes: []string{"Patient"},
 		OutputFormat:  "application/fhir+ndjson",
 		CreatedAt:     time.Now().UTC(),
+		RequestTime:   time.Now().UTC(),
 	}
 	mgr.mu.Unlock()
 
@@ -1061,6 +1062,8 @@ func TestExportHandler_RegisterRoutes(t *testing.T) {
 	expected := []string{
 		"POST:/fhir/$export",
 		"POST:/fhir/Patient/$export",
+		"POST:/fhir/Patient/:id/$export",
+		"POST:/fhir/Group/:id/$export",
 		"GET:/fhir/$export-status/:id",
 		"GET:/fhir/$export-data/:id/:type",
 		"DELETE:/fhir/$export-status/:id",
@@ -1069,6 +1072,442 @@ func TestExportHandler_RegisterRoutes(t *testing.T) {
 		if !routePaths[path] {
 			t.Errorf("missing expected route: %s", path)
 		}
+	}
+}
+
+// =========== New TDD Tests (Spec Compliance + Production Hardening) ===========
+
+func TestExportManager_OutputFormat_Valid(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+
+	job, err := mgr.KickOffWithFormat([]string{"Patient"}, "", nil, "application/fhir+ndjson", nil)
+	if err != nil {
+		t.Fatalf("expected no error for valid format, got %v", err)
+	}
+	if job.OutputFormat != "application/fhir+ndjson" {
+		t.Errorf("expected format 'application/fhir+ndjson', got %q", job.OutputFormat)
+	}
+}
+
+func TestExportManager_OutputFormat_Invalid(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+
+	_, err := mgr.KickOffWithFormat([]string{"Patient"}, "", nil, "text/csv", nil)
+	if err == nil {
+		t.Fatal("expected error for invalid format text/csv")
+	}
+	if !strings.Contains(err.Error(), "unsupported") {
+		t.Errorf("expected error containing 'unsupported', got %q", err.Error())
+	}
+}
+
+func TestExportHandler_OutputFormat_Aliases(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+
+	// "application/ndjson" should be accepted
+	job1, err := mgr.KickOffWithFormat([]string{"Patient"}, "", nil, "application/ndjson", nil)
+	if err != nil {
+		t.Fatalf("expected no error for application/ndjson, got %v", err)
+	}
+	if job1.OutputFormat != "application/fhir+ndjson" {
+		t.Errorf("expected canonical format, got %q", job1.OutputFormat)
+	}
+
+	// "ndjson" should be accepted
+	job2, err := mgr.KickOffWithFormat([]string{"Patient"}, "", nil, "ndjson", nil)
+	if err != nil {
+		t.Fatalf("expected no error for ndjson, got %v", err)
+	}
+	if job2.OutputFormat != "application/fhir+ndjson" {
+		t.Errorf("expected canonical format, got %q", job2.OutputFormat)
+	}
+}
+
+func TestExportHandler_RetryAfterHeader(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	// Manually create an in-progress job
+	mgr.mu.Lock()
+	mgr.jobs["retry-test"] = &ExportJob{
+		ID:            "retry-test",
+		Status:        "in-progress",
+		ResourceTypes: []string{"Patient"},
+		OutputFormat:  "application/fhir+ndjson",
+		CreatedAt:     time.Now().UTC(),
+		RequestTime:   time.Now().UTC(),
+		TotalTypes:    1,
+	}
+	mgr.mu.Unlock()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/retry-test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("retry-test")
+
+	err := h.ExportStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+	retryAfter := rec.Header().Get("Retry-After")
+	if retryAfter != "120" {
+		t.Errorf("expected Retry-After '120', got %q", retryAfter)
+	}
+}
+
+func TestExportHandler_RequiresAccessToken(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	job := mgr.KickOff([]string{"Patient"}, nil)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/"+job.ID, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(job.ID)
+
+	err := h.ExportStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+	rat, ok := result["requiresAccessToken"].(bool)
+	if !ok || !rat {
+		t.Errorf("expected requiresAccessToken: true, got %v", result["requiresAccessToken"])
+	}
+}
+
+func TestExportHandler_PatientExportByID(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "patient-42"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/fhir/Patient/patient-42/$export?_type=Patient", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("patient-42")
+
+	err := h.PatientExportByID(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+	contentLocation := rec.Header().Get("Content-Location")
+	if contentLocation == "" {
+		t.Error("expected Content-Location header")
+	}
+
+	// Extract job ID and wait for completion
+	parts := strings.Split(contentLocation, "/")
+	jobID := parts[len(parts)-1]
+	completed := waitForComplete(t, mgr, jobID, 5*time.Second)
+
+	if len(exporter.exportByPatientCalls) == 0 {
+		t.Fatal("expected ExportByPatient to be called")
+	}
+	if exporter.exportByPatientCalls[0] != "patient-42" {
+		t.Errorf("expected patient ID 'patient-42', got %q", exporter.exportByPatientCalls[0])
+	}
+	if completed.Status != "complete" {
+		t.Errorf("expected 'complete', got %q", completed.Status)
+	}
+}
+
+func TestExportHandler_GroupExport(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Condition", "id": "c1"},
+		},
+	}
+	mgr.RegisterExporter("Condition", exporter)
+
+	// Register a group resolver that returns two patients
+	mgr.SetGroupResolver(func(ctx context.Context, groupID string) ([]string, error) {
+		if groupID == "grp-1" {
+			return []string{"p1", "p2"}, nil
+		}
+		return nil, fmt.Errorf("group not found: %s", groupID)
+	})
+
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/fhir/Group/grp-1/$export?_type=Condition", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("grp-1")
+
+	err := h.GroupExport(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+
+	// Extract job ID and wait
+	contentLocation := rec.Header().Get("Content-Location")
+	parts := strings.Split(contentLocation, "/")
+	jobID := parts[len(parts)-1]
+	completed := waitForComplete(t, mgr, jobID, 5*time.Second)
+
+	if completed.Status != "complete" {
+		t.Errorf("expected 'complete', got %q", completed.Status)
+	}
+	// ExportByPatient should have been called for both p1 and p2
+	if len(exporter.exportByPatientCalls) < 2 {
+		t.Errorf("expected at least 2 ExportByPatient calls, got %d", len(exporter.exportByPatientCalls))
+	}
+}
+
+func TestExportHandler_GroupExport_NotFound(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+
+	mgr.SetGroupResolver(func(ctx context.Context, groupID string) ([]string, error) {
+		return nil, fmt.Errorf("group not found: %s", groupID)
+	})
+
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/fhir/Group/nonexistent/$export?_type=Patient", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("nonexistent")
+
+	err := h.GroupExport(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestExportManager_MaxConcurrentJobs(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 2, JobTTL: time.Hour})
+
+	// Register a blocking exporter so jobs stay in-progress
+	blocker1 := &blockingExporter{
+		started:   make(chan struct{}),
+		release:   make(chan struct{}),
+		resources: []map[string]interface{}{{"resourceType": "Patient", "id": "p1"}},
+	}
+	blocker2 := &blockingExporter{
+		started:   make(chan struct{}),
+		release:   make(chan struct{}),
+		resources: []map[string]interface{}{{"resourceType": "Patient", "id": "p2"}},
+	}
+	mgr.RegisterExporter("Patient", blocker1)
+
+	// Job 1
+	mgr.KickOff([]string{"Patient"}, nil)
+	<-blocker1.started
+
+	// Swap to second blocker for job 2
+	mgr.RegisterExporter("Patient", blocker2)
+	mgr.KickOff([]string{"Patient"}, nil)
+	<-blocker2.started
+
+	// Job 3 should fail because we're at max
+	_, err := mgr.KickOffWithFormat([]string{"Patient"}, "", nil, "", nil)
+	if err == nil {
+		t.Fatal("expected error when exceeding max concurrent jobs")
+	}
+	if !strings.Contains(err.Error(), "concurrent") {
+		t.Errorf("expected error about concurrent jobs, got %q", err.Error())
+	}
+
+	// Release blockers
+	close(blocker1.release)
+	close(blocker2.release)
+}
+
+func TestExportManager_JobExpiration(t *testing.T) {
+	// Use a very short TTL for testing
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: 50 * time.Millisecond})
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+
+	job := mgr.KickOff([]string{"Patient"}, nil)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	// Verify job exists
+	_, err := mgr.GetStatus(job.ID)
+	if err != nil {
+		t.Fatalf("job should exist before cleanup: %v", err)
+	}
+
+	// Wait for TTL to expire
+	time.Sleep(100 * time.Millisecond)
+
+	// Run cleanup
+	mgr.CleanupExpiredJobs()
+
+	// Job should be gone
+	_, err = mgr.GetStatus(job.ID)
+	if err == nil {
+		t.Error("expected job to be cleaned up after TTL")
+	}
+}
+
+func TestExportManager_ProgressTracking(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	// Create a job with known progress
+	mgr.mu.Lock()
+	mgr.jobs["progress-test"] = &ExportJob{
+		ID:             "progress-test",
+		Status:         "in-progress",
+		ResourceTypes:  []string{"Patient", "Observation", "Condition"},
+		OutputFormat:   "application/fhir+ndjson",
+		CreatedAt:      time.Now().UTC(),
+		RequestTime:    time.Now().UTC(),
+		ProcessedTypes: 2,
+		TotalTypes:     3,
+	}
+	mgr.mu.Unlock()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/progress-test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("progress-test")
+
+	err := h.ExportStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	progress := rec.Header().Get("X-Progress")
+	if progress != "2/3 resource types processed" {
+		t.Errorf("expected X-Progress '2/3 resource types processed', got %q", progress)
+	}
+}
+
+func TestExportHandler_TypeFilter(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Observation", "id": "obs1"},
+		},
+	}
+	mgr.RegisterExporter("Observation", exporter)
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/fhir/$export?_type=Observation&_typeFilter=Observation%3Fcategory%3Dlaboratory", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.SystemExport(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+
+	// Verify the type filter was stored on the job
+	contentLocation := rec.Header().Get("Content-Location")
+	parts := strings.Split(contentLocation, "/")
+	jobID := parts[len(parts)-1]
+
+	job, err := mgr.GetStatus(jobID)
+	if err != nil {
+		t.Fatalf("failed to get job: %v", err)
+	}
+	if len(job.TypeFilter) == 0 {
+		t.Error("expected TypeFilter to be stored on job")
+	}
+	if job.TypeFilter[0] != "Observation?category=laboratory" {
+		t.Errorf("expected type filter 'Observation?category=laboratory', got %q", job.TypeFilter[0])
+	}
+}
+
+func TestExportManager_TransactionTime(t *testing.T) {
+	mgr := NewExportManagerWithOptions(ExportOptions{MaxConcurrentJobs: 10, JobTTL: time.Hour})
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	h := NewExportHandler(mgr)
+	e := echo.New()
+
+	beforeKickOff := time.Now().UTC()
+	job := mgr.KickOff([]string{"Patient"}, nil)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/"+job.ID, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues(job.ID)
+
+	err := h.ExportStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+
+	txTimeStr, ok := result["transactionTime"].(string)
+	if !ok {
+		t.Fatal("expected transactionTime in response")
+	}
+
+	txTime, err := time.Parse(time.RFC3339, txTimeStr)
+	if err != nil {
+		t.Fatalf("invalid transactionTime format: %v", err)
+	}
+
+	// transactionTime should be the request time (before or close to kickoff), not the completion time
+	if txTime.Before(beforeKickOff.Add(-time.Second)) {
+		t.Errorf("transactionTime %v is before kickoff %v", txTime, beforeKickOff)
+	}
+	// It should be within a second of kickoff, not at completion time
+	if txTime.After(beforeKickOff.Add(2 * time.Second)) {
+		t.Errorf("transactionTime %v is too far after kickoff %v; should be request time, not completion", txTime, beforeKickOff)
 	}
 }
 

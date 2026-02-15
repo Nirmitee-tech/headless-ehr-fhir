@@ -441,7 +441,7 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **Patient/$everything** (`GET /fhir/Patient/:id/$everything`) -- Returns all data for a patient in a single searchset Bundle. Uses a registered-fetcher pattern where each domain registers a `PatientResourceFetcher` function. Supports `_type` (comma-separated resource filter) and `_count` (per-type limit) query parameters. Covers all 29 Patient Compartment resource types.
 
-- **$export** (`POST /fhir/$export`, `POST /fhir/Patient/$export`) -- Asynchronous bulk data export using NDJSON format. Uses the `ExportManager` with registered `ResourceExporter` implementations.
+- **$export** (`POST /fhir/$export`, `POST /fhir/Patient/$export`, `POST /fhir/Patient/:id/$export`, `POST /fhir/Group/:id/$export`) -- Asynchronous bulk data export per the FHIR Bulk Data Access IG. Supports system-level, patient-level, and group-level exports with NDJSON output. Features include `_outputFormat` validation, `Retry-After` headers, `_typeFilter` parameter, progress tracking (`X-Progress`), `requiresAccessToken: true`, max concurrent job limits (429 with Retry-After), automatic job expiration/cleanup, and 29 registered resource type exporters. Uses the `ExportManager` with registered `ResourceExporter` implementations.
 
 - **CDS Hooks** (`GET /cds-services`, `POST /cds-services/:id`, `POST /cds-services/:id/feedback`) -- HL7 CDS Hooks 2.0 interface. Uses a `CDSHooksHandler` with registered `ServiceHandler` functions per hook service. Ships with three built-in services: patient-risk-alerts (patient-view hook), drug-interaction-check (order-select hook), and formulary-check (order-select hook). Routes are registered at the root level (not under /fhir) per the CDS Hooks specification.
 
