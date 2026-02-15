@@ -1806,6 +1806,11 @@ func runServer() error {
 		},
 	})
 
+	// Group export resolver — returns 404 until a Group domain is implemented.
+	exportManager.SetGroupResolver(func(ctx context.Context, groupID string) ([]string, error) {
+		return nil, fmt.Errorf("group not found: %s (Group resource type not yet supported)", groupID)
+	})
+
 	exportHandler := fhir.NewExportHandler(exportManager)
 	exportHandler.RegisterRoutes(fhirGroup)
 

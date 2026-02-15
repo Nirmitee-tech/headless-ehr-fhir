@@ -63,13 +63,33 @@ func waitForComplete(t *testing.T, mgr *ExportManager, jobID string, timeout tim
 	return nil
 }
 
+// mustKickOff calls KickOff and fails the test on error.
+func mustKickOff(t *testing.T, mgr *ExportManager, resourceTypes []string, since *time.Time) *ExportJob {
+	t.Helper()
+	job, err := mgr.KickOff(resourceTypes, since)
+	if err != nil {
+		t.Fatalf("KickOff failed: %v", err)
+	}
+	return job
+}
+
+// mustKickOffForPatient calls KickOffForPatient and fails the test on error.
+func mustKickOffForPatient(t *testing.T, mgr *ExportManager, resourceTypes []string, patientID string, since *time.Time) *ExportJob {
+	t.Helper()
+	job, err := mgr.KickOffForPatient(resourceTypes, patientID, since)
+	if err != nil {
+		t.Fatalf("KickOffForPatient failed: %v", err)
+	}
+	return job
+}
+
 // =========== ExportManager Tests ===========
 
 func TestExportManager_KickOff_CreatesJob(t *testing.T) {
 	mgr := NewExportManager()
 
 	// With no exporters registered, kick off should still create a job
-	job := mgr.KickOff([]string{"Patient", "Observation"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient", "Observation"}, nil)
 
 	if job.ID == "" {
 		t.Error("expected job ID to be set")
@@ -97,7 +117,7 @@ func TestExportManager_KickOff_AsyncProcessing(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", exporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 
 	// Job should start in a non-complete state (in-progress or accepted)
 	// It transitions to complete asynchronously
@@ -118,7 +138,7 @@ func TestExportManager_KickOff_AsyncProcessing(t *testing.T) {
 func TestExportManager_KickOff_DefaultTypes(t *testing.T) {
 	mgr := NewExportManager()
 
-	job := mgr.KickOff(nil, nil)
+	job := mustKickOff(t, mgr,nil, nil)
 
 	if len(job.ResourceTypes) != 5 {
 		t.Errorf("expected 5 default resource types, got %d", len(job.ResourceTypes))
@@ -129,7 +149,7 @@ func TestExportManager_KickOff_WithSince(t *testing.T) {
 	mgr := NewExportManager()
 
 	since := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	job := mgr.KickOff([]string{"Patient"}, &since)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, &since)
 
 	if job.Since == nil {
 		t.Fatal("expected Since to be set")
@@ -151,7 +171,7 @@ func TestExportManager_Status_Pending(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", slowExporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 
 	// Wait for the exporter goroutine to start
 	<-slowExporter.started
@@ -185,7 +205,7 @@ func TestExportManager_Status_Complete(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", exporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	completed := waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	if completed.Status != "complete" {
@@ -213,7 +233,7 @@ func TestExportManager_GetJobData_ReturnsNDJSON(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", exporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	data, err := mgr.GetJobData(job.ID, "Patient")
@@ -257,7 +277,7 @@ func TestExportManager_GetJobData_RealData(t *testing.T) {
 	}
 	mgr.RegisterExporter("Observation", exporter)
 
-	job := mgr.KickOff([]string{"Observation"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Observation"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	data, err := mgr.GetJobData(job.ID, "Observation")
@@ -296,7 +316,7 @@ func TestExportManager_PatientExport(t *testing.T) {
 	}
 	mgr.RegisterExporter("Condition", exporter)
 
-	job := mgr.KickOffForPatient([]string{"Condition"}, "p123", nil)
+	job := mustKickOffForPatient(t, mgr,[]string{"Condition"}, "p123", nil)
 
 	if job.PatientID != "p123" {
 		t.Errorf("expected PatientID 'p123', got %q", job.PatientID)
@@ -335,7 +355,7 @@ func TestExportManager_Delete(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", exporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	// Delete the job
@@ -381,7 +401,7 @@ func TestExportManager_GetJobData_NotFound(t *testing.T) {
 func TestExportManager_GetJobData_WrongType(t *testing.T) {
 	mgr := NewExportManager()
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	_, err := mgr.GetJobData(job.ID, "Observation")
@@ -399,7 +419,7 @@ func TestExportManager_GetJobData_NotComplete(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", slowExporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	<-slowExporter.started
 
 	_, err := mgr.GetJobData(job.ID, "Patient")
@@ -421,7 +441,7 @@ func TestExportManager_SinceParameter(t *testing.T) {
 	mgr.RegisterExporter("Patient", exporter)
 
 	since := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-	job := mgr.KickOff([]string{"Patient"}, &since)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, &since)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	// Verify the _since parameter was passed to the exporter
@@ -450,7 +470,7 @@ func TestExportManager_MultipleResourceTypes(t *testing.T) {
 	mgr.RegisterExporter("Patient", patientExporter)
 	mgr.RegisterExporter("Observation", obsExporter)
 
-	job := mgr.KickOff([]string{"Patient", "Observation"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient", "Observation"}, nil)
 	completed := waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	if len(completed.OutputFiles) != 2 {
@@ -483,7 +503,7 @@ func TestExportManager_NoExporterForType(t *testing.T) {
 	// but the data for that type should be empty
 	mgr := NewExportManager()
 
-	job := mgr.KickOff([]string{"UnknownType"}, nil)
+	job := mustKickOff(t, mgr,[]string{"UnknownType"}, nil)
 	completed := waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	if completed.Status != "complete" {
@@ -508,7 +528,7 @@ func TestExportManager_ExporterError(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", exporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	completed := waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	if completed.Status != "error" {
@@ -544,7 +564,7 @@ func TestExportManager_ResourceFetcher_Integration(t *testing.T) {
 	mgr := NewExportManager()
 	mgr.RegisterExporter("Patient", adapter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	if !called {
@@ -817,7 +837,7 @@ func TestExportHandler_ExportStatus_Complete(t *testing.T) {
 	h := NewExportHandler(mgr)
 	e := echo.New()
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/"+job.ID, nil)
@@ -945,7 +965,7 @@ func TestExportHandler_ExportData(t *testing.T) {
 	h := NewExportHandler(mgr)
 	e := echo.New()
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-data/"+job.ID+"/Patient", nil)
@@ -1001,7 +1021,7 @@ func TestExportHandler_DeleteExport(t *testing.T) {
 	h := NewExportHandler(mgr)
 	e := echo.New()
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	req := httptest.NewRequest(http.MethodDelete, "/fhir/$export-status/"+job.ID, nil)
@@ -1171,7 +1191,7 @@ func TestExportHandler_RequiresAccessToken(t *testing.T) {
 	h := NewExportHandler(mgr)
 	e := echo.New()
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/"+job.ID, nil)
@@ -1332,12 +1352,12 @@ func TestExportManager_MaxConcurrentJobs(t *testing.T) {
 	mgr.RegisterExporter("Patient", blocker1)
 
 	// Job 1
-	mgr.KickOff([]string{"Patient"}, nil)
+	mustKickOff(t, mgr, []string{"Patient"}, nil)
 	<-blocker1.started
 
 	// Swap to second blocker for job 2
 	mgr.RegisterExporter("Patient", blocker2)
-	mgr.KickOff([]string{"Patient"}, nil)
+	mustKickOff(t, mgr, []string{"Patient"}, nil)
 	<-blocker2.started
 
 	// Job 3 should fail because we're at max
@@ -1364,7 +1384,7 @@ func TestExportManager_JobExpiration(t *testing.T) {
 	}
 	mgr.RegisterExporter("Patient", exporter)
 
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	// Verify job exists
@@ -1474,7 +1494,7 @@ func TestExportManager_TransactionTime(t *testing.T) {
 	e := echo.New()
 
 	beforeKickOff := time.Now().UTC()
-	job := mgr.KickOff([]string{"Patient"}, nil)
+	job := mustKickOff(t, mgr,[]string{"Patient"}, nil)
 	waitForComplete(t, mgr, job.ID, 5*time.Second)
 
 	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-status/"+job.ID, nil)

@@ -149,25 +149,13 @@ func (m *ExportManager) RegisterExporter(resourceType string, exporter ResourceE
 }
 
 // KickOff creates a new system-level export job and starts async processing.
-// It panics if the concurrent job limit is reached (callers that need error
-// handling should use KickOffWithFormat directly).
-func (m *ExportManager) KickOff(resourceTypes []string, since *time.Time) *ExportJob {
-	job, err := m.KickOffWithFormat(resourceTypes, "", since, "", nil)
-	if err != nil {
-		panic("KickOff failed: " + err.Error())
-	}
-	return job
+func (m *ExportManager) KickOff(resourceTypes []string, since *time.Time) (*ExportJob, error) {
+	return m.KickOffWithFormat(resourceTypes, "", since, "", nil)
 }
 
 // KickOffForPatient creates a new patient-level export job and starts async processing.
-// It panics if the concurrent job limit is reached (callers that need error
-// handling should use KickOffWithFormat directly).
-func (m *ExportManager) KickOffForPatient(resourceTypes []string, patientID string, since *time.Time) *ExportJob {
-	job, err := m.KickOffWithFormat(resourceTypes, patientID, since, "", nil)
-	if err != nil {
-		panic("KickOffForPatient failed: " + err.Error())
-	}
-	return job
+func (m *ExportManager) KickOffForPatient(resourceTypes []string, patientID string, since *time.Time) (*ExportJob, error) {
+	return m.KickOffWithFormat(resourceTypes, patientID, since, "", nil)
 }
 
 // KickOffWithFormat creates a new export job with output format validation
@@ -178,6 +166,20 @@ func (m *ExportManager) KickOffWithFormat(resourceTypes []string, patientID stri
 	if outputFormat != "" {
 		if !validOutputFormats[outputFormat] {
 			return nil, fmt.Errorf("unsupported _outputFormat: %s", outputFormat)
+		}
+	}
+
+	// If _type is empty but _typeFilter is provided, derive resource types
+	// from the filter prefixes (e.g. "Observation?category=laboratory" → "Observation").
+	if len(resourceTypes) == 0 && len(typeFilter) > 0 {
+		seen := make(map[string]bool)
+		for _, tf := range typeFilter {
+			if prefix, _, ok := strings.Cut(tf, "?"); ok && prefix != "" {
+				if !seen[prefix] {
+					resourceTypes = append(resourceTypes, prefix)
+					seen[prefix] = true
+				}
+			}
 		}
 	}
 
@@ -240,7 +242,7 @@ func (m *ExportManager) KickOffForGroup(resourceTypes []string, groupID string, 
 	m.mu.RUnlock()
 
 	if resolver == nil {
-		return nil, fmt.Errorf("group export not configured")
+		return nil, fmt.Errorf("Group resource not found: no group resolver configured")
 	}
 
 	// Resolve group members
@@ -569,19 +571,6 @@ func (m *ExportManager) StartCleanup(ctx context.Context) {
 			}
 		}
 	}()
-}
-
-// ActiveJobCount returns the number of in-progress jobs (for 429 responses).
-func (m *ExportManager) ActiveJobCount() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	count := 0
-	for _, j := range m.jobs {
-		if j.Status == "in-progress" {
-			count++
-		}
-	}
-	return count
 }
 
 // ExportHandler provides REST endpoints for FHIR $export operations.
