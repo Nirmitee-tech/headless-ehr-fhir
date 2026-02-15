@@ -62,6 +62,7 @@ import (
 	"github.com/ehr/ehr/internal/platform/openapi"
 	"github.com/ehr/ehr/internal/platform/reporting"
 	"github.com/ehr/ehr/internal/platform/sandbox"
+	"github.com/ehr/ehr/internal/platform/bot"
 	selfsched "github.com/ehr/ehr/internal/platform/scheduling"
 	"github.com/ehr/ehr/internal/platform/webhook"
 	"github.com/ehr/ehr/internal/platform/websocket"
@@ -2534,6 +2535,26 @@ func runServer() error {
 	profileValidator := fhir.NewProfileValidator(profileRegistry)
 	profileHandler := fhir.NewProfileHandler(profileValidator, profileRegistry)
 	profileHandler.RegisterRoutes(fhirGroup)
+
+	// CQL Engine & FHIR Measure/$evaluate-measure — clinical quality measures
+	measureEvaluator := fhir.NewMeasureEvaluator()
+	measureHandler := fhir.NewMeasureHandler(measureEvaluator)
+	measureHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR Patient/$merge — Master Data Management (MDM) with survivorship rules
+	mdmService := fhir.NewMDMService()
+	mergeHandler := fhir.NewMergeHandler(mdmService)
+	mergeHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR Narrative Generation — auto-generate text.div XHTML for resources
+	narrativeGenerator := fhir.NewNarrativeGenerator()
+	fhirGroup.Use(fhir.NarrativeMiddleware(narrativeGenerator))
+
+	// Server-Side Scripting (Bots) — FHIRPath-based automation engine
+	botEngine := bot.NewBotEngine()
+	bot.RegisterExampleBots(botEngine)
+	botHandler := bot.NewBotHandler(botEngine)
+	botHandler.RegisterRoutes(apiV1)
 
 	// C-CDA Generation & Parsing — Continuity of Care Documents
 	ccdaGenerator := ccda.NewGenerator("EHR System", "2.16.840.1.113883.3.0000")

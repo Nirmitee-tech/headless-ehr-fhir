@@ -52,6 +52,10 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **FHIR Group Resource** — patient cohorts, research populations, practitioner/device groups with member management and $export integration
 - **FHIR Binary Resource** — raw binary content with content negotiation (raw bytes vs FHIR JSON), base64 encoding, 50MB limit
 - **NutritionOrder** — oral diet, supplement, enteral formula with nutrient/texture modifiers, food preferences, status state machine
+- **CQL Engine & $evaluate-measure** — Clinical Quality Language engine with 3 built-in quality measures (CMS122 Diabetes HbA1c, CMS125 Breast Cancer Screening, CMS165 BP Control), individual and population evaluation, MeasureReport generation
+- **Patient/$merge (MDM)** — Master Data Management with survivorship rules (target-wins, source-wins, merge-lists, most-recent), reference rewriting, golden record chain resolution, preview mode
+- **FHIR Narrative Generation** — auto-generate XHTML text.div for 10 resource types via Echo middleware with opt-out support
+- **Server-Side Scripting (Bots)** — FHIRPath-based automation engine with 8 action types, trigger matching (subscription/cron/manual/webhook), execution safety (30s timeout, 100-action limit)
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -822,6 +826,50 @@ Supports oral diet (nutrients, texture modifiers, fluid consistency), supplement
 | POST | `/fhir/metadata/profiles` | Register custom profile |
 
 10 built-in US Core IG v6.1.0 profiles: Patient, Condition, Observation Lab, AllergyIntolerance, MedicationRequest, Encounter, Procedure, Immunization, DiagnosticReport Lab, DocumentReference. Validates cardinality (min/max), MustSupport fields (warnings), choice types (`medication[x]`, `effective[x]`, etc.), and terminology bindings.
+
+### CQL Engine & Quality Measures
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/Measure` | List all registered measures |
+| GET | `/fhir/Measure/:id` | Get measure by ID |
+| POST | `/fhir/Measure` | Create a custom measure |
+| POST | `/fhir/Measure/$evaluate-measure` | Evaluate measure (individual or population) |
+| GET | `/fhir/MeasureReport` | List generated measure reports |
+| GET | `/fhir/MeasureReport/:id` | Get measure report by ID |
+| GET | `/fhir/Library` | List CQL libraries |
+| POST | `/fhir/Library` | Register a CQL library |
+
+3 built-in quality measures: CMS122 (Diabetes HbA1c Poor Control), CMS125 (Breast Cancer Screening), CMS165 (Controlling High Blood Pressure). Supports individual evaluation (single patient MeasureReport) and population evaluation (aggregate scoring with proportion scoring and stratification).
+
+### Patient $merge (MDM)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/Patient/$merge` | Merge two patient records |
+| GET | `/fhir/Patient/$links` | List all patient merge links |
+| GET | `/fhir/Patient/:id/$golden-record` | Resolve golden record (follows chain) |
+| DELETE | `/fhir/Patient/:id/$link` | Unlink a merged patient |
+| GET | `/api/v1/admin/patient-links` | Admin view of all merge links |
+
+Survivorship rules: target-wins (default), source-wins, merge-lists (combine arrays), most-recent (by lastUpdated). Reference rewriter recursively walks all resources to update Patient references. Preview mode returns merge result without persisting.
+
+### Server-Side Scripting (Bots)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/bots` | List all bots |
+| POST | `/api/v1/bots` | Create a new bot |
+| GET | `/api/v1/bots/:id` | Get bot by ID |
+| PUT | `/api/v1/bots/:id` | Update a bot |
+| DELETE | `/api/v1/bots/:id` | Delete a bot |
+| POST | `/api/v1/bots/:id/execute` | Execute a bot manually |
+| POST | `/api/v1/bots/:id/enable` | Enable a bot |
+| POST | `/api/v1/bots/:id/disable` | Disable a bot |
+| GET | `/api/v1/bots/:id/logs` | View execution logs |
+| POST | `/api/v1/bots/dispatch` | Dispatch event to matching bots |
+
+FHIRPath-based DSL with 8 action types: log, condition, transform, create, validate, webhook, send-notification, set-status. Trigger types: subscription (resource events), cron (scheduled), manual, webhook (external). 3 built-in example bots: Lab Critical Alert, New Patient Welcome, Auto-Complete Encounter. Execution safety: 30s timeout, 100-action limit, deep-copy isolation.
 
 ### Role-Based Access Control
 
