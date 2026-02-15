@@ -29,7 +29,7 @@ OpenEHR Server is a headless, API-first Electronic Health Record system written 
 
 - **Schema-per-tenant isolation.** Each tenant receives a dedicated PostgreSQL schema. All request-scoped queries run against the tenant schema via `SET search_path`. This provides HIPAA-grade data isolation without the operational overhead of separate database instances.
 
-- **Domain-driven decomposition.** The system is organized into 20 domains, each following an identical 5-file pattern. This makes the codebase predictable, easy to navigate, and straightforward to extend.
+- **Domain-driven decomposition.** The system is organized into 28 domains, each following an identical 5-file pattern. This makes the codebase predictable, easy to navigate, and straightforward to extend.
 
 - **Repository interface pattern.** All database access flows through Go interfaces. Service layers depend on these interfaces rather than concrete PostgreSQL implementations. This enables in-memory mock testing without a database.
 
@@ -86,7 +86,7 @@ OpenEHR Server is a headless, API-first Electronic Health Record system written 
 
 ### Domain Organization
 
-The 20 domains are organized into five tiers (plus cross-cutting infrastructure) based on clinical priority, dependency relationships, and deployment criticality:
+The 28 domains are organized into five tiers (plus cross-cutting infrastructure) based on clinical priority, dependency relationships, and deployment criticality:
 
 **Tier 0 -- Core Infrastructure**
 
@@ -100,9 +100,10 @@ These domains must exist before any other domain can function:
 
 Core clinical data that most healthcare workflows depend on:
 
-- `clinical` -- Conditions (diagnoses), observations (vitals, lab values), allergies/intolerances, procedures.
+- `clinical` -- Conditions (diagnoses), observations (vitals, lab values), allergies/intolerances, procedures, flags, detected issues, adverse events, clinical impressions, risk assessments.
 - `medication` -- Medication catalog, prescriptions, administration records, dispenses, medication statements.
 - `diagnostics` -- Service requests (orders), specimen tracking, diagnostic reports, imaging studies.
+- `fhirlist` -- Curated FHIR List resources for organizing clinical content (problem lists, medication lists, etc.).
 
 **Tier 2 -- Operational Workflows**
 
@@ -112,6 +113,9 @@ Supporting systems that drive daily hospital operations:
 - `billing` -- Insurance coverage, claims, adjudication responses, invoices.
 - `documents` -- Patient consents, document references, clinical notes, FHIR compositions.
 - `inbox` -- In-basket messaging, co-sign requests, patient lists, clinical handoffs.
+- `episodeofcare` -- Longitudinal care tracking across encounters with status management.
+- `healthcareservice` -- Service catalog, availability, and appointment requirements.
+- `measurereport` -- Quality measure reporting with group populations and scoring.
 
 **Tier 3 -- Specialty Modules**
 
@@ -122,6 +126,9 @@ Department-specific clinical modules:
 - `obstetrics` -- Pregnancy records, prenatal visits, labor monitoring, delivery, newborn, postpartum.
 - `oncology` -- Cancer diagnosis staging, treatment protocols, chemotherapy, radiation, tumor markers, tumor boards.
 - `nursing` -- Flowsheets, nursing assessments, fall risk, skin/pain assessments, lines/drains, restraints, I/O.
+- `financial` -- Accounts, insurance plans, payment notices, payment reconciliation, charge items, charge item definitions, contracts, enrollment requests/responses.
+- `workflow` -- Activity definitions, request groups, guidance responses for clinical protocol automation.
+- `supply` -- Supply request and delivery tracking for inventory management.
 
 **Tier 4 -- Extended Modules**
 
@@ -131,6 +138,9 @@ Specialized systems that extend the core EHR:
 - `research` -- Clinical trial protocols, patient enrollment, adverse events, protocol deviations.
 - `portal` -- Patient portal accounts, portal messaging, questionnaires, check-in workflows.
 - `cds` -- Clinical decision support rules, alerts, drug interactions, order sets, clinical pathways, formulary, medication reconciliation.
+- `conformance` -- Naming systems, operation definitions, message definitions, message headers for FHIR conformance metadata.
+- `visionprescription` -- Optometry prescriptions with lens specifications.
+- `terminology` -- ICD-10, LOINC, SNOMED CT, RxNorm, CPT code systems and value set expansion.
 
 **Cross-Cutting Infrastructure**
 

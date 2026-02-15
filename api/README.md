@@ -405,6 +405,178 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | POST | `/fhir/ViewDefinition/:id/$execute` | Execute view against resources |
 | GET | `/fhir/ViewDefinition/:id/$sql` | Generate PostgreSQL SQL |
 
+**Clinical Safety** (Flag, DetectedIssue, AdverseEvent, ClinicalImpression, RiskAssessment)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/Flag` | Search flags |
+| POST | `/fhir/Flag` | Create flag |
+| GET | `/fhir/Flag/:id` | Read flag |
+| PUT | `/fhir/Flag/:id` | Update flag |
+| DELETE | `/fhir/Flag/:id` | Delete flag |
+| PATCH | `/fhir/Flag/:id` | Patch flag |
+| GET | `/fhir/DetectedIssue` | Search detected issues |
+| POST | `/fhir/DetectedIssue` | Create detected issue |
+| GET | `/fhir/DetectedIssue/:id` | Read detected issue |
+| PUT | `/fhir/DetectedIssue/:id` | Update detected issue |
+| DELETE | `/fhir/DetectedIssue/:id` | Delete detected issue |
+| GET | `/fhir/AdverseEvent` | Search adverse events |
+| POST | `/fhir/AdverseEvent` | Create adverse event |
+| GET | `/fhir/AdverseEvent/:id` | Read adverse event |
+| PUT | `/fhir/AdverseEvent/:id` | Update adverse event |
+| DELETE | `/fhir/AdverseEvent/:id` | Delete adverse event |
+| GET | `/fhir/ClinicalImpression` | Search clinical impressions |
+| POST | `/fhir/ClinicalImpression` | Create clinical impression |
+| GET | `/fhir/ClinicalImpression/:id` | Read clinical impression |
+| PUT | `/fhir/ClinicalImpression/:id` | Update clinical impression |
+| DELETE | `/fhir/ClinicalImpression/:id` | Delete clinical impression |
+| GET | `/fhir/RiskAssessment` | Search risk assessments |
+| POST | `/fhir/RiskAssessment` | Create risk assessment |
+| GET | `/fhir/RiskAssessment/:id` | Read risk assessment |
+| PUT | `/fhir/RiskAssessment/:id` | Update risk assessment |
+| DELETE | `/fhir/RiskAssessment/:id` | Delete risk assessment |
+
+**FHIR List**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/List` | Search lists |
+| POST | `/fhir/List` | Create list |
+| GET | `/fhir/List/:id` | Read list |
+| PUT | `/fhir/List/:id` | Update list |
+| DELETE | `/fhir/List/:id` | Delete list |
+
+**Episode of Care**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/EpisodeOfCare` | Search episodes of care |
+| POST | `/fhir/EpisodeOfCare` | Create episode of care |
+| GET | `/fhir/EpisodeOfCare/:id` | Read episode of care |
+| PUT | `/fhir/EpisodeOfCare/:id` | Update episode of care |
+| DELETE | `/fhir/EpisodeOfCare/:id` | Delete episode of care |
+
+**Healthcare Service**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/HealthcareService` | Search healthcare services |
+| POST | `/fhir/HealthcareService` | Create healthcare service |
+| GET | `/fhir/HealthcareService/:id` | Read healthcare service |
+| PUT | `/fhir/HealthcareService/:id` | Update healthcare service |
+| DELETE | `/fhir/HealthcareService/:id` | Delete healthcare service |
+
+**Measure Report**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/MeasureReport` | Search measure reports |
+| POST | `/fhir/MeasureReport` | Create measure report |
+| GET | `/fhir/MeasureReport/:id` | Read measure report |
+| PUT | `/fhir/MeasureReport/:id` | Update measure report |
+| DELETE | `/fhir/MeasureReport/:id` | Delete measure report |
+
+**Financial** (Account, InsurancePlan, PaymentNotice, PaymentReconciliation, ChargeItem, ChargeItemDefinition, Contract, EnrollmentRequest, EnrollmentResponse)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/Account` | Search accounts |
+| POST | `/fhir/Account` | Create account |
+| GET | `/fhir/Account/:id` | Read account |
+| PUT | `/fhir/Account/:id` | Update account |
+| DELETE | `/fhir/Account/:id` | Delete account |
+| GET | `/fhir/InsurancePlan` | Search insurance plans |
+| POST | `/fhir/InsurancePlan` | Create insurance plan |
+| GET | `/fhir/InsurancePlan/:id` | Read insurance plan |
+| PUT | `/fhir/InsurancePlan/:id` | Update insurance plan |
+| DELETE | `/fhir/InsurancePlan/:id` | Delete insurance plan |
+| GET | `/fhir/PaymentNotice` | Search payment notices |
+| POST | `/fhir/PaymentNotice` | Create payment notice |
+| GET | `/fhir/PaymentNotice/:id` | Read payment notice |
+| GET | `/fhir/PaymentReconciliation` | Search payment reconciliations |
+| POST | `/fhir/PaymentReconciliation` | Create payment reconciliation |
+| GET | `/fhir/PaymentReconciliation/:id` | Read payment reconciliation |
+| GET | `/fhir/ChargeItem` | Search charge items |
+| POST | `/fhir/ChargeItem` | Create charge item |
+| GET | `/fhir/ChargeItem/:id` | Read charge item |
+| PUT | `/fhir/ChargeItem/:id` | Update charge item |
+| GET | `/fhir/ChargeItemDefinition` | Search charge item definitions |
+| POST | `/fhir/ChargeItemDefinition` | Create charge item definition |
+| GET | `/fhir/ChargeItemDefinition/:id` | Read charge item definition |
+| GET | `/fhir/Contract` | Search contracts |
+| POST | `/fhir/Contract` | Create contract |
+| GET | `/fhir/Contract/:id` | Read contract |
+| GET | `/fhir/EnrollmentRequest` | Search enrollment requests |
+| POST | `/fhir/EnrollmentRequest` | Create enrollment request |
+| GET | `/fhir/EnrollmentResponse` | Search enrollment responses |
+| POST | `/fhir/EnrollmentResponse` | Create enrollment response |
+
+**Workflow** (ActivityDefinition, RequestGroup, GuidanceResponse)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/ActivityDefinition` | Search activity definitions |
+| POST | `/fhir/ActivityDefinition` | Create activity definition |
+| GET | `/fhir/ActivityDefinition/:id` | Read activity definition |
+| PUT | `/fhir/ActivityDefinition/:id` | Update activity definition |
+| DELETE | `/fhir/ActivityDefinition/:id` | Delete activity definition |
+| GET | `/fhir/RequestGroup` | Search request groups |
+| POST | `/fhir/RequestGroup` | Create request group |
+| GET | `/fhir/RequestGroup/:id` | Read request group |
+| PUT | `/fhir/RequestGroup/:id` | Update request group |
+| DELETE | `/fhir/RequestGroup/:id` | Delete request group |
+| GET | `/fhir/GuidanceResponse` | Search guidance responses |
+| POST | `/fhir/GuidanceResponse` | Create guidance response |
+| GET | `/fhir/GuidanceResponse/:id` | Read guidance response |
+| PUT | `/fhir/GuidanceResponse/:id` | Update guidance response |
+| DELETE | `/fhir/GuidanceResponse/:id` | Delete guidance response |
+
+**Supply** (SupplyRequest, SupplyDelivery)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/SupplyRequest` | Search supply requests |
+| POST | `/fhir/SupplyRequest` | Create supply request |
+| GET | `/fhir/SupplyRequest/:id` | Read supply request |
+| PUT | `/fhir/SupplyRequest/:id` | Update supply request |
+| DELETE | `/fhir/SupplyRequest/:id` | Delete supply request |
+| GET | `/fhir/SupplyDelivery` | Search supply deliveries |
+| POST | `/fhir/SupplyDelivery` | Create supply delivery |
+| GET | `/fhir/SupplyDelivery/:id` | Read supply delivery |
+| PUT | `/fhir/SupplyDelivery/:id` | Update supply delivery |
+| DELETE | `/fhir/SupplyDelivery/:id` | Delete supply delivery |
+
+**Conformance** (NamingSystem, OperationDefinition, MessageDefinition, MessageHeader)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/NamingSystem` | Search naming systems |
+| POST | `/fhir/NamingSystem` | Create naming system |
+| GET | `/fhir/NamingSystem/:id` | Read naming system |
+| PUT | `/fhir/NamingSystem/:id` | Update naming system |
+| DELETE | `/fhir/NamingSystem/:id` | Delete naming system |
+| GET | `/fhir/OperationDefinition` | Search operation definitions |
+| POST | `/fhir/OperationDefinition` | Create operation definition |
+| GET | `/fhir/OperationDefinition/:id` | Read operation definition |
+| PUT | `/fhir/OperationDefinition/:id` | Update operation definition |
+| DELETE | `/fhir/OperationDefinition/:id` | Delete operation definition |
+| GET | `/fhir/MessageDefinition` | Search message definitions |
+| POST | `/fhir/MessageDefinition` | Create message definition |
+| GET | `/fhir/MessageDefinition/:id` | Read message definition |
+| GET | `/fhir/MessageHeader` | Search message headers |
+| POST | `/fhir/MessageHeader` | Create message header |
+| GET | `/fhir/MessageHeader/:id` | Read message header |
+
+**Vision Prescription**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/VisionPrescription` | Search vision prescriptions |
+| POST | `/fhir/VisionPrescription` | Create vision prescription |
+| GET | `/fhir/VisionPrescription/:id` | Read vision prescription |
+| PUT | `/fhir/VisionPrescription/:id` | Update vision prescription |
+| DELETE | `/fhir/VisionPrescription/:id` | Delete vision prescription |
+
 **Research**
 
 | Method | Path | Description |
