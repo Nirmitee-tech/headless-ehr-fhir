@@ -22,6 +22,7 @@ type HasParam struct {
 	TargetParam string // The reference search parameter on the target resource
 	SearchParam string // The search parameter to filter on the target resource
 	Value       string // The value to match
+	Modifier    string // Optional chained _has modifier
 }
 
 // ParseChainedParam parses a chained search parameter.

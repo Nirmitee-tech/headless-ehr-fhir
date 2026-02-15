@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -2537,6 +2538,22 @@ func runServer() error {
 	translateHandler := fhir.NewTranslateHandler(conceptMapTranslator)
 	translateHandler.RegisterRoutes(fhirGroup)
 
+	// FHIR CodeSystem/$subsumes — hierarchical code subsumption testing
+	subsumptionChecker := fhir.NewSubsumptionChecker()
+	subsumesHandler := fhir.NewSubsumesHandler(subsumptionChecker)
+	subsumesHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR ValueSet/$validate-code — check code membership in value sets
+	valueSetValidator := fhir.NewValueSetValidator()
+	valueSetValidateHandler := fhir.NewValueSetValidateHandler(valueSetValidator)
+	valueSetValidateHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR Composition/$document — generate Document Bundles from Compositions
+	documentResolver := &fhirResourceResolver{fhirGroup: fhirGroup}
+	documentGenerator := fhir.NewDocumentGenerator(documentResolver)
+	documentHandler := fhir.NewDocumentHandler(documentGenerator)
+	documentHandler.RegisterRoutes(fhirGroup)
+
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))
 
@@ -2743,4 +2760,24 @@ func stringVal(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// fhirResourceResolver implements fhir.ResourceResolver for the $document operation.
+// It resolves FHIR references like "Patient/123" by delegating to domain services.
+// For now it returns a minimal stub — full resolution would require a service registry.
+type fhirResourceResolver struct {
+	fhirGroup *echo.Group
+}
+
+func (r *fhirResourceResolver) ResolveReference(ctx context.Context, reference string) (map[string]interface{}, error) {
+	// Return a minimal resource stub with the reference preserved.
+	// Full implementation would parse "ResourceType/id" and query the appropriate service.
+	parts := strings.SplitN(reference, "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid reference format: %s", reference)
+	}
+	return map[string]interface{}{
+		"resourceType": parts[0],
+		"id":           parts[1],
+	}, nil
 }

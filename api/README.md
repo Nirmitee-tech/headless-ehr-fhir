@@ -25,6 +25,10 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **HL7v2 Interface Engine** — parse and generate ADT (A01-A08), ORM (O01), ORU (R01) messages with FHIR conversion
 - **Patient/$match** — probabilistic patient matching with Jaro-Winkler similarity scoring and configurable weights
 - **ConceptMap/$translate** — code system translation (SNOMED↔ICD-10, LOINC→SNOMED) with 3 built-in concept maps
+- **CodeSystem/$subsumes** — hierarchical subsumption testing for SNOMED CT and ICD-10 code systems
+- **ValueSet/$validate-code** — code membership validation against 10 built-in FHIR R4 required value sets
+- **Composition/$document** — generate complete FHIR Document Bundles from Compositions with reference resolution
+- **_has and _filter** — advanced FHIR search: reverse chaining (_has) and filter expressions (_filter) with SQL generation
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD

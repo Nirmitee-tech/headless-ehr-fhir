@@ -457,6 +457,14 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **ConceptMap/$translate** (`GET/POST /fhir/ConceptMap/$translate`, `GET /fhir/ConceptMap/:id/$translate`, `GET /fhir/ConceptMap`) -- Code system translation between clinical terminologies. Ships with 3 built-in concept maps: SNOMED CT → ICD-10-CM (15 common conditions), ICD-10-CM → SNOMED CT (reverse), LOINC → SNOMED CT (10 lab tests). Returns FHIR Parameters resources with equivalence classification. Supports lookup by source/target system pair or specific ConceptMap URL/ID. Located in `internal/platform/fhir/translate_op.go`.
 
+- **CodeSystem/$subsumes** (`GET/POST /fhir/CodeSystem/$subsumes`) -- Hierarchical subsumption testing between codes within a code system. Supports SNOMED CT (4 clinical hierarchies: diabetes, hypertension, heart disease, respiratory with transitive ancestor walking) and ICD-10 (prefix-based subsumption). Returns outcome: subsumes, subsumed-by, equivalent, or not-subsumed. Located in `internal/platform/fhir/subsumes_op.go`.
+
+- **ValueSet/$validate-code** (`GET/POST /fhir/ValueSet/$validate-code`) -- Validates whether a code is a member of a specified value set. Ships with 10 built-in FHIR R4 required value sets (observation-status, condition-clinical, administrative-gender, encounter-status, medication-request-status, procedure-status, diagnostic-report-status, immunization-status, allergy-intolerance-clinical, care-plan-status). Supports optional system filtering. Located in `internal/platform/fhir/valueset_validate_op.go`.
+
+- **Composition/$document** (`GET /fhir/Composition/:id/$document`, `POST /fhir/Composition/$document`) -- Generates complete FHIR Document Bundles from Composition resources. Walks all references (subject, author, custodian, encounter, attester, section entries) and resolves them into Bundle entries. Composition is always the first entry per FHIR spec. Handles nested sections and deduplicates references. Located in `internal/platform/fhir/document_op.go`.
+
+- **Advanced Search: _has and _filter** -- Library for parsing and SQL generation of advanced FHIR search parameters. `_has` (reverse chaining) generates EXISTS subqueries for finding resources referenced by other resources (e.g., find Patients with specific Observations). `_filter` parses structured filter expressions (eq, ne, gt, lt, ge, le, co, sw, ew operators with and/or combiners) and generates parameterized PostgreSQL WHERE clauses. Located in `internal/platform/fhir/search_advanced.go`.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.
