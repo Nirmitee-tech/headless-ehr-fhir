@@ -519,6 +519,16 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **Server-Side Scripting (Bots)** (`GET/POST /api/v1/bots`, `POST /api/v1/bots/:id/execute`, `POST /api/v1/bots/dispatch`) -- FHIRPath-based automation engine. 8 action types: log, condition (branching), transform (FHIRPath-based field updates), create (new FHIR resources), validate, webhook (HTTP callbacks), send-notification, set-status. 4 trigger types: subscription (resource events), cron (scheduled), manual, webhook (external). 3 built-in example bots: Lab Critical Alert, New Patient Welcome, Auto-Complete Encounter. Execution safety: 30s timeout, 100-action limit, deep-copy resource isolation. Located in `internal/platform/bot/bot.go`.
 
+- **Auto-Provenance** -- Echo middleware that auto-creates FHIR Provenance resources on every write to `/fhir/*` endpoints. Asynchronous creation to avoid blocking request latency. Extracts authentication context (agent, role, organization) from the request. Opt-out via `X-No-Provenance` header for bulk operations. Located in `internal/platform/fhir/auto_provenance.go`.
+
+- **OpenTelemetry** -- Self-contained observability package with tracing middleware (span recording, FHIR resource type extraction), metrics middleware (histogram buckets for latency distribution), and Prometheus `/metrics` endpoint. Provides end-to-end distributed tracing across multi-service deployments. Located in `internal/platform/telemetry/`.
+
+- **Topic-Based Subscriptions** -- R5-style SubscriptionTopic engine. ResourceTrigger definitions with FHIRPath-based criteria evaluation. 4 built-in clinical topics. TopicSubscription model with channel types (rest-hook, websocket, email). NotificationBundle generation per the FHIR R5 Subscription backport. Located in `internal/platform/fhir/subscription_topic.go`.
+
+- **PlanDefinition/$apply** (`POST /fhir/PlanDefinition/:id/$apply`) -- Clinical workflow automation via FHIR PlanDefinition. Recursive action trees with FHIRPath applicability conditions. ActivityDefinition resolution into concrete resource instances. 4 built-in clinical protocols. DynamicValue expressions for computed fields. Located in `internal/platform/fhir/plan_definition.go`.
+
+- **SQL-on-FHIR ViewDefinitions** -- HL7 SQL-on-FHIR specification implementation for flattening FHIR resources into tabular views. FHIRPath-based column extraction with type-aware evaluation. Output formats: CSV, JSON, NDJSON, and SQL INSERT statements. 6 built-in analytics views for common reporting needs. Located in `internal/platform/fhir/sql_on_fhir.go`.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.

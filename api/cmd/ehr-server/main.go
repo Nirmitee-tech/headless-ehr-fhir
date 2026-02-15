@@ -32,11 +32,17 @@ import (
 	"github.com/ehr/ehr/internal/domain/diagnostics"
 	"github.com/ehr/ehr/internal/domain/documents"
 	"github.com/ehr/ehr/internal/domain/emergency"
+	"github.com/ehr/ehr/internal/domain/conformance"
 	"github.com/ehr/ehr/internal/domain/encounter"
+	"github.com/ehr/ehr/internal/domain/episodeofcare"
 	"github.com/ehr/ehr/internal/domain/familyhistory"
+	"github.com/ehr/ehr/internal/domain/fhirlist"
+	"github.com/ehr/ehr/internal/domain/financial"
+	"github.com/ehr/ehr/internal/domain/healthcareservice"
 	"github.com/ehr/ehr/internal/domain/identity"
 	"github.com/ehr/ehr/internal/domain/immunization"
 	"github.com/ehr/ehr/internal/domain/inbox"
+	"github.com/ehr/ehr/internal/domain/measurereport"
 	"github.com/ehr/ehr/internal/domain/medication"
 	"github.com/ehr/ehr/internal/domain/nursing"
 	"github.com/ehr/ehr/internal/domain/obstetrics"
@@ -46,10 +52,13 @@ import (
 	"github.com/ehr/ehr/internal/domain/relatedperson"
 	"github.com/ehr/ehr/internal/domain/research"
 	"github.com/ehr/ehr/internal/domain/scheduling"
+	"github.com/ehr/ehr/internal/domain/supply"
 	"github.com/ehr/ehr/internal/domain/surgery"
 	"github.com/ehr/ehr/internal/domain/subscription"
 	fhirtask "github.com/ehr/ehr/internal/domain/task"
 	"github.com/ehr/ehr/internal/domain/terminology"
+	"github.com/ehr/ehr/internal/domain/visionprescription"
+	"github.com/ehr/ehr/internal/domain/workflow"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -64,6 +73,7 @@ import (
 	"github.com/ehr/ehr/internal/platform/sandbox"
 	"github.com/ehr/ehr/internal/platform/bot"
 	selfsched "github.com/ehr/ehr/internal/platform/scheduling"
+	"github.com/ehr/ehr/internal/platform/telemetry"
 	"github.com/ehr/ehr/internal/platform/webhook"
 	"github.com/ehr/ehr/internal/platform/websocket"
 )
@@ -624,6 +634,122 @@ func runServer() error {
 		{Name: "url", Type: "uri"},
 	})
 
+	// Clinical Safety resources
+	capBuilder.AddResource("Flag", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("DetectedIssue", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("AdverseEvent", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "actuality", Type: "token"},
+	})
+	capBuilder.AddResource("ClinicalImpression", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("RiskAssessment", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+
+	// Care Delivery resources
+	capBuilder.AddResource("EpisodeOfCare", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("HealthcareService", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "name", Type: "string"},
+		{Name: "active", Type: "token"},
+	})
+	capBuilder.AddResource("MeasureReport", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("List", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+
+	// Financial resources
+	capBuilder.AddResource("Account", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("InsurancePlan", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("PaymentNotice", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("PaymentReconciliation", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("ChargeItem", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("ChargeItemDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("Contract", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("EnrollmentRequest", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("EnrollmentResponse", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+
+	// Workflow resources
+	capBuilder.AddResource("ActivityDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("RequestGroup", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("GuidanceResponse", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+
+	// Supply resources
+	capBuilder.AddResource("SupplyRequest", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("SupplyDelivery", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+
+	// Conformance resources
+	capBuilder.AddResource("NamingSystem", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "name", Type: "string"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("OperationDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "name", Type: "string"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("MessageDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("MessageHeader", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "event", Type: "token"},
+	})
+
+	// Specialty resources
+	capBuilder.AddResource("VisionPrescription", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
@@ -646,6 +772,14 @@ func runServer() error {
 		"Task",
 		"Device",
 		"Subscription",
+		"Flag", "DetectedIssue", "AdverseEvent", "ClinicalImpression", "RiskAssessment",
+		"EpisodeOfCare", "HealthcareService", "MeasureReport", "List",
+		"Account", "InsurancePlan", "PaymentNotice", "PaymentReconciliation",
+		"ChargeItem", "ChargeItemDefinition", "Contract", "EnrollmentRequest", "EnrollmentResponse",
+		"ActivityDefinition", "RequestGroup", "GuidanceResponse",
+		"SupplyRequest", "SupplyDelivery",
+		"NamingSystem", "OperationDefinition", "MessageDefinition", "MessageHeader",
+		"VisionPrescription",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -672,6 +806,12 @@ func runServer() error {
 		"MedicationRequest", "MedicationAdministration", "ServiceRequest",
 		"DiagnosticReport", "Immunization", "CarePlan", "CareTeam", "Task"} {
 		includeRegistry.RegisterReference(rt, "encounter", "Encounter")
+	}
+	for _, rt := range []string{"Flag", "DetectedIssue", "AdverseEvent", "ClinicalImpression",
+		"RiskAssessment", "EpisodeOfCare", "MeasureReport", "ChargeItem",
+		"RequestGroup", "GuidanceResponse", "VisionPrescription"} {
+		includeRegistry.RegisterReference(rt, "patient", "Patient")
+		includeRegistry.RegisterReference(rt, "subject", "Patient")
 	}
 	includeRegistry.RegisterReference("Provenance", "target", "Patient")
 	includeRegistry.RegisterReference("Provenance", "agent", "Practitioner")
@@ -1016,6 +1156,94 @@ func runServer() error {
 	subHandler := subscription.NewHandler(subSvc)
 	subHandler.RegisterRoutes(apiV1, fhirGroup)
 
+	// Clinical Safety domain (Flag, DetectedIssue, AdverseEvent, ClinicalImpression, RiskAssessment)
+	flagRepo := clinical.NewFlagRepoPG(pool)
+	detectedIssueRepo := clinical.NewDetectedIssueRepoPG(pool)
+	adverseEventRepo := clinical.NewAdverseEventRepoPG(pool)
+	clinicalImpressionRepo := clinical.NewClinicalImpressionRepoPG(pool)
+	riskAssessmentRepo := clinical.NewRiskAssessmentRepoPG(pool)
+	clinicalSafetySvc := clinical.NewClinicalSafetyService(flagRepo, detectedIssueRepo, adverseEventRepo, clinicalImpressionRepo, riskAssessmentRepo)
+	clinicalSafetySvc.SetVersionTracker(versionTracker)
+	clinicalSafetyHandler := clinical.NewClinicalSafetyHandler(clinicalSafetySvc)
+	clinicalSafetyHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// EpisodeOfCare domain
+	eocRepo := episodeofcare.NewEpisodeOfCareRepoPG(pool)
+	eocSvc := episodeofcare.NewService(eocRepo)
+	eocSvc.SetVersionTracker(versionTracker)
+	eocHandler := episodeofcare.NewHandler(eocSvc)
+	eocHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// HealthcareService domain
+	hcsRepo := healthcareservice.NewHealthcareServiceRepoPG(pool)
+	hcsSvc := healthcareservice.NewService(hcsRepo)
+	hcsSvc.SetVersionTracker(versionTracker)
+	hcsHandler := healthcareservice.NewHandler(hcsSvc)
+	hcsHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MeasureReport domain
+	mrRepo := measurereport.NewMeasureReportRepoPG(pool)
+	mrSvc := measurereport.NewService(mrRepo)
+	mrSvc.SetVersionTracker(versionTracker)
+	mrHandler := measurereport.NewHandler(mrSvc)
+	mrHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// FHIRList domain
+	fhirListRepo := fhirlist.NewFHIRListRepoPG(pool)
+	fhirListSvc := fhirlist.NewService(fhirListRepo)
+	fhirListSvc.SetVersionTracker(versionTracker)
+	fhirListHandler := fhirlist.NewHandler(fhirListSvc)
+	fhirListHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Financial domain
+	accountRepo := financial.NewAccountRepoPG(pool)
+	insurancePlanRepo := financial.NewInsurancePlanRepoPG(pool)
+	paymentNoticeRepo := financial.NewPaymentNoticeRepoPG(pool)
+	paymentReconciliationRepo := financial.NewPaymentReconciliationRepoPG(pool)
+	chargeItemRepo := financial.NewChargeItemRepoPG(pool)
+	chargeItemDefRepo := financial.NewChargeItemDefinitionRepoPG(pool)
+	contractRepo := financial.NewContractRepoPG(pool)
+	enrollReqRepo := financial.NewEnrollmentRequestRepoPG(pool)
+	enrollRespRepo := financial.NewEnrollmentResponseRepoPG(pool)
+	financialSvc := financial.NewService(accountRepo, insurancePlanRepo, paymentNoticeRepo, paymentReconciliationRepo, chargeItemRepo, chargeItemDefRepo, contractRepo, enrollReqRepo, enrollRespRepo)
+	financialSvc.SetVersionTracker(versionTracker)
+	financialHandler := financial.NewHandler(financialSvc)
+	financialHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Workflow domain (ActivityDefinition, RequestGroup, GuidanceResponse)
+	actDefRepo := workflow.NewActivityDefinitionRepoPG(pool)
+	reqGrpRepo := workflow.NewRequestGroupRepoPG(pool)
+	guidRespRepo := workflow.NewGuidanceResponseRepoPG(pool)
+	workflowSvc := workflow.NewService(actDefRepo, reqGrpRepo, guidRespRepo)
+	workflowSvc.SetVersionTracker(versionTracker)
+	workflowHandler := workflow.NewHandler(workflowSvc)
+	workflowHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Supply domain
+	supplyReqRepo := supply.NewSupplyRequestRepoPG(pool)
+	supplyDelRepo := supply.NewSupplyDeliveryRepoPG(pool)
+	supplySvc := supply.NewService(supplyReqRepo, supplyDelRepo)
+	supplySvc.SetVersionTracker(versionTracker)
+	supplyHandler := supply.NewHandler(supplySvc)
+	supplyHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Conformance domain (NamingSystem, OperationDefinition, MessageDefinition, MessageHeader)
+	namingSysRepo := conformance.NewNamingSystemRepoPG(pool)
+	opDefRepo := conformance.NewOperationDefinitionRepoPG(pool)
+	msgDefRepo := conformance.NewMessageDefinitionRepoPG(pool)
+	msgHeaderRepo := conformance.NewMessageHeaderRepoPG(pool)
+	conformanceSvc := conformance.NewService(namingSysRepo, opDefRepo, msgDefRepo, msgHeaderRepo)
+	conformanceSvc.SetVersionTracker(versionTracker)
+	conformanceHandler := conformance.NewHandler(conformanceSvc)
+	conformanceHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// VisionPrescription domain
+	vpRepo := visionprescription.NewVisionPrescriptionRepoPG(pool)
+	vpSvc := visionprescription.NewService(vpRepo)
+	vpSvc.SetVersionTracker(versionTracker)
+	vpHandler := visionprescription.NewHandler(vpSvc)
+	vpHandler.RegisterRoutes(apiV1, fhirGroup)
+
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
 	notifyEngine := fhir.NewNotificationEngine(notifyAdapter, logger)
@@ -1256,6 +1484,153 @@ func runServer() error {
 			return nil, err
 		}
 		return s.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Flag", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		f, err := clinicalSafetySvc.GetFlagByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return f.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("DetectedIssue", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		d, err := clinicalSafetySvc.GetDetectedIssueByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return d.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("AdverseEvent", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		a, err := clinicalSafetySvc.GetAdverseEventByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return a.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("ClinicalImpression", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		ci, err := clinicalSafetySvc.GetClinicalImpressionByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return ci.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("RiskAssessment", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		ra, err := clinicalSafetySvc.GetRiskAssessmentByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return ra.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("EpisodeOfCare", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		e, err := eocSvc.GetEpisodeOfCareByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return e.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("HealthcareService", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		h, err := hcsSvc.GetHealthcareServiceByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return h.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("MeasureReport", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		mr, err := mrSvc.GetMeasureReportByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return mr.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("List", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		l, err := fhirListSvc.GetFHIRListByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return l.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Account", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		a, err := financialSvc.GetAccountByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return a.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("InsurancePlan", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		ip, err := financialSvc.GetInsurancePlanByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return ip.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("ActivityDefinition", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		ad, err := workflowSvc.GetActivityDefinitionByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return ad.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("RequestGroup", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		rg, err := workflowSvc.GetRequestGroupByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return rg.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("GuidanceResponse", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		gr, err := workflowSvc.GetGuidanceResponseByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return gr.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("SupplyRequest", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		sr, err := supplySvc.GetSupplyRequestByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return sr.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("SupplyDelivery", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		sd, err := supplySvc.GetSupplyDeliveryByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return sd.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("NamingSystem", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		ns, err := conformanceSvc.GetNamingSystemByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return ns.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("OperationDefinition", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		od, err := conformanceSvc.GetOperationDefinitionByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return od.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("MessageDefinition", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		md, err := conformanceSvc.GetMessageDefinitionByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return md.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("MessageHeader", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		mh, err := conformanceSvc.GetMessageHeaderByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return mh.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("VisionPrescription", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		vp, err := vpSvc.GetVisionPrescriptionByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return vp.ToFHIR(), nil
 	})
 
 	// Reporting framework
@@ -2730,6 +3105,47 @@ func runServer() error {
 	_ = apiKeyMgr
 	_ = clientRateLimiter
 	_ = usageTracker
+
+	// -- Platform Feature Wiring --
+
+	// Shared FHIRPath engine — used by PlanDefinition/$apply and SQL-on-FHIR
+	fhirPathEngine := fhir.NewFHIRPathEngine()
+
+	// Auto-Provenance Middleware — automatically creates Provenance resources on writes
+	provenanceStore := fhir.NewProvenanceStore()
+	fhirGroup.Use(fhir.AutoProvenanceMiddleware(provenanceStore))
+
+	// OpenTelemetry Observability — tracing, metrics, Prometheus endpoint
+	telemetryProvider := telemetry.NewTelemetryProvider(telemetry.TelemetryConfig{
+		ServiceName:    "ehr-server",
+		ServiceVersion: "0.1.0",
+		Environment:    cfg.Env,
+	})
+	e.Use(telemetryProvider.TracingMiddleware())
+	e.Use(telemetryProvider.MetricsMiddleware())
+	e.GET("/metrics", telemetryProvider.PrometheusHandler())
+
+	// Topic-Based Subscriptions (R5-style) — clinical event notification
+	topicEngine := fhir.NewSubscriptionTopicEngine()
+	topicEngine.RegisterBuiltInTopics()
+	topicHandler := fhir.NewTopicHandler(topicEngine)
+	topicHandler.RegisterRoutes(fhirGroup)
+
+	// PlanDefinition/$apply — clinical protocol automation
+	planHandler := fhir.NewPlanDefinitionHandler(fhirPathEngine)
+	planHandler.RegisterRoutes(fhirGroup)
+
+	// SQL-on-FHIR ViewDefinitions — tabular views over FHIR resources
+	viewEngine := fhir.NewViewDefinitionEngine(fhirPathEngine)
+	viewHandler := fhir.NewViewDefinitionHandler(viewEngine)
+	viewHandler.LoadBuiltIns()
+	viewHandler.RegisterRoutes(fhirGroup)
+
+	// Suppress unused warnings for new platform features
+	_ = provenanceStore
+	_ = telemetryProvider
+	_ = topicEngine
+	_ = fhirPathEngine
 
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))

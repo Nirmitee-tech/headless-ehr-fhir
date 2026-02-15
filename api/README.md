@@ -56,6 +56,11 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **Patient/$merge (MDM)** — Master Data Management with survivorship rules (target-wins, source-wins, merge-lists, most-recent), reference rewriting, golden record chain resolution, preview mode
 - **FHIR Narrative Generation** — auto-generate XHTML text.div for 10 resource types via Echo middleware with opt-out support
 - **Server-Side Scripting (Bots)** — FHIRPath-based automation engine with 8 action types, trigger matching (subscription/cron/manual/webhook), execution safety (30s timeout, 100-action limit)
+- **Auto-Provenance Middleware** — automatically creates FHIR Provenance resources on every write (POST/PUT/PATCH/DELETE) to FHIR endpoints, opt-out with `X-No-Provenance: true` header
+- **OpenTelemetry Observability** — tracing and metrics middleware with Prometheus exposition format at `/metrics`, tracking request duration, active requests, and FHIR resource type breakdown
+- **Topic-Based Subscriptions (R5-style)** — SubscriptionTopic engine with 4 built-in clinical topics (encounter-start, encounter-end, new-lab-result, admission-discharge) and topic-aware subscription routing
+- **PlanDefinition/$apply** — clinical protocol automation with FHIRPath-based applicability, 4 built-in protocols (Diabetes Management, Sepsis Bundle SEP-1, CHF Discharge, Preventive Care Screening)
+- **SQL-on-FHIR ViewDefinitions** — tabular views over FHIR resources using FHIRPath with 6 built-in views, CSV/JSON/NDJSON output, and PostgreSQL JSONB SQL generation
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -238,6 +243,7 @@ The server exposes two parallel API surfaces: FHIR R4 endpoints for interoperabi
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Server health status |
+| GET | `/metrics` | Prometheus metrics (OpenTelemetry) |
 
 ### FHIR R4 Endpoints
 
@@ -361,6 +367,43 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | PUT | `/fhir/Subscription/:id` | Update subscription |
 | DELETE | `/fhir/Subscription/:id` | Delete subscription |
 | PATCH | `/fhir/Subscription/:id` | Patch subscription |
+
+**Topic-Based Subscriptions** (R5-style SubscriptionTopic)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/SubscriptionTopic` | List subscription topics |
+| POST | `/fhir/SubscriptionTopic` | Create subscription topic |
+| POST | `/fhir/Subscription` | Subscribe to a topic |
+| GET | `/fhir/Subscription/:id/$status` | Get subscription status |
+| GET | `/fhir/Subscription/:id/$events` | Get subscription events |
+| POST | `/fhir/Subscription/:id/$events` | Trigger event check |
+
+**PlanDefinition** (Clinical Protocol Automation)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/PlanDefinition` | Search plan definitions |
+| POST | `/fhir/PlanDefinition` | Create plan definition |
+| GET | `/fhir/PlanDefinition/:id` | Read plan definition |
+| PUT | `/fhir/PlanDefinition/:id` | Update plan definition |
+| DELETE | `/fhir/PlanDefinition/:id` | Delete plan definition |
+| POST | `/fhir/PlanDefinition/:id/$apply` | Apply protocol to patient |
+| GET | `/fhir/ActivityDefinition` | Search activity definitions |
+| POST | `/fhir/ActivityDefinition` | Create activity definition |
+| GET | `/fhir/ActivityDefinition/:id` | Read activity definition |
+
+**ViewDefinition** (SQL-on-FHIR)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/ViewDefinition` | Search view definitions |
+| POST | `/fhir/ViewDefinition` | Create view definition |
+| GET | `/fhir/ViewDefinition/:id` | Read view definition |
+| PUT | `/fhir/ViewDefinition/:id` | Update view definition |
+| DELETE | `/fhir/ViewDefinition/:id` | Delete view definition |
+| POST | `/fhir/ViewDefinition/:id/$execute` | Execute view against resources |
+| GET | `/fhir/ViewDefinition/:id/$sql` | Generate PostgreSQL SQL |
 
 **Research**
 
@@ -870,6 +913,61 @@ Survivorship rules: target-wins (default), source-wins, merge-lists (combine arr
 | POST | `/api/v1/bots/dispatch` | Dispatch event to matching bots |
 
 FHIRPath-based DSL with 8 action types: log, condition, transform, create, validate, webhook, send-notification, set-status. Trigger types: subscription (resource events), cron (scheduled), manual, webhook (external). 3 built-in example bots: Lab Critical Alert, New Patient Welcome, Auto-Complete Encounter. Execution safety: 30s timeout, 100-action limit, deep-copy isolation.
+
+### Auto-Provenance Middleware
+
+Automatically creates FHIR Provenance resources on every write operation (POST, PUT, PATCH, DELETE) to FHIR endpoints. The Provenance captures the agent (authenticated user), target resource, activity type, and timestamp. Opt out on a per-request basis by setting the `X-No-Provenance: true` header.
+
+### OpenTelemetry Observability
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/metrics` | Prometheus exposition format metrics |
+
+Tracing and metrics middleware powered by OpenTelemetry. Tracks HTTP request duration histograms, active in-flight requests, and per-FHIR-resource-type operation breakdown. Prometheus scrape endpoint at `/metrics`.
+
+### Topic-Based Subscriptions (R5-style)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/SubscriptionTopic` | List subscription topics |
+| POST | `/fhir/SubscriptionTopic` | Create subscription topic |
+| POST | `/fhir/Subscription` | Subscribe to a topic |
+| GET | `/fhir/Subscription/:id/$status` | Get subscription status |
+| GET | `/fhir/Subscription/:id/$events` | Get subscription events |
+| POST | `/fhir/Subscription/:id/$events` | Trigger event check |
+
+R5-style SubscriptionTopic engine backported to R4. 4 built-in clinical topics: encounter-start, encounter-end, new-lab-result, admission-discharge. Subscriptions reference a topic via `criteria` and receive filtered notifications when matching events occur.
+
+### PlanDefinition/$apply
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/PlanDefinition` | Search plan definitions |
+| POST | `/fhir/PlanDefinition` | Create plan definition |
+| GET | `/fhir/PlanDefinition/:id` | Read plan definition |
+| PUT | `/fhir/PlanDefinition/:id` | Update plan definition |
+| DELETE | `/fhir/PlanDefinition/:id` | Delete plan definition |
+| POST | `/fhir/PlanDefinition/:id/$apply` | Apply protocol to patient |
+| GET | `/fhir/ActivityDefinition` | Search activity definitions |
+| POST | `/fhir/ActivityDefinition` | Create activity definition |
+| GET | `/fhir/ActivityDefinition/:id` | Read activity definition |
+
+Clinical protocol automation with FHIRPath-based applicability conditions. `$apply` evaluates a PlanDefinition against a patient's data and generates a CarePlan with RequestGroup actions. 4 built-in protocols: Diabetes Management, Sepsis Bundle SEP-1, CHF Discharge, Preventive Care Screening.
+
+### SQL-on-FHIR ViewDefinitions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/ViewDefinition` | Search view definitions |
+| POST | `/fhir/ViewDefinition` | Create view definition |
+| GET | `/fhir/ViewDefinition/:id` | Read view definition |
+| PUT | `/fhir/ViewDefinition/:id` | Update view definition |
+| DELETE | `/fhir/ViewDefinition/:id` | Delete view definition |
+| POST | `/fhir/ViewDefinition/:id/$execute` | Execute view against resources |
+| GET | `/fhir/ViewDefinition/:id/$sql` | Generate PostgreSQL SQL |
+
+Tabular views over FHIR resources using FHIRPath column expressions. `$execute` runs a view against stored resources and returns flat rows. `$sql` generates a PostgreSQL query using JSONB operators for direct database execution. 6 built-in views: patient_demographics, active_conditions, lab_results, active_medications, vital_signs, encounters_summary. Supports CSV, JSON, and NDJSON output formats via Accept header content negotiation.
 
 ### Role-Based Access Control
 
