@@ -134,6 +134,8 @@ type TokenClaims struct {
 // ---------------------------------------------------------------------------
 
 // SMARTServer implements the SMART on FHIR authorization server.
+// NOTE: All state is held in memory. Registered clients, tokens, and auth codes
+// are lost on server restart. For production use, back with persistent storage.
 type SMARTServer struct {
 	mu             sync.RWMutex
 	clients        map[string]*SMARTClient
@@ -338,13 +340,14 @@ func (s *SMARTServer) ExchangeCode(req *TokenRequest) (*TokenResponse, error) {
 	tokenID, _ := generateRandomHex(16)
 
 	claims := map[string]interface{}{
-		"iss":   s.issuer,
-		"sub":   ac.UserID,
-		"aud":   s.issuer + "/fhir",
-		"exp":   now.Add(s.tokenExpiry).Unix(),
-		"iat":   now.Unix(),
-		"jti":   tokenID,
-		"scope": ac.Scope,
+		"iss":       s.issuer,
+		"sub":       ac.UserID,
+		"aud":       s.issuer + "/fhir",
+		"exp":       now.Add(s.tokenExpiry).Unix(),
+		"iat":       now.Unix(),
+		"jti":       tokenID,
+		"scope":     ac.Scope,
+		"client_id": ac.ClientID,
 	}
 
 	if ac.PatientID != "" {
@@ -423,13 +426,14 @@ func (s *SMARTServer) RefreshAccessToken(refreshToken, clientID string) (*TokenR
 	tokenID, _ := generateRandomHex(16)
 
 	claims := map[string]interface{}{
-		"iss":   s.issuer,
-		"sub":   rtData.UserID,
-		"aud":   s.issuer + "/fhir",
-		"exp":   now.Add(s.tokenExpiry).Unix(),
-		"iat":   now.Unix(),
-		"jti":   tokenID,
-		"scope": rtData.Scope,
+		"iss":       s.issuer,
+		"sub":       rtData.UserID,
+		"aud":       s.issuer + "/fhir",
+		"exp":       now.Add(s.tokenExpiry).Unix(),
+		"iat":       now.Unix(),
+		"jti":       tokenID,
+		"scope":     rtData.Scope,
+		"client_id": rtData.ClientID,
 	}
 
 	if rtData.PatientID != "" {
@@ -749,7 +753,6 @@ func (h *SMARTHandler) RegisterRoutes(e *echo.Echo) {
 	e.POST("/auth/register", h.handleRegister)
 	e.POST("/auth/launch", h.handleLaunch)
 	e.POST("/auth/introspect", h.handleIntrospect)
-	e.GET("/.well-known/smart-configuration", h.handleSMARTConfiguration)
 }
 
 // handleAuthorize handles GET /auth/authorize.
@@ -1023,40 +1026,4 @@ func (h *SMARTHandler) handleIntrospect(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, claims)
-}
-
-// handleSMARTConfiguration handles GET /.well-known/smart-configuration.
-func (h *SMARTHandler) handleSMARTConfiguration(c echo.Context) error {
-	cfg := map[string]interface{}{
-		"issuer":                 h.server.issuer,
-		"authorization_endpoint": h.server.issuer + "/auth/authorize",
-		"token_endpoint":         h.server.issuer + "/auth/token",
-		"registration_endpoint":  h.server.issuer + "/auth/register",
-		"introspection_endpoint": h.server.issuer + "/auth/introspect",
-		"scopes_supported": []string{
-			"patient/*.read", "patient/*.write",
-			"user/*.read", "user/*.write",
-			"launch", "launch/patient", "launch/encounter",
-			"openid", "fhirUser",
-			"offline_access",
-		},
-		"response_types_supported": []string{"code"},
-		"capabilities": []string{
-			"launch-ehr",
-			"launch-standalone",
-			"client-public",
-			"client-confidential-symmetric",
-			"sso-openid-connect",
-			"permission-patient",
-			"permission-user",
-			"context-ehr-patient",
-			"context-ehr-encounter",
-			"context-standalone-patient",
-		},
-		"code_challenge_methods_supported":        []string{"S256"},
-		"grant_types_supported":                   []string{"authorization_code", "refresh_token"},
-		"token_endpoint_auth_methods_supported":   []string{"client_secret_basic", "client_secret_post", "none"},
-	}
-
-	return c.JSON(http.StatusOK, cfg)
 }

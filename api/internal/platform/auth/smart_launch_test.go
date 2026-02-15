@@ -1311,116 +1311,38 @@ func TestSMARTHandler_Introspect_Invalid(t *testing.T) {
 	}
 }
 
-func TestSMARTHandler_SMARTConfiguration(t *testing.T) {
+func TestSMARTHandler_NoWellKnownRoute(t *testing.T) {
 	s := newTestSMARTServer()
 	handler := NewSMARTHandler(s)
 
 	e := echo.New()
 	handler.RegisterRoutes(e)
 
+	// Verify /.well-known/smart-configuration is NOT registered (should return 404/405)
 	req := httptest.NewRequest(http.MethodGet, "/.well-known/smart-configuration", nil)
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
+	if rec.Code == http.StatusOK {
+		t.Errorf("expected non-200 for /.well-known/smart-configuration, got %d (route should not be registered on SMARTHandler)", rec.Code)
 	}
 
-	var cfg map[string]interface{}
-	if err := json.Unmarshal(rec.Body.Bytes(), &cfg); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
-	}
+	// Verify /auth/authorize still works (returns redirect, not 404)
+	client := registerTestClient(t, s, false)
+	q := url.Values{}
+	q.Set("response_type", "code")
+	q.Set("client_id", client.ClientID)
+	q.Set("redirect_uri", "https://app.example.com/callback")
+	q.Set("scope", "patient/*.read")
+	q.Set("state", "test-state")
+	q.Set("aud", "https://ehr.example.com/fhir")
 
-	// Check required fields
-	if cfg["issuer"] != "https://ehr.example.com" {
-		t.Errorf("expected issuer 'https://ehr.example.com', got %v", cfg["issuer"])
-	}
-	if cfg["authorization_endpoint"] != "https://ehr.example.com/auth/authorize" {
-		t.Errorf("unexpected authorization_endpoint: %v", cfg["authorization_endpoint"])
-	}
-	if cfg["token_endpoint"] != "https://ehr.example.com/auth/token" {
-		t.Errorf("unexpected token_endpoint: %v", cfg["token_endpoint"])
-	}
-	if cfg["registration_endpoint"] != "https://ehr.example.com/auth/register" {
-		t.Errorf("unexpected registration_endpoint: %v", cfg["registration_endpoint"])
-	}
-	if cfg["introspection_endpoint"] != "https://ehr.example.com/auth/introspect" {
-		t.Errorf("unexpected introspection_endpoint: %v", cfg["introspection_endpoint"])
-	}
+	authReq := httptest.NewRequest(http.MethodGet, "/auth/authorize?"+q.Encode(), nil)
+	authRec := httptest.NewRecorder()
+	e.ServeHTTP(authRec, authReq)
 
-	// Check scopes
-	scopes, ok := cfg["scopes_supported"].([]interface{})
-	if !ok || len(scopes) == 0 {
-		t.Error("expected non-empty scopes_supported")
-	}
-
-	scopeSet := make(map[string]bool)
-	for _, s := range scopes {
-		scopeSet[s.(string)] = true
-	}
-	requiredScopes := []string{"patient/*.read", "patient/*.write", "user/*.read", "user/*.write", "launch", "launch/patient", "launch/encounter", "openid", "fhirUser", "offline_access"}
-	for _, s := range requiredScopes {
-		if !scopeSet[s] {
-			t.Errorf("missing required scope: %s", s)
-		}
-	}
-
-	// Check capabilities
-	caps, ok := cfg["capabilities"].([]interface{})
-	if !ok || len(caps) == 0 {
-		t.Error("expected non-empty capabilities")
-	}
-
-	capSet := make(map[string]bool)
-	for _, c := range caps {
-		capSet[c.(string)] = true
-	}
-	requiredCaps := []string{"launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "sso-openid-connect", "permission-patient", "permission-user", "context-ehr-patient", "context-ehr-encounter", "context-standalone-patient"}
-	for _, c := range requiredCaps {
-		if !capSet[c] {
-			t.Errorf("missing required capability: %s", c)
-		}
-	}
-
-	// Check code_challenge_methods
-	methods, ok := cfg["code_challenge_methods_supported"].([]interface{})
-	if !ok || len(methods) == 0 || methods[0].(string) != "S256" {
-		t.Error("expected code_challenge_methods_supported to include 'S256'")
-	}
-
-	// Check grant_types
-	grants, ok := cfg["grant_types_supported"].([]interface{})
-	if !ok || len(grants) == 0 {
-		t.Error("expected non-empty grant_types_supported")
-	}
-	grantSet := make(map[string]bool)
-	for _, g := range grants {
-		grantSet[g.(string)] = true
-	}
-	if !grantSet["authorization_code"] {
-		t.Error("missing grant type: authorization_code")
-	}
-	if !grantSet["refresh_token"] {
-		t.Error("missing grant type: refresh_token")
-	}
-
-	// Check token_endpoint_auth_methods
-	authMethods, ok := cfg["token_endpoint_auth_methods_supported"].([]interface{})
-	if !ok || len(authMethods) == 0 {
-		t.Error("expected non-empty token_endpoint_auth_methods_supported")
-	}
-	amSet := make(map[string]bool)
-	for _, m := range authMethods {
-		amSet[m.(string)] = true
-	}
-	if !amSet["client_secret_basic"] {
-		t.Error("missing auth method: client_secret_basic")
-	}
-	if !amSet["client_secret_post"] {
-		t.Error("missing auth method: client_secret_post")
-	}
-	if !amSet["none"] {
-		t.Error("missing auth method: none")
+	if authRec.Code != http.StatusFound {
+		t.Errorf("expected 302 for /auth/authorize, got %d", authRec.Code)
 	}
 }
 
@@ -1433,12 +1355,11 @@ func TestSMARTHandler_RegisterRoutes(t *testing.T) {
 
 	routes := e.Routes()
 	expectedRoutes := map[string]string{
-		"GET::/auth/authorize":                    "",
-		"POST::/auth/token":                       "",
-		"POST::/auth/register":                    "",
-		"POST::/auth/launch":                      "",
-		"POST::/auth/introspect":                  "",
-		"GET::/.well-known/smart-configuration":   "",
+		"GET::/auth/authorize":   "",
+		"POST::/auth/token":      "",
+		"POST::/auth/register":   "",
+		"POST::/auth/launch":     "",
+		"POST::/auth/introspect": "",
 	}
 
 	for _, route := range routes {
@@ -1754,6 +1675,127 @@ func TestSMARTServer_IntrospectToken_InvalidSignature(t *testing.T) {
 	}
 	if result.Active {
 		t.Error("expected active=false for token with invalid signature")
+	}
+}
+
+func TestSMARTServer_TokenContainsClientID(t *testing.T) {
+	s := newTestSMARTServer()
+	client := registerTestClient(t, s, false)
+
+	lc, _ := s.CreateLaunchContext("patient-cid", "encounter-cid", "user-cid")
+	authResp := mustAuthorize(t, s, client.ClientID, "https://app.example.com/callback", "patient/*.read launch", lc.ID, "")
+
+	tokenResp, err := s.ExchangeCode(&TokenRequest{
+		GrantType:    "authorization_code",
+		Code:         authResp.Code,
+		RedirectURI:  "https://app.example.com/callback",
+		ClientID:     client.ClientID,
+		ClientSecret: "test-secret",
+	})
+	if err != nil {
+		t.Fatalf("ExchangeCode failed: %v", err)
+	}
+
+	// Parse the JWT access token manually
+	parts := strings.SplitN(tokenResp.AccessToken, ".", 3)
+	if len(parts) != 3 {
+		t.Fatalf("expected 3-part JWT, got %d parts", len(parts))
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("failed to decode JWT payload: %v", err)
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("failed to unmarshal JWT claims: %v", err)
+	}
+
+	gotClientID, ok := claims["client_id"].(string)
+	if !ok {
+		t.Fatalf("expected client_id claim to be a string, got %T", claims["client_id"])
+	}
+	if gotClientID != client.ClientID {
+		t.Errorf("expected client_id %q, got %q", client.ClientID, gotClientID)
+	}
+}
+
+func TestSMARTServer_RefreshTokenContainsClientID(t *testing.T) {
+	s := newTestSMARTServer()
+	client := registerTestClient(t, s, false)
+
+	lc, _ := s.CreateLaunchContext("patient-rcid", "encounter-rcid", "user-rcid")
+	authResp := mustAuthorize(t, s, client.ClientID, "https://app.example.com/callback", "patient/*.read launch offline_access", lc.ID, "")
+
+	tokenResp, err := s.ExchangeCode(&TokenRequest{
+		GrantType:    "authorization_code",
+		Code:         authResp.Code,
+		RedirectURI:  "https://app.example.com/callback",
+		ClientID:     client.ClientID,
+		ClientSecret: "test-secret",
+	})
+	if err != nil {
+		t.Fatalf("ExchangeCode failed: %v", err)
+	}
+	if tokenResp.RefreshToken == "" {
+		t.Fatal("expected non-empty refresh token with offline_access scope")
+	}
+
+	// Use the refresh token to get a new access token
+	refreshResp, err := s.RefreshAccessToken(tokenResp.RefreshToken, client.ClientID)
+	if err != nil {
+		t.Fatalf("RefreshAccessToken failed: %v", err)
+	}
+
+	// Parse the new JWT access token
+	parts := strings.SplitN(refreshResp.AccessToken, ".", 3)
+	if len(parts) != 3 {
+		t.Fatalf("expected 3-part JWT, got %d parts", len(parts))
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("failed to decode JWT payload: %v", err)
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("failed to unmarshal JWT claims: %v", err)
+	}
+
+	gotClientID, ok := claims["client_id"].(string)
+	if !ok {
+		t.Fatalf("expected client_id claim to be a string, got %T", claims["client_id"])
+	}
+	if gotClientID != client.ClientID {
+		t.Errorf("expected client_id %q, got %q", client.ClientID, gotClientID)
+	}
+}
+
+func TestSMARTServer_IntrospectReturnsClientID(t *testing.T) {
+	s := newTestSMARTServer()
+	client := registerTestClient(t, s, false)
+
+	lc, _ := s.CreateLaunchContext("patient-icid", "encounter-icid", "user-icid")
+	authResp := mustAuthorize(t, s, client.ClientID, "https://app.example.com/callback", "patient/*.read launch", lc.ID, "")
+
+	tokenResp, err := s.ExchangeCode(&TokenRequest{
+		GrantType:    "authorization_code",
+		Code:         authResp.Code,
+		RedirectURI:  "https://app.example.com/callback",
+		ClientID:     client.ClientID,
+		ClientSecret: "test-secret",
+	})
+	if err != nil {
+		t.Fatalf("ExchangeCode failed: %v", err)
+	}
+
+	introspected, err := s.IntrospectToken(tokenResp.AccessToken)
+	if err != nil {
+		t.Fatalf("IntrospectToken failed: %v", err)
+	}
+	if !introspected.Active {
+		t.Fatal("expected introspected token to be active")
+	}
+	if introspected.ClientID != client.ClientID {
+		t.Errorf("expected introspected client_id %q, got %q", client.ClientID, introspected.ClientID)
 	}
 }
 

@@ -932,6 +932,64 @@ func TestValidateHandler_GeneralEndpoint(t *testing.T) {
 	}
 }
 
+func TestValidateHandler_ProfileParamWarning(t *testing.T) {
+	v := NewResourceValidator()
+	h := NewValidateHandler(v)
+	e := echo.New()
+
+	body := `{
+		"resourceType": "Patient",
+		"id": "p-1",
+		"name": [{"family": "Smith"}]
+	}`
+
+	profileURL := "http://hl7.org/fhir/StructureDefinition/Patient"
+	req := httptest.NewRequest(http.MethodPost, "/fhir/$validate?profile="+profileURL, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.Validate(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var outcome map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &outcome); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if outcome["resourceType"] != "OperationOutcome" {
+		t.Errorf("expected resourceType OperationOutcome, got %v", outcome["resourceType"])
+	}
+
+	issues, ok := outcome["issue"].([]interface{})
+	if !ok || len(issues) == 0 {
+		t.Fatal("expected issues in response")
+	}
+
+	// The profile warning should be the first issue.
+	firstIssue := issues[0].(map[string]interface{})
+	if firstIssue["severity"] != "warning" {
+		t.Errorf("expected first issue severity 'warning', got %v", firstIssue["severity"])
+	}
+	if firstIssue["code"] != "invariant" {
+		t.Errorf("expected first issue code 'invariant', got %v", firstIssue["code"])
+	}
+
+	diag, _ := firstIssue["diagnostics"].(string)
+	if !strings.Contains(diag, "Profile validation") {
+		t.Errorf("expected diagnostics to mention profile validation, got: %s", diag)
+	}
+	if !strings.Contains(diag, profileURL) {
+		t.Errorf("expected diagnostics to contain the profile URL '%s', got: %s", profileURL, diag)
+	}
+}
+
 func TestValidateHandler_RegisterRoutes(t *testing.T) {
 	v := NewResourceValidator()
 	h := NewValidateHandler(v)

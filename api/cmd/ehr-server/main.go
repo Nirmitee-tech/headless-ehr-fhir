@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	crypto_rand "crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -2503,11 +2504,12 @@ func runServer() error {
 	ccdaHandler.RegisterRoutes(apiV1)
 
 	// SMART on FHIR App Launch — OAuth2 authorization server for SMART apps
-	smartSigningKey := []byte("smart-signing-key-change-in-production")
-	if keyHex := os.Getenv("SMART_SIGNING_KEY"); keyHex != "" {
-		if decoded, err := hex.DecodeString(keyHex); err == nil {
-			smartSigningKey = decoded
-		}
+	smartSigningKey, randomKey, err := resolveSmartSigningKey(os.Getenv("SMART_SIGNING_KEY"))
+	if err != nil {
+		logger.Fatal().Err(err).Msg("SMART signing key error")
+	}
+	if randomKey {
+		logger.Warn().Msg("SMART_SIGNING_KEY not set; using random key (tokens will not survive restart)")
 	}
 	smartIssuer := "http://localhost:" + cfg.Port
 	if issuer := os.Getenv("SMART_ISSUER"); issuer != "" {
@@ -2609,18 +2611,14 @@ func (f *ccdaDataFetcher) FetchPatientData(ctx context.Context, patientID string
 	if obs, _, err := f.clinicalSvc.ListObservationsByPatient(ctx, pid, 1000, 0); err == nil {
 		for _, o := range obs {
 			fhirObs := o.ToFHIR()
-			// Separate labs from vitals based on category
-			if cats, ok := fhirObs["category"].([]map[string]interface{}); ok && len(cats) > 0 {
-				if codings, ok := cats[0]["coding"].([]map[string]interface{}); ok && len(codings) > 0 {
-					if code, ok := codings[0]["code"].(string); ok {
-						if code == "vital-signs" {
-							data.VitalSigns = append(data.VitalSigns, fhirObs)
-							continue
-						}
-					}
-				}
+			switch classifyObservation(fhirObs) {
+			case "social-history":
+				data.SocialHistory = append(data.SocialHistory, fhirObs)
+			case "vital-signs":
+				data.VitalSigns = append(data.VitalSigns, fhirObs)
+			default:
+				data.Results = append(data.Results, fhirObs)
 			}
-			data.Results = append(data.Results, fhirObs)
 		}
 	}
 
@@ -2646,4 +2644,38 @@ func (f *ccdaDataFetcher) FetchPatientData(ctx context.Context, patientID string
 	}
 
 	return data, nil
+}
+
+// classifyObservation returns the FHIR observation category code (e.g.
+// "vital-signs", "social-history", "laboratory") or an empty string when
+// the category cannot be determined.
+func classifyObservation(fhirObs map[string]interface{}) string {
+	cats, ok := fhirObs["category"].([]map[string]interface{})
+	if !ok || len(cats) == 0 {
+		return ""
+	}
+	codings, ok := cats[0]["coding"].([]map[string]interface{})
+	if !ok || len(codings) == 0 {
+		return ""
+	}
+	code, _ := codings[0]["code"].(string)
+	return code
+}
+
+// resolveSmartSigningKey returns the SMART signing key from the environment
+// variable SMART_SIGNING_KEY (hex-encoded) or generates a random 32-byte
+// key.  The second return value is true when a random key was generated.
+func resolveSmartSigningKey(envValue string) ([]byte, bool, error) {
+	if envValue != "" {
+		decoded, err := hex.DecodeString(envValue)
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid SMART_SIGNING_KEY hex value: %w", err)
+		}
+		return decoded, false, nil
+	}
+	key := make([]byte, 32)
+	if _, err := crypto_rand.Read(key); err != nil {
+		return nil, false, fmt.Errorf("failed to generate random SMART signing key: %w", err)
+	}
+	return key, true, nil
 }

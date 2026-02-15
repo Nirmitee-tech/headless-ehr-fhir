@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -773,16 +772,23 @@ func (h *ValidateHandler) Validate(c echo.Context) error {
 		}
 	}
 
-	// Check profile parameter (log warning, not yet supported).
-	if profile := c.QueryParam("profile"); profile != "" {
-		log.Printf("WARN: $validate profile parameter '%s' requested but profile validation is not yet supported", profile)
-	}
+	// Check profile parameter — include warning in response if requested.
+	profileParam := c.QueryParam("profile")
 
 	// Determine mode.
 	mode := c.QueryParam("mode")
 
 	// Run validation.
 	vResult := h.validator.ValidateWithMode(resource, mode)
+
+	if profileParam != "" {
+		profileWarning := ValidationIssue{
+			Severity:    SeverityWarning,
+			Code:        VIssueTypeInvariant,
+			Diagnostics: fmt.Sprintf("Profile validation for '%s' is not yet supported; only base FHIR R4 rules were applied", profileParam),
+		}
+		vResult.Issues = append([]ValidationIssue{profileWarning}, vResult.Issues...)
+	}
 
 	// Build the OperationOutcome.
 	outcome := buildValidateOperationOutcome(vResult)
