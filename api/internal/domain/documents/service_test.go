@@ -3,6 +3,7 @@ package documents
 import (
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -334,6 +335,9 @@ func (m *mockDocTemplateRepo) GetSections(_ context.Context, templateID uuid.UUI
 			result = append(result, s)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].SortOrder < result[j].SortOrder
+	})
 	return result, nil
 }
 

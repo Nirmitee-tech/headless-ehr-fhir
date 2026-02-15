@@ -218,6 +218,7 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | POST | `/fhir/Patient` | Create patient |
 | PUT | `/fhir/Patient/:id` | Update patient |
 | DELETE | `/fhir/Patient/:id` | Delete patient |
+| GET | `/fhir/Patient/:id/$everything` | Patient $everything |
 | GET | `/fhir/Practitioner` | Search practitioners |
 | GET | `/fhir/Practitioner/:id` | Read practitioner |
 | POST | `/fhir/Practitioner` | Create practitioner |

@@ -1496,6 +1496,437 @@ func runServer() error {
 	exportHandler := fhir.NewExportHandler(exportManager)
 	exportHandler.RegisterRoutes(fhirGroup)
 
+	// FHIR Patient/$everything — aggregates all patient compartment data
+	everythingHandler := fhir.NewEverythingHandler()
+	everythingHandler.SetPatientFetcher(func(ctx context.Context, fhirID string) (map[string]interface{}, error) {
+		p, err := identitySvc.GetPatientByFHIRID(ctx, fhirID)
+		if err != nil {
+			return nil, err
+		}
+		return p.ToFHIR(), nil
+	})
+	everythingHandler.RegisterFetcher("Encounter", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := encSvc.ListEncountersByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Condition", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := clinicalSvc.ListConditionsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Observation", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := clinicalSvc.ListObservationsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("AllergyIntolerance", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := clinicalSvc.ListAllergiesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Procedure", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := clinicalSvc.ListProceduresByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("MedicationRequest", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := medSvc.ListMedicationRequestsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("MedicationAdministration", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := medSvc.ListMedicationAdministrationsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("MedicationDispense", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := medSvc.ListMedicationDispensesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("ServiceRequest", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := dxSvc.ListServiceRequestsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("DiagnosticReport", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := dxSvc.ListDiagnosticReportsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("ImagingStudy", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := dxSvc.ListImagingStudiesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Specimen", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := dxSvc.ListSpecimensByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Immunization", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := immSvc.ListImmunizationsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("ImmunizationRecommendation", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := immSvc.ListRecommendationsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("CarePlan", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := cpSvc.ListCarePlansByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Goal", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := cpSvc.ListGoalsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("CareTeam", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := ctSvc.ListCareTeamsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Coverage", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := billSvc.ListCoveragesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Claim", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := billSvc.ListClaimsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Consent", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := docSvc.ListConsentsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("DocumentReference", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := docSvc.ListDocumentReferencesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Composition", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := docSvc.ListCompositionsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("FamilyMemberHistory", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := fmhSvc.ListFamilyMemberHistoriesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("RelatedPerson", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := rpSvc.ListRelatedPersonsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Appointment", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := schedSvc.ListAppointmentsByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("QuestionnaireResponse", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := portalSvc.ListQuestionnaireResponsesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Device", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := devSvc.ListDevicesByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterFetcher("Task", func(ctx context.Context, patientID string) ([]map[string]interface{}, error) {
+		pid, err := uuid.Parse(patientID)
+		if err != nil {
+			return nil, err
+		}
+		items, _, err := taskSvc.ListTasksByPatient(ctx, pid, 10000, 0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]map[string]interface{}, len(items))
+		for i, v := range items {
+			out[i] = v.ToFHIR()
+		}
+		return out, nil
+	})
+	everythingHandler.RegisterRoutes(fhirGroup)
+
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))
 

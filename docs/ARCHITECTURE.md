@@ -435,6 +435,14 @@ The migration system supports extension tables that add custom fields to existin
 
 Because the FHIR layer uses `map[string]interface{}` for resource representation, plugins can define custom FHIR resource mappings for non-standard resources or extensions.
 
+### FHIR Operations
+
+The platform supports FHIR-defined operations as platform-level handlers in `internal/platform/fhir/`:
+
+- **Patient/$everything** (`GET /fhir/Patient/:id/$everything`) -- Returns all data for a patient in a single searchset Bundle. Uses a registered-fetcher pattern where each domain registers a `PatientResourceFetcher` function. Supports `_type` (comma-separated resource filter) and `_count` (per-type limit) query parameters. Covers all 29 Patient Compartment resource types.
+
+- **$export** (`POST /fhir/$export`, `POST /fhir/Patient/$export`) -- Asynchronous bulk data export using NDJSON format. Uses the `ExportManager` with registered `ResourceExporter` implementations.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.
