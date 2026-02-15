@@ -30,9 +30,16 @@ type Immunization struct {
 	DoseUnit           *string    `db:"dose_unit" json:"dose_unit,omitempty"`
 	PerformerID        *uuid.UUID `db:"performer_id" json:"performer_id,omitempty"`
 	Note               *string    `db:"note" json:"note,omitempty"`
+	VersionID          int        `db:"version_id" json:"version_id"`
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (im *Immunization) GetVersionID() int { return im.VersionID }
+
+// SetVersionID sets the current version.
+func (im *Immunization) SetVersionID(v int) { im.VersionID = v }
 
 func (im *Immunization) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -107,9 +114,16 @@ type ImmunizationRecommendation struct {
 	SeriesDoses     *int       `db:"series_doses" json:"series_doses,omitempty"`
 	DoseNumber      *int       `db:"dose_number" json:"dose_number,omitempty"`
 	Description     *string    `db:"description" json:"description,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (r *ImmunizationRecommendation) GetVersionID() int { return r.VersionID }
+
+// SetVersionID sets the current version.
+func (r *ImmunizationRecommendation) SetVersionID(v int) { r.VersionID = v }
 
 func (r *ImmunizationRecommendation) ToFHIR() map[string]interface{} {
 	rec := map[string]interface{}{

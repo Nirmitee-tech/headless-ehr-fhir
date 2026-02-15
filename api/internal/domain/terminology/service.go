@@ -3,6 +3,8 @@ package terminology
 import (
 	"context"
 	"fmt"
+
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 // Service provides terminology lookup and validation operations.
@@ -12,6 +14,17 @@ type Service struct {
 	snomed SNOMEDRepository
 	rxnorm RxNormRepository
 	cpt    CPTRepository
+	vt     *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 // NewService creates a new terminology service.

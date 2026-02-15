@@ -23,7 +23,7 @@ func ProjectionMiddleware() echo.MiddlewareFunc {
 			}
 
 			// Create a response recorder
-			rec := &responseRecorder{
+			rec := &projectionResponseRecorder{
 				ResponseWriter: c.Response().Writer,
 				body:           &bytes.Buffer{},
 			}
@@ -76,18 +76,18 @@ func ProjectionMiddleware() echo.MiddlewareFunc {
 	}
 }
 
-// responseRecorder captures the response body for post-processing.
-type responseRecorder struct {
+// projectionResponseRecorder captures the response body for post-processing.
+type projectionResponseRecorder struct {
 	http.ResponseWriter
 	body       *bytes.Buffer
 	statusCode int
 }
 
-func (r *responseRecorder) Write(b []byte) (int, error) {
+func (r *projectionResponseRecorder) Write(b []byte) (int, error) {
 	return r.body.Write(b)
 }
 
-func (r *responseRecorder) WriteHeader(code int) {
+func (r *projectionResponseRecorder) WriteHeader(code int) {
 	r.statusCode = code
 	r.ResponseWriter.WriteHeader(code)
 }

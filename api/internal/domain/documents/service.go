@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -15,6 +16,7 @@ type Service struct {
 	notes      ClinicalNoteRepository
 	comps      CompositionRepository
 	templates  DocumentTemplateRepository
+	vt         *fhir.VersionTracker
 }
 
 func NewService(consents ConsentRepository, docRefs DocumentReferenceRepository, notes ClinicalNoteRepository, comps CompositionRepository, templates ...DocumentTemplateRepository) *Service {
@@ -23,6 +25,16 @@ func NewService(consents ConsentRepository, docRefs DocumentReferenceRepository,
 		s.templates = templates[0]
 	}
 	return s
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 // -- Consent --
@@ -42,7 +54,14 @@ func (s *Service) CreateConsent(ctx context.Context, c *Consent) error {
 	if !validConsentStatuses[c.Status] {
 		return fmt.Errorf("invalid status: %s", c.Status)
 	}
-	return s.consents.Create(ctx, c)
+	if err := s.consents.Create(ctx, c); err != nil {
+		return err
+	}
+	c.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Consent", c.FHIRID, c.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetConsent(ctx context.Context, id uuid.UUID) (*Consent, error) {
@@ -57,10 +76,22 @@ func (s *Service) UpdateConsent(ctx context.Context, c *Consent) error {
 	if c.Status != "" && !validConsentStatuses[c.Status] {
 		return fmt.Errorf("invalid status: %s", c.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Consent", c.FHIRID, c.VersionID, c.ToFHIR())
+		if err == nil {
+			c.VersionID = newVer
+		}
+	}
 	return s.consents.Update(ctx, c)
 }
 
 func (s *Service) DeleteConsent(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		c, err := s.consents.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Consent", c.FHIRID, c.VersionID)
+		}
+	}
 	return s.consents.Delete(ctx, id)
 }
 
@@ -88,7 +119,14 @@ func (s *Service) CreateDocumentReference(ctx context.Context, d *DocumentRefere
 	if !validDocRefStatuses[d.Status] {
 		return fmt.Errorf("invalid status: %s", d.Status)
 	}
-	return s.docRefs.Create(ctx, d)
+	if err := s.docRefs.Create(ctx, d); err != nil {
+		return err
+	}
+	d.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "DocumentReference", d.FHIRID, d.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetDocumentReference(ctx context.Context, id uuid.UUID) (*DocumentReference, error) {
@@ -103,10 +141,22 @@ func (s *Service) UpdateDocumentReference(ctx context.Context, d *DocumentRefere
 	if d.Status != "" && !validDocRefStatuses[d.Status] {
 		return fmt.Errorf("invalid status: %s", d.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "DocumentReference", d.FHIRID, d.VersionID, d.ToFHIR())
+		if err == nil {
+			d.VersionID = newVer
+		}
+	}
 	return s.docRefs.Update(ctx, d)
 }
 
 func (s *Service) DeleteDocumentReference(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		d, err := s.docRefs.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "DocumentReference", d.FHIRID, d.VersionID)
+		}
+	}
 	return s.docRefs.Delete(ctx, id)
 }
 
@@ -182,7 +232,14 @@ func (s *Service) CreateComposition(ctx context.Context, comp *Composition) erro
 	if !validCompStatuses[comp.Status] {
 		return fmt.Errorf("invalid status: %s", comp.Status)
 	}
-	return s.comps.Create(ctx, comp)
+	if err := s.comps.Create(ctx, comp); err != nil {
+		return err
+	}
+	comp.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Composition", comp.FHIRID, comp.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetComposition(ctx context.Context, id uuid.UUID) (*Composition, error) {
@@ -197,10 +254,22 @@ func (s *Service) UpdateComposition(ctx context.Context, comp *Composition) erro
 	if comp.Status != "" && !validCompStatuses[comp.Status] {
 		return fmt.Errorf("invalid status: %s", comp.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Composition", comp.FHIRID, comp.VersionID, comp.ToFHIR())
+		if err == nil {
+			comp.VersionID = newVer
+		}
+	}
 	return s.comps.Update(ctx, comp)
 }
 
 func (s *Service) DeleteComposition(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		comp, err := s.comps.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Composition", comp.FHIRID, comp.VersionID)
+		}
+	}
 	return s.comps.Delete(ctx, id)
 }
 

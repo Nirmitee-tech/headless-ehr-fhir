@@ -9,6 +9,13 @@ import (
 	"io"
 )
 
+// FieldEncryptor is the interface for encrypting and decrypting individual PHI field values.
+// Both PHIEncryptor and RotatingEncryptor satisfy this interface.
+type FieldEncryptor interface {
+	Encrypt(plaintext string) (string, error)
+	Decrypt(ciphertext string) (string, error)
+}
+
 // PHIEncryptor provides AES-256-GCM field-level encryption and decryption for PHI data.
 type PHIEncryptor struct {
 	aead cipher.AEAD

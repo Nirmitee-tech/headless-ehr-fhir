@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -650,5 +651,82 @@ func TestValidStatuses(t *testing.T) {
 		if !validStatuses[s] {
 			t.Errorf("expected %s to be a valid status", s)
 		}
+	}
+}
+
+// =========== Version Tracking Tests ===========
+
+func TestCreateEncounter_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	// Wire up a VersionTracker (will error on RecordCreate due to no DB, but the
+	// service swallows that error; what we care about is that VersionID is set to 1).
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	if err := svc.CreateEncounter(context.Background(), enc); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if enc.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", enc.VersionID)
+	}
+}
+
+func TestCreateEncounter_NilVersionTracker_NoError(t *testing.T) {
+	svc := newTestService()
+	// Do NOT call SetVersionTracker -- VersionTracker is nil.
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	if err := svc.CreateEncounter(context.Background(), enc); err != nil {
+		t.Fatalf("unexpected error with nil version tracker: %v", err)
+	}
+	// VersionID should be 1 after create (set unconditionally).
+	if enc.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create (even with nil tracker), got %d", enc.VersionID)
+	}
+}
+
+func TestUpdateEncounter_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	svc.CreateEncounter(context.Background(), enc)
+
+	// Update -- the RecordUpdate will error (no DB), so version won't increment,
+	// but crucially, the update itself must not fail.
+	enc.Status = "in-progress"
+	if err := svc.UpdateEncounter(context.Background(), enc); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteEncounter_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	enc := &Encounter{PatientID: uuid.New(), ClassCode: "AMB"}
+	svc.CreateEncounter(context.Background(), enc)
+
+	if err := svc.DeleteEncounter(context.Background(), enc.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVersionTrackerAccessor(t *testing.T) {
+	svc := newTestService()
+	if svc.VersionTracker() != nil {
+		t.Error("expected nil VersionTracker initially")
+	}
+
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+	if svc.VersionTracker() != vt {
+		t.Error("expected VersionTracker to match")
 	}
 }

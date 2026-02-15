@@ -4,12 +4,24 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
 // Service provides business logic for the RelatedPerson domain.
 type Service struct {
 	relatedPersons RelatedPersonRepository
+	vt             *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 // NewService creates a new RelatedPerson domain service.
@@ -27,7 +39,14 @@ func (s *Service) CreateRelatedPerson(ctx context.Context, rp *RelatedPerson) er
 	if rp.RelationshipDisplay == "" {
 		return fmt.Errorf("relationship_display is required")
 	}
-	return s.relatedPersons.Create(ctx, rp)
+	if err := s.relatedPersons.Create(ctx, rp); err != nil {
+		return err
+	}
+	rp.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "RelatedPerson", rp.FHIRID, rp.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetRelatedPerson(ctx context.Context, id uuid.UUID) (*RelatedPerson, error) {
@@ -39,10 +58,22 @@ func (s *Service) GetRelatedPersonByFHIRID(ctx context.Context, fhirID string) (
 }
 
 func (s *Service) UpdateRelatedPerson(ctx context.Context, rp *RelatedPerson) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "RelatedPerson", rp.FHIRID, rp.VersionID, rp.ToFHIR())
+		if err == nil {
+			rp.VersionID = newVer
+		}
+	}
 	return s.relatedPersons.Update(ctx, rp)
 }
 
 func (s *Service) DeleteRelatedPerson(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		rp, err := s.relatedPersons.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "RelatedPerson", rp.FHIRID, rp.VersionID)
+		}
+	}
 	return s.relatedPersons.Delete(ctx, id)
 }
 

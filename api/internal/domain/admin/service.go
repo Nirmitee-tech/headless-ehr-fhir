@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -12,6 +13,17 @@ type Service struct {
 	depts DepartmentRepository
 	locs  LocationRepository
 	users SystemUserRepository
+	vt    *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(orgs OrganizationRepository, depts DepartmentRepository, locs LocationRepository, users SystemUserRepository) *Service {
@@ -28,7 +40,14 @@ func (s *Service) CreateOrganization(ctx context.Context, org *Organization) err
 		org.TypeCode = "prov"
 	}
 	org.Active = true
-	return s.orgs.Create(ctx, org)
+	if err := s.orgs.Create(ctx, org); err != nil {
+		return err
+	}
+	org.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Organization", org.FHIRID, org.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetOrganization(ctx context.Context, id uuid.UUID) (*Organization, error) {
@@ -43,10 +62,22 @@ func (s *Service) UpdateOrganization(ctx context.Context, org *Organization) err
 	if org.Name == "" {
 		return fmt.Errorf("organization name is required")
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Organization", org.FHIRID, org.VersionID, org.ToFHIR())
+		if err == nil {
+			org.VersionID = newVer
+		}
+	}
 	return s.orgs.Update(ctx, org)
 }
 
 func (s *Service) DeleteOrganization(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		org, err := s.orgs.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Organization", org.FHIRID, org.VersionID)
+		}
+	}
 	return s.orgs.Delete(ctx, id)
 }
 
@@ -96,7 +127,14 @@ func (s *Service) CreateLocation(ctx context.Context, loc *Location) error {
 	if loc.Status == "" {
 		loc.Status = "active"
 	}
-	return s.locs.Create(ctx, loc)
+	if err := s.locs.Create(ctx, loc); err != nil {
+		return err
+	}
+	loc.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Location", loc.FHIRID, loc.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetLocation(ctx context.Context, id uuid.UUID) (*Location, error) {
@@ -108,10 +146,22 @@ func (s *Service) GetLocationByFHIRID(ctx context.Context, fhirID string) (*Loca
 }
 
 func (s *Service) UpdateLocation(ctx context.Context, loc *Location) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Location", loc.FHIRID, loc.VersionID, loc.ToFHIR())
+		if err == nil {
+			loc.VersionID = newVer
+		}
+	}
 	return s.locs.Update(ctx, loc)
 }
 
 func (s *Service) DeleteLocation(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		loc, err := s.locs.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Location", loc.FHIRID, loc.VersionID)
+		}
+	}
 	return s.locs.Delete(ctx, id)
 }
 

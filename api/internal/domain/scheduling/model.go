@@ -21,9 +21,16 @@ type Schedule struct {
 	PlanningHorizonStart *time.Time `db:"planning_horizon_start" json:"planning_horizon_start,omitempty"`
 	PlanningHorizonEnd   *time.Time `db:"planning_horizon_end" json:"planning_horizon_end,omitempty"`
 	Comment              *string    `db:"comment" json:"comment,omitempty"`
+	VersionID            int        `db:"version_id" json:"version_id"`
 	CreatedAt            time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt            time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (s *Schedule) GetVersionID() int { return s.VersionID }
+
+// SetVersionID sets the current version.
+func (s *Schedule) SetVersionID(v int) { s.VersionID = v }
 
 func (s *Schedule) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -77,9 +84,16 @@ type Slot struct {
 	SpecialtyDisplay       *string    `db:"specialty_display" json:"specialty_display,omitempty"`
 	AppointmentTypeCode    *string    `db:"appointment_type_code" json:"appointment_type_code,omitempty"`
 	AppointmentTypeDisplay *string    `db:"appointment_type_display" json:"appointment_type_display,omitempty"`
+	VersionID              int        `db:"version_id" json:"version_id"`
 	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (sl *Slot) GetVersionID() int { return sl.VersionID }
+
+// SetVersionID sets the current version.
+func (sl *Slot) SetVersionID(v int) { sl.VersionID = v }
 
 func (sl *Slot) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -143,9 +157,16 @@ type Appointment struct {
 	PatientInstruction     *string    `db:"patient_instruction" json:"patient_instruction,omitempty"`
 	IsTelehealth           *bool      `db:"is_telehealth" json:"is_telehealth,omitempty"`
 	TelehealthURL          *string    `db:"telehealth_url" json:"telehealth_url,omitempty"`
+	VersionID              int        `db:"version_id" json:"version_id"`
 	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (a *Appointment) GetVersionID() int { return a.VersionID }
+
+// SetVersionID sets the current version.
+func (a *Appointment) SetVersionID(v int) { a.VersionID = v }
 
 func (a *Appointment) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

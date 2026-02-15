@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -13,10 +14,22 @@ type Service struct {
 	patients      PatientRepository
 	practitioners PractitionerRepository
 	links         PatientLinkRepository
+	vt            *fhir.VersionTracker
 }
 
 func NewService(patients PatientRepository, practitioners PractitionerRepository, links PatientLinkRepository) *Service {
 	return &Service{patients: patients, practitioners: practitioners, links: links}
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+// When set, create/update/delete operations record version history.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 // -- Patient --
@@ -29,7 +42,14 @@ func (s *Service) CreatePatient(ctx context.Context, p *Patient) error {
 		return fmt.Errorf("mrn is required")
 	}
 	p.Active = true
-	return s.patients.Create(ctx, p)
+	if err := s.patients.Create(ctx, p); err != nil {
+		return err
+	}
+	p.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Patient", p.FHIRID, p.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetPatient(ctx context.Context, id uuid.UUID) (*Patient, error) {
@@ -48,10 +68,22 @@ func (s *Service) UpdatePatient(ctx context.Context, p *Patient) error {
 	if p.FirstName == "" || p.LastName == "" {
 		return fmt.Errorf("first_name and last_name are required")
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Patient", p.FHIRID, p.VersionID, p.ToFHIR())
+		if err == nil {
+			p.VersionID = newVer
+		}
+	}
 	return s.patients.Update(ctx, p)
 }
 
 func (s *Service) DeletePatient(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		p, err := s.patients.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Patient", p.FHIRID, p.VersionID)
+		}
+	}
 	return s.patients.Delete(ctx, id)
 }
 
@@ -202,7 +234,14 @@ func (s *Service) CreatePractitioner(ctx context.Context, p *Practitioner) error
 		return fmt.Errorf("first_name and last_name are required")
 	}
 	p.Active = true
-	return s.practitioners.Create(ctx, p)
+	if err := s.practitioners.Create(ctx, p); err != nil {
+		return err
+	}
+	p.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Practitioner", p.FHIRID, p.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetPractitioner(ctx context.Context, id uuid.UUID) (*Practitioner, error) {
@@ -221,10 +260,22 @@ func (s *Service) UpdatePractitioner(ctx context.Context, p *Practitioner) error
 	if p.FirstName == "" || p.LastName == "" {
 		return fmt.Errorf("first_name and last_name are required")
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Practitioner", p.FHIRID, p.VersionID, p.ToFHIR())
+		if err == nil {
+			p.VersionID = newVer
+		}
+	}
 	return s.practitioners.Update(ctx, p)
 }
 
 func (s *Service) DeletePractitioner(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		p, err := s.practitioners.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Practitioner", p.FHIRID, p.VersionID)
+		}
+	}
 	return s.practitioners.Delete(ctx, id)
 }
 

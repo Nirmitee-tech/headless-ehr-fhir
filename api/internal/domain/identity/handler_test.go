@@ -843,3 +843,224 @@ func TestHandler_HistoryPractitionerFHIR(t *testing.T) {
 		t.Errorf("expected 200, got %d", rec.Code)
 	}
 }
+
+// -- applyPatientPatch Tests --
+
+func TestApplyPatientPatch_BasicFields(t *testing.T) {
+	p := &Patient{FirstName: "John", LastName: "Doe", Active: false}
+
+	patched := map[string]interface{}{
+		"active":    true,
+		"gender":    "male",
+		"birthDate": "1990-05-15",
+	}
+	applyPatientPatch(p, patched)
+
+	if p.Active != true {
+		t.Errorf("expected Active=true, got %v", p.Active)
+	}
+	if p.Gender == nil || *p.Gender != "male" {
+		t.Errorf("expected Gender=male, got %v", p.Gender)
+	}
+	if p.BirthDate == nil {
+		t.Fatal("expected BirthDate to be set")
+	}
+	if p.BirthDate.Format("2006-01-02") != "1990-05-15" {
+		t.Errorf("expected BirthDate=1990-05-15, got %s", p.BirthDate.Format("2006-01-02"))
+	}
+	// Unchanged fields
+	if p.FirstName != "John" {
+		t.Errorf("expected FirstName=John, got %s", p.FirstName)
+	}
+	if p.LastName != "Doe" {
+		t.Errorf("expected LastName=Doe, got %s", p.LastName)
+	}
+}
+
+func TestApplyPatientPatch_Name(t *testing.T) {
+	p := &Patient{FirstName: "Old", LastName: "Name"}
+
+	patched := map[string]interface{}{
+		"name": []interface{}{
+			map[string]interface{}{
+				"family": "Smith",
+				"given":  []interface{}{"Jane", "Marie"},
+				"prefix": []interface{}{"Dr."},
+				"suffix": []interface{}{"Jr."},
+			},
+		},
+	}
+	applyPatientPatch(p, patched)
+
+	if p.LastName != "Smith" {
+		t.Errorf("expected LastName=Smith, got %s", p.LastName)
+	}
+	if p.FirstName != "Jane" {
+		t.Errorf("expected FirstName=Jane, got %s", p.FirstName)
+	}
+	if p.MiddleName == nil || *p.MiddleName != "Marie" {
+		t.Errorf("expected MiddleName=Marie, got %v", p.MiddleName)
+	}
+	if p.Prefix == nil || *p.Prefix != "Dr." {
+		t.Errorf("expected Prefix=Dr., got %v", p.Prefix)
+	}
+	if p.Suffix == nil || *p.Suffix != "Jr." {
+		t.Errorf("expected Suffix=Jr., got %v", p.Suffix)
+	}
+}
+
+func TestApplyPatientPatch_Telecom(t *testing.T) {
+	p := &Patient{FirstName: "John", LastName: "Doe"}
+
+	patched := map[string]interface{}{
+		"telecom": []interface{}{
+			map[string]interface{}{
+				"system": "phone",
+				"value":  "555-0100",
+				"use":    "mobile",
+			},
+			map[string]interface{}{
+				"system": "phone",
+				"value":  "555-0101",
+				"use":    "home",
+			},
+			map[string]interface{}{
+				"system": "email",
+				"value":  "john@example.com",
+			},
+		},
+	}
+	applyPatientPatch(p, patched)
+
+	if p.PhoneMobile == nil || *p.PhoneMobile != "555-0100" {
+		t.Errorf("expected PhoneMobile=555-0100, got %v", p.PhoneMobile)
+	}
+	if p.PhoneHome == nil || *p.PhoneHome != "555-0101" {
+		t.Errorf("expected PhoneHome=555-0101, got %v", p.PhoneHome)
+	}
+	if p.Email == nil || *p.Email != "john@example.com" {
+		t.Errorf("expected Email=john@example.com, got %v", p.Email)
+	}
+}
+
+func TestApplyPatientPatch_Address(t *testing.T) {
+	p := &Patient{FirstName: "John", LastName: "Doe"}
+
+	patched := map[string]interface{}{
+		"address": []interface{}{
+			map[string]interface{}{
+				"use":        "home",
+				"line":       []interface{}{"123 Main St", "Apt 4B"},
+				"city":       "Springfield",
+				"district":   "Clark",
+				"state":      "IL",
+				"postalCode": "62701",
+				"country":    "US",
+			},
+		},
+	}
+	applyPatientPatch(p, patched)
+
+	if p.AddressUse == nil || *p.AddressUse != "home" {
+		t.Errorf("expected AddressUse=home, got %v", p.AddressUse)
+	}
+	if p.AddressLine1 == nil || *p.AddressLine1 != "123 Main St" {
+		t.Errorf("expected AddressLine1=123 Main St, got %v", p.AddressLine1)
+	}
+	if p.AddressLine2 == nil || *p.AddressLine2 != "Apt 4B" {
+		t.Errorf("expected AddressLine2=Apt 4B, got %v", p.AddressLine2)
+	}
+	if p.City == nil || *p.City != "Springfield" {
+		t.Errorf("expected City=Springfield, got %v", p.City)
+	}
+	if p.District == nil || *p.District != "Clark" {
+		t.Errorf("expected District=Clark, got %v", p.District)
+	}
+	if p.State == nil || *p.State != "IL" {
+		t.Errorf("expected State=IL, got %v", p.State)
+	}
+	if p.PostalCode == nil || *p.PostalCode != "62701" {
+		t.Errorf("expected PostalCode=62701, got %v", p.PostalCode)
+	}
+	if p.Country == nil || *p.Country != "US" {
+		t.Errorf("expected Country=US, got %v", p.Country)
+	}
+}
+
+func TestApplyPatientPatch_EmptyMap(t *testing.T) {
+	p := &Patient{FirstName: "John", LastName: "Doe", Active: true}
+
+	patched := map[string]interface{}{}
+	applyPatientPatch(p, patched)
+
+	if p.FirstName != "John" {
+		t.Errorf("expected FirstName=John, got %s", p.FirstName)
+	}
+	if p.LastName != "Doe" {
+		t.Errorf("expected LastName=Doe, got %s", p.LastName)
+	}
+	if p.Active != true {
+		t.Errorf("expected Active=true, got %v", p.Active)
+	}
+	if p.Gender != nil {
+		t.Errorf("expected Gender=nil, got %v", p.Gender)
+	}
+}
+
+// -- applyPractitionerPatch Tests --
+
+func TestApplyPractitionerPatch_BasicFields(t *testing.T) {
+	pr := &Practitioner{FirstName: "Dr", LastName: "Smith", Active: false}
+
+	patched := map[string]interface{}{
+		"active": true,
+		"gender": "female",
+		"name": []interface{}{
+			map[string]interface{}{
+				"family": "Johnson",
+				"given":  []interface{}{"Sarah", "Ann"},
+				"prefix": []interface{}{"Dr."},
+				"suffix": []interface{}{"MD"},
+			},
+		},
+		"telecom": []interface{}{
+			map[string]interface{}{
+				"system": "phone",
+				"value":  "555-9999",
+			},
+			map[string]interface{}{
+				"system": "email",
+				"value":  "sarah@hospital.com",
+			},
+		},
+	}
+	applyPractitionerPatch(pr, patched)
+
+	if pr.Active != true {
+		t.Errorf("expected Active=true, got %v", pr.Active)
+	}
+	if pr.Gender == nil || *pr.Gender != "female" {
+		t.Errorf("expected Gender=female, got %v", pr.Gender)
+	}
+	if pr.LastName != "Johnson" {
+		t.Errorf("expected LastName=Johnson, got %s", pr.LastName)
+	}
+	if pr.FirstName != "Sarah" {
+		t.Errorf("expected FirstName=Sarah, got %s", pr.FirstName)
+	}
+	if pr.MiddleName == nil || *pr.MiddleName != "Ann" {
+		t.Errorf("expected MiddleName=Ann, got %v", pr.MiddleName)
+	}
+	if pr.Prefix == nil || *pr.Prefix != "Dr." {
+		t.Errorf("expected Prefix=Dr., got %v", pr.Prefix)
+	}
+	if pr.Suffix == nil || *pr.Suffix != "MD" {
+		t.Errorf("expected Suffix=MD, got %v", pr.Suffix)
+	}
+	if pr.Phone == nil || *pr.Phone != "555-9999" {
+		t.Errorf("expected Phone=555-9999, got %v", pr.Phone)
+	}
+	if pr.Email == nil || *pr.Email != "sarah@hospital.com" {
+		t.Errorf("expected Email=sarah@hospital.com, got %v", pr.Email)
+	}
+}

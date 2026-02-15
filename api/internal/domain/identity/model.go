@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -47,16 +48,24 @@ type Patient struct {
 	InterpreterNeeded      bool       `db:"interpreter_needed" json:"interpreter_needed"`
 	PrimaryCareProviderID  *uuid.UUID `db:"primary_care_provider_id" json:"primary_care_provider_id,omitempty"`
 	ManagingOrgID          *uuid.UUID `db:"managing_org_id" json:"managing_org_id,omitempty"`
+	VersionID              int        `db:"version_id" json:"version_id"`
 	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+func (p *Patient) GetVersionID() int      { return p.VersionID }
+func (p *Patient) SetVersionID(v int)     { p.VersionID = v }
+
 func (p *Patient) ToFHIR() map[string]interface{} {
+	versionID := p.VersionID
+	if versionID == 0 {
+		versionID = 1
+	}
 	result := map[string]interface{}{
 		"resourceType": "Patient",
 		"id":           p.FHIRID,
 		"active":       p.Active,
-		"meta":         fhir.Meta{LastUpdated: p.UpdatedAt},
+		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: p.UpdatedAt},
 	}
 
 	// Name
@@ -254,16 +263,24 @@ type Practitioner struct {
 	PostalCode            *string    `db:"postal_code" json:"postal_code,omitempty"`
 	Country               *string    `db:"country" json:"country,omitempty"`
 	QualificationSummary  *string    `db:"qualification_summary" json:"qualification_summary,omitempty"`
+	VersionID             int        `db:"version_id" json:"version_id"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+func (p *Practitioner) GetVersionID() int  { return p.VersionID }
+func (p *Practitioner) SetVersionID(v int) { p.VersionID = v }
+
 func (p *Practitioner) ToFHIR() map[string]interface{} {
+	versionID := p.VersionID
+	if versionID == 0 {
+		versionID = 1
+	}
 	result := map[string]interface{}{
 		"resourceType": "Practitioner",
 		"id":           p.FHIRID,
 		"active":       p.Active,
-		"meta":         fhir.Meta{LastUpdated: p.UpdatedAt},
+		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: p.UpdatedAt},
 	}
 
 	name := fhir.HumanName{

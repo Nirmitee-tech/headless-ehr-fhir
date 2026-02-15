@@ -5,15 +5,27 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
 type Service struct {
 	repo Repository
+	vt   *fhir.VersionTracker
 }
 
 func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 // Valid encounter statuses per FHIR R4.
@@ -44,7 +56,14 @@ func (s *Service) CreateEncounter(ctx context.Context, enc *Encounter) error {
 	if enc.PeriodStart.IsZero() {
 		enc.PeriodStart = time.Now().UTC()
 	}
-	return s.repo.Create(ctx, enc)
+	if err := s.repo.Create(ctx, enc); err != nil {
+		return err
+	}
+	enc.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Encounter", enc.FHIRID, enc.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetEncounter(ctx context.Context, id uuid.UUID) (*Encounter, error) {
@@ -58,6 +77,12 @@ func (s *Service) GetEncounterByFHIRID(ctx context.Context, fhirID string) (*Enc
 func (s *Service) UpdateEncounter(ctx context.Context, enc *Encounter) error {
 	if enc.Status != "" && !validStatuses[enc.Status] {
 		return fmt.Errorf("invalid status: %s", enc.Status)
+	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Encounter", enc.FHIRID, enc.VersionID, enc.ToFHIR())
+		if err == nil {
+			enc.VersionID = newVer
+		}
 	}
 	return s.repo.Update(ctx, enc)
 }
@@ -95,6 +120,12 @@ func (s *Service) UpdateEncounterStatus(ctx context.Context, id uuid.UUID, newSt
 }
 
 func (s *Service) DeleteEncounter(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		enc, err := s.repo.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Encounter", enc.FHIRID, enc.VersionID)
+		}
+	}
 	return s.repo.Delete(ctx, id)
 }
 

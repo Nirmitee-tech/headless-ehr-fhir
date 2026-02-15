@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -12,6 +13,17 @@ type Service struct {
 	enrollments EnrollmentRepository
 	adverse     AdverseEventRepository
 	deviations  DeviationRepository
+	vt          *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(
@@ -49,7 +61,14 @@ func (s *Service) CreateStudy(ctx context.Context, st *ResearchStudy) error {
 	if !validStudyStatuses[st.Status] {
 		return fmt.Errorf("invalid status: %s", st.Status)
 	}
-	return s.studies.Create(ctx, st)
+	if err := s.studies.Create(ctx, st); err != nil {
+		return err
+	}
+	st.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "ResearchStudy", st.FHIRID, st.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetStudy(ctx context.Context, id uuid.UUID) (*ResearchStudy, error) {
@@ -64,10 +83,22 @@ func (s *Service) UpdateStudy(ctx context.Context, st *ResearchStudy) error {
 	if st.Status != "" && !validStudyStatuses[st.Status] {
 		return fmt.Errorf("invalid status: %s", st.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "ResearchStudy", st.FHIRID, st.VersionID, st.ToFHIR())
+		if err == nil {
+			st.VersionID = newVer
+		}
+	}
 	return s.studies.Update(ctx, st)
 }
 
 func (s *Service) DeleteStudy(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		st, err := s.studies.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "ResearchStudy", st.FHIRID, st.VersionID)
+		}
+	}
 	return s.studies.Delete(ctx, id)
 }
 

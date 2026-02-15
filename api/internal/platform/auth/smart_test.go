@@ -364,7 +364,10 @@ func TestLaunchContextStore(t *testing.T) {
 		}
 
 		// Get should return the context
-		got := store.Get(ctx.LaunchToken)
+		got, err2 := store.Get(context.Background(), ctx.LaunchToken)
+		if err2 != nil {
+			t.Fatalf("unexpected error: %v", err2)
+		}
 		if got == nil {
 			t.Fatal("expected to find context")
 		}
@@ -377,7 +380,7 @@ func TestLaunchContextStore(t *testing.T) {
 		ctx, _ := store.Create("patient-789", "", "")
 		token := ctx.LaunchToken
 
-		consumed := store.Consume(token)
+		consumed, _ := store.Consume(context.Background(), token)
 		if consumed == nil {
 			t.Fatal("expected to consume context")
 		}
@@ -386,20 +389,20 @@ func TestLaunchContextStore(t *testing.T) {
 		}
 
 		// Second consume should return nil
-		second := store.Consume(token)
+		second, _ := store.Consume(context.Background(), token)
 		if second != nil {
 			t.Error("expected nil on second consume")
 		}
 
 		// Get should also return nil
-		got := store.Get(token)
+		got, _ := store.Get(context.Background(), token)
 		if got != nil {
 			t.Error("expected nil after consume")
 		}
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		got := store.Get("nonexistent-token")
+		got, _ := store.Get(context.Background(), "nonexistent-token")
 		if got != nil {
 			t.Error("expected nil for nonexistent token")
 		}
@@ -413,7 +416,7 @@ func TestLaunchContextStoreExpiry(t *testing.T) {
 	token := ctx.LaunchToken
 
 	// Should be available immediately
-	got := store.Get(token)
+	got, _ := store.Get(context.Background(), token)
 	if got == nil {
 		t.Fatal("expected context to be available immediately")
 	}
@@ -421,7 +424,7 @@ func TestLaunchContextStoreExpiry(t *testing.T) {
 	// Wait for expiry
 	time.Sleep(100 * time.Millisecond)
 
-	got = store.Get(token)
+	got, _ = store.Get(context.Background(), token)
 	if got != nil {
 		t.Error("expected context to be expired")
 	}
@@ -743,13 +746,13 @@ func TestLaunchContextStore_ConsumeExpired(t *testing.T) {
 	// Wait for expiry
 	time.Sleep(100 * time.Millisecond)
 
-	consumed := store.Consume(token)
+	consumed, _ := store.Consume(context.Background(), token)
 	if consumed != nil {
 		t.Error("expected nil when consuming expired context")
 	}
 
 	// The token should have been cleaned up
-	got := store.Get(token)
+	got, _ := store.Get(context.Background(), token)
 	if got != nil {
 		t.Error("expected nil after expired consume")
 	}
@@ -758,7 +761,7 @@ func TestLaunchContextStore_ConsumeExpired(t *testing.T) {
 func TestLaunchContextStore_ConsumeNonExistent(t *testing.T) {
 	store := NewLaunchContextStore(5 * time.Minute)
 
-	consumed := store.Consume("nonexistent-token")
+	consumed, _ := store.Consume(context.Background(), "nonexistent-token")
 	if consumed != nil {
 		t.Error("expected nil for non-existent token")
 	}
@@ -891,7 +894,7 @@ func TestLaunchContextStore_ConcurrentAccess(t *testing.T) {
 	// Concurrent reads
 	for i := 0; i < 10; i++ {
 		go func() {
-			store.Get("nonexistent")
+			store.Get(context.Background(), "nonexistent")
 			done <- true
 		}()
 	}

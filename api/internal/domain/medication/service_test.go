@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -1269,5 +1270,91 @@ func TestSearchMedicationStatements(t *testing.T) {
 	}
 	if total < 1 || len(items) < 1 {
 		t.Error("expected items")
+	}
+}
+
+// =========== Version Tracking Tests ===========
+
+func TestCreateMedication_WithVersionTracker_NoError(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	m := &Medication{CodeValue: "1049502", CodeDisplay: "Acetaminophen 325 MG"}
+	if err := svc.CreateMedication(context.Background(), m); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Medication has no VersionID (no ToFHIR); just verify no error with tracker set.
+}
+
+func TestCreateMedicationRequest_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	mr := &MedicationRequest{
+		PatientID:    uuid.New(),
+		MedicationID: uuid.New(),
+		RequesterID:  uuid.New(),
+	}
+	if err := svc.CreateMedicationRequest(context.Background(), mr); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mr.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", mr.VersionID)
+	}
+}
+
+func TestCreateMedication_NilVersionTracker_NoError(t *testing.T) {
+	svc := newTestService()
+	m := &Medication{CodeValue: "1049502", CodeDisplay: "Acetaminophen 325 MG"}
+	if err := svc.CreateMedication(context.Background(), m); err != nil {
+		t.Fatalf("unexpected error with nil version tracker: %v", err)
+	}
+	// Medication has no VersionID (no ToFHIR); just verify no error with nil tracker.
+}
+
+func TestUpdateMedication_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	m := &Medication{CodeValue: "1049502", CodeDisplay: "Acetaminophen 325 MG"}
+	svc.CreateMedication(context.Background(), m)
+
+	m.Status = "inactive"
+	if err := svc.UpdateMedication(context.Background(), m); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteMedication_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	m := &Medication{CodeValue: "1049502", CodeDisplay: "Acetaminophen 325 MG"}
+	svc.CreateMedication(context.Background(), m)
+
+	if err := svc.DeleteMedication(context.Background(), m.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMedicationVersionTrackerAccessor(t *testing.T) {
+	svc := newTestService()
+	if svc.VersionTracker() != nil {
+		t.Error("expected nil VersionTracker initially")
+	}
+
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+	if svc.VersionTracker() != vt {
+		t.Error("expected VersionTracker to match")
 	}
 }

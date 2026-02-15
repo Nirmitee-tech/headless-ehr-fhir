@@ -1,5 +1,6 @@
 # Binaries
 bin/
+/ehr-server
 *.exe
 *.exe~
 *.dll

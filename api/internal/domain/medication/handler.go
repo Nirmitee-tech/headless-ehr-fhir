@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -862,10 +863,7 @@ func (h *Handler) PatchMedicationFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyMedicationPatch(existing, patched)
 	if err := h.svc.UpdateMedication(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -906,10 +904,7 @@ func (h *Handler) PatchMedicationRequestFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyMedicationRequestPatch(existing, patched)
 	if err := h.svc.UpdateMedicationRequest(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -950,10 +945,7 @@ func (h *Handler) PatchMedicationAdministrationFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyMedicationAdministrationPatch(existing, patched)
 	if err := h.svc.UpdateMedicationAdministration(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -994,10 +986,7 @@ func (h *Handler) PatchMedicationDispenseFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyMedicationDispensePatch(existing, patched)
 	if err := h.svc.UpdateMedicationDispense(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -1119,4 +1108,414 @@ func medicationToFHIR(m *Medication) map[string]interface{} {
 		}
 	}
 	return result
+}
+
+// -- FHIR PATCH helpers --
+
+func patchCodeableConcept(patched map[string]interface{}, key string) (code, display string, ok bool) {
+	v, exists := patched[key]
+	if !exists {
+		return "", "", false
+	}
+	switch val := v.(type) {
+	case map[string]interface{}:
+		if coding, ok := val["coding"].([]interface{}); ok && len(coding) > 0 {
+			if c, ok := coding[0].(map[string]interface{}); ok {
+				code, _ = c["code"].(string)
+				display, _ = c["display"].(string)
+				return code, display, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func patchStringPtr(patched map[string]interface{}, key string, target **string) {
+	if v, ok := patched[key].(string); ok {
+		*target = &v
+	}
+}
+
+func patchFloat64Ptr(patched map[string]interface{}, key string, target **float64) {
+	if v, ok := patched[key].(float64); ok {
+		*target = &v
+	}
+}
+
+func patchBoolPtr(patched map[string]interface{}, key string, target **bool) {
+	if v, ok := patched[key].(bool); ok {
+		*target = &v
+	}
+}
+
+func patchTimePtr(patched map[string]interface{}, key string, target **time.Time) {
+	if v, ok := patched[key].(string); ok {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			*target = &t
+		}
+	}
+}
+
+func applyMedicationPatch(m *Medication, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		m.Status = v
+	}
+	// code
+	if v, ok := patched["code"]; ok {
+		if cc, ok := v.(map[string]interface{}); ok {
+			if coding, ok := cc["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						m.CodeValue = code
+					}
+					if display, ok := c["display"].(string); ok {
+						m.CodeDisplay = display
+					}
+					if system, ok := c["system"].(string); ok {
+						m.CodeSystem = &system
+					}
+				}
+			}
+		}
+	}
+	// form
+	if code, display, ok := patchCodeableConcept(patched, "form"); ok {
+		m.FormCode = &code
+		m.FormDisplay = &display
+	}
+	// manufacturer
+	if v, ok := patched["manufacturer"]; ok {
+		if mfr, ok := v.(map[string]interface{}); ok {
+			if display, ok := mfr["display"].(string); ok {
+				m.ManufacturerName = &display
+			}
+		}
+	}
+	// batch
+	if v, ok := patched["batch"]; ok {
+		if batch, ok := v.(map[string]interface{}); ok {
+			patchStringPtr(batch, "lotNumber", &m.LotNumber)
+			if exp, ok := batch["expirationDate"].(string); ok {
+				if t, err := time.Parse("2006-01-02", exp); err == nil {
+					m.ExpirationDate = &t
+				}
+			}
+		}
+	}
+}
+
+func applyMedicationRequestPatch(mr *MedicationRequest, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		mr.Status = v
+	}
+	if v, ok := patched["intent"].(string); ok {
+		mr.Intent = v
+	}
+	patchStringPtr(patched, "priority", &mr.Priority)
+	// category
+	if v, ok := patched["category"]; ok {
+		if cats, ok := v.([]interface{}); ok && len(cats) > 0 {
+			if cat, ok := cats[0].(map[string]interface{}); ok {
+				if coding, ok := cat["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							mr.CategoryCode = &code
+						}
+						if display, ok := c["display"].(string); ok {
+							mr.CategoryDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// authoredOn
+	patchTimePtr(patched, "authoredOn", &mr.AuthoredOn)
+	// reasonCode
+	if v, ok := patched["reasonCode"]; ok {
+		if reasons, ok := v.([]interface{}); ok && len(reasons) > 0 {
+			if reason, ok := reasons[0].(map[string]interface{}); ok {
+				if coding, ok := reason["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							mr.ReasonCode = &code
+						}
+						if display, ok := c["display"].(string); ok {
+							mr.ReasonDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// dosageInstruction
+	if v, ok := patched["dosageInstruction"]; ok {
+		if dosages, ok := v.([]interface{}); ok && len(dosages) > 0 {
+			if dosage, ok := dosages[0].(map[string]interface{}); ok {
+				patchStringPtr(dosage, "text", &mr.DosageText)
+				if v, ok := dosage["asNeededBoolean"].(bool); ok {
+					mr.AsNeeded = &v
+				}
+				// timing
+				if timing, ok := dosage["timing"].(map[string]interface{}); ok {
+					if timingCode, ok := timing["code"].(map[string]interface{}); ok {
+						if coding, ok := timingCode["coding"].([]interface{}); ok && len(coding) > 0 {
+							if c, ok := coding[0].(map[string]interface{}); ok {
+								if code, ok := c["code"].(string); ok {
+									mr.DosageTimingCode = &code
+								}
+								if display, ok := c["display"].(string); ok {
+									mr.DosageTimingDisplay = &display
+								}
+							}
+						}
+					}
+				}
+				// route
+				if code, display, ok := patchCodeableConcept(dosage, "route"); ok {
+					mr.DosageRouteCode = &code
+					mr.DosageRouteDisplay = &display
+				}
+				// site
+				if code, display, ok := patchCodeableConcept(dosage, "site"); ok {
+					mr.DosageSiteCode = &code
+					mr.DosageSiteDisplay = &display
+				}
+				// method
+				if code, display, ok := patchCodeableConcept(dosage, "method"); ok {
+					mr.DosageMethodCode = &code
+					mr.DosageMethodDisplay = &display
+				}
+				// doseAndRate
+				if dar, ok := dosage["doseAndRate"].([]interface{}); ok && len(dar) > 0 {
+					if d, ok := dar[0].(map[string]interface{}); ok {
+						if dq, ok := d["doseQuantity"].(map[string]interface{}); ok {
+							patchFloat64Ptr(dq, "value", &mr.DoseQuantity)
+							patchStringPtr(dq, "unit", &mr.DoseUnit)
+						}
+					}
+				}
+			}
+		}
+	}
+	// dispenseRequest
+	if v, ok := patched["dispenseRequest"]; ok {
+		if dr, ok := v.(map[string]interface{}); ok {
+			if qty, ok := dr["quantity"].(map[string]interface{}); ok {
+				patchFloat64Ptr(qty, "value", &mr.QuantityValue)
+				patchStringPtr(qty, "unit", &mr.QuantityUnit)
+			}
+			if supply, ok := dr["expectedSupplyDuration"].(map[string]interface{}); ok {
+				if v, ok := supply["value"].(float64); ok {
+					iv := int(v)
+					mr.DaysSupply = &iv
+				}
+			}
+			if nr, ok := dr["numberOfRepeatsAllowed"].(float64); ok {
+				iv := int(nr)
+				mr.RefillsAllowed = &iv
+			}
+			if vp, ok := dr["validityPeriod"].(map[string]interface{}); ok {
+				patchTimePtr(vp, "start", &mr.ValidityStart)
+				patchTimePtr(vp, "end", &mr.ValidityEnd)
+			}
+		}
+	}
+	// substitution
+	if v, ok := patched["substitution"].(map[string]interface{}); ok {
+		patchBoolPtr(v, "allowedBoolean", &mr.SubstitutionAllowed)
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				patchStringPtr(note, "text", &mr.Note)
+			}
+		}
+	}
+}
+
+func applyMedicationAdministrationPatch(ma *MedicationAdministration, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		ma.Status = v
+	}
+	// statusReason
+	if code, display, ok := patchCodeableConcept(patched, "statusReason"); ok {
+		ma.StatusReasonCode = &code
+		ma.StatusReasonDisplay = &display
+	}
+	// category
+	if code, display, ok := patchCodeableConcept(patched, "category"); ok {
+		ma.CategoryCode = &code
+		ma.CategoryDisplay = &display
+	}
+	// effectiveDateTime
+	patchTimePtr(patched, "effectiveDateTime", &ma.EffectiveDatetime)
+	// effectivePeriod
+	if v, ok := patched["effectivePeriod"].(map[string]interface{}); ok {
+		patchTimePtr(v, "start", &ma.EffectiveStart)
+		patchTimePtr(v, "end", &ma.EffectiveEnd)
+	}
+	// reasonCode
+	if v, ok := patched["reasonCode"]; ok {
+		if reasons, ok := v.([]interface{}); ok && len(reasons) > 0 {
+			if reason, ok := reasons[0].(map[string]interface{}); ok {
+				if coding, ok := reason["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							ma.ReasonCode = &code
+						}
+						if display, ok := c["display"].(string); ok {
+							ma.ReasonDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// dosage
+	if v, ok := patched["dosage"].(map[string]interface{}); ok {
+		patchStringPtr(v, "text", &ma.DosageText)
+		// route
+		if code, display, ok := patchCodeableConcept(v, "route"); ok {
+			ma.DosageRouteCode = &code
+			ma.DosageRouteDisplay = &display
+		}
+		// site
+		if code, display, ok := patchCodeableConcept(v, "site"); ok {
+			ma.DosageSiteCode = &code
+			ma.DosageSiteDisplay = &display
+		}
+		// method
+		if code, display, ok := patchCodeableConcept(v, "method"); ok {
+			ma.DosageMethodCode = &code
+			ma.DosageMethodDisplay = &display
+		}
+		// dose
+		if dose, ok := v["dose"].(map[string]interface{}); ok {
+			patchFloat64Ptr(dose, "value", &ma.DoseQuantity)
+			patchStringPtr(dose, "unit", &ma.DoseUnit)
+		}
+		// rateQuantity
+		if rate, ok := v["rateQuantity"].(map[string]interface{}); ok {
+			patchFloat64Ptr(rate, "value", &ma.RateQuantity)
+			patchStringPtr(rate, "unit", &ma.RateUnit)
+		}
+	}
+	// performer
+	if v, ok := patched["performer"]; ok {
+		if performers, ok := v.([]interface{}); ok && len(performers) > 0 {
+			if perf, ok := performers[0].(map[string]interface{}); ok {
+				if actor, ok := perf["actor"].(map[string]interface{}); ok {
+					if ref, ok := actor["reference"].(string); ok {
+						parts := strings.Split(ref, "/")
+						if len(parts) >= 2 {
+							if id, err := uuid.Parse(parts[len(parts)-1]); err == nil {
+								ma.PerformerID = &id
+							}
+						}
+					}
+				}
+				if fn, ok := perf["function"]; ok {
+					if fc, ok := fn.(map[string]interface{}); ok {
+						if coding, ok := fc["coding"].([]interface{}); ok && len(coding) > 0 {
+							if c, ok := coding[0].(map[string]interface{}); ok {
+								if code, ok := c["code"].(string); ok {
+									ma.PerformerRoleCode = &code
+								}
+								if display, ok := c["display"].(string); ok {
+									ma.PerformerRoleDisplay = &display
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				patchStringPtr(note, "text", &ma.Note)
+			}
+		}
+	}
+}
+
+func applyMedicationDispensePatch(md *MedicationDispense, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		md.Status = v
+	}
+	// statusReason
+	if code, display, ok := patchCodeableConcept(patched, "statusReasonCodeableConcept"); ok {
+		md.StatusReasonCode = &code
+		md.StatusReasonDisplay = &display
+	}
+	// category
+	if code, display, ok := patchCodeableConcept(patched, "category"); ok {
+		md.CategoryCode = &code
+		md.CategoryDisplay = &display
+	}
+	// quantity
+	if v, ok := patched["quantity"].(map[string]interface{}); ok {
+		patchFloat64Ptr(v, "value", &md.QuantityValue)
+		patchStringPtr(v, "unit", &md.QuantityUnit)
+	}
+	// daysSupply
+	if v, ok := patched["daysSupply"].(map[string]interface{}); ok {
+		if val, ok := v["value"].(float64); ok {
+			iv := int(val)
+			md.DaysSupply = &iv
+		}
+	}
+	// whenPrepared
+	patchTimePtr(patched, "whenPrepared", &md.WhenPrepared)
+	// whenHandedOver
+	patchTimePtr(patched, "whenHandedOver", &md.WhenHandedOver)
+	// performer
+	if v, ok := patched["performer"]; ok {
+		if performers, ok := v.([]interface{}); ok && len(performers) > 0 {
+			if perf, ok := performers[0].(map[string]interface{}); ok {
+				if actor, ok := perf["actor"].(map[string]interface{}); ok {
+					if ref, ok := actor["reference"].(string); ok {
+						parts := strings.Split(ref, "/")
+						if len(parts) >= 2 {
+							if id, err := uuid.Parse(parts[len(parts)-1]); err == nil {
+								md.PerformerID = &id
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// substitution
+	if v, ok := patched["substitution"].(map[string]interface{}); ok {
+		patchBoolPtr(v, "wasSubstituted", &md.WasSubstituted)
+		if typeCC, ok := v["type"].(map[string]interface{}); ok {
+			if coding, ok := typeCC["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						md.SubstitutionTypeCode = &code
+					}
+				}
+			}
+		}
+		if reasons, ok := v["reason"].([]interface{}); ok && len(reasons) > 0 {
+			if reason, ok := reasons[0].(map[string]interface{}); ok {
+				if text, ok := reason["text"].(string); ok {
+					md.SubstitutionReason = &text
+				}
+			}
+		}
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				patchStringPtr(note, "text", &md.Note)
+			}
+		}
+	}
 }

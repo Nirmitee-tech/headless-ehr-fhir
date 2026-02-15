@@ -72,9 +72,16 @@ type Questionnaire struct {
 	Publisher     *string    `db:"publisher" json:"publisher,omitempty"`
 	ApprovalDate  *time.Time `db:"approval_date" json:"approval_date,omitempty"`
 	LastReviewDate *time.Time `db:"last_review_date" json:"last_review_date,omitempty"`
+	VersionID     int        `db:"version_id" json:"version_id"`
 	CreatedAt     time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt     time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (q *Questionnaire) GetVersionID() int { return q.VersionID }
+
+// SetVersionID sets the current version.
+func (q *Questionnaire) SetVersionID(v int) { q.VersionID = v }
 
 func (q *Questionnaire) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -143,9 +150,16 @@ type QuestionnaireResponse struct {
 	AuthorID        *uuid.UUID `db:"author_id" json:"author_id,omitempty"`
 	Status          string     `db:"status" json:"status"`
 	Authored        *time.Time `db:"authored" json:"authored,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (qr *QuestionnaireResponse) GetVersionID() int { return qr.VersionID }
+
+// SetVersionID sets the current version.
+func (qr *QuestionnaireResponse) SetVersionID(v int) { qr.VersionID = v }
 
 func (qr *QuestionnaireResponse) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

@@ -39,7 +39,7 @@ const consentCols = `id, fhir_id, status, scope, category_code, category_display
 	provision_type, provision_start, provision_end, provision_action,
 	hipaa_authorization, abdm_consent, abdm_consent_id,
 	signature_type, signature_when, signature_data,
-	date_time, note, created_at, updated_at`
+	date_time, note, version_id, created_at, updated_at`
 
 func (r *consentRepoPG) scanConsent(row pgx.Row) (*Consent, error) {
 	var c Consent
@@ -48,7 +48,7 @@ func (r *consentRepoPG) scanConsent(row pgx.Row) (*Consent, error) {
 		&c.ProvisionType, &c.ProvisionStart, &c.ProvisionEnd, &c.ProvisionAction,
 		&c.HIPAAAuth, &c.ABDMConsent, &c.ABDMConsentID,
 		&c.SignatureType, &c.SignatureWhen, &c.SignatureData,
-		&c.DateTime, &c.Note, &c.CreatedAt, &c.UpdatedAt)
+		&c.DateTime, &c.Note, &c.VersionID, &c.CreatedAt, &c.UpdatedAt)
 	return &c, err
 }
 
@@ -85,12 +85,12 @@ func (r *consentRepoPG) Update(ctx context.Context, c *Consent) error {
 		UPDATE consent SET status=$2, scope=$3, category_code=$4, category_display=$5,
 			provision_type=$6, provision_start=$7, provision_end=$8, provision_action=$9,
 			hipaa_authorization=$10, abdm_consent=$11, abdm_consent_id=$12,
-			signature_type=$13, signature_when=$14, signature_data=$15, note=$16, updated_at=NOW()
+			signature_type=$13, signature_when=$14, signature_data=$15, note=$16, version_id=$17, updated_at=NOW()
 		WHERE id = $1`,
 		c.ID, c.Status, c.Scope, c.CategoryCode, c.CategoryDisplay,
 		c.ProvisionType, c.ProvisionStart, c.ProvisionEnd, c.ProvisionAction,
 		c.HIPAAAuth, c.ABDMConsent, c.ABDMConsentID,
-		c.SignatureType, c.SignatureWhen, c.SignatureData, c.Note)
+		c.SignatureType, c.SignatureWhen, c.SignatureData, c.Note, c.VersionID)
 	return err
 }
 
@@ -191,7 +191,7 @@ const docRefCols = `id, fhir_id, status, doc_status, type_code, type_display,
 	category_code, category_display, patient_id, author_id, custodian_id, encounter_id,
 	date, description, security_label,
 	content_type, content_url, content_size, content_hash, content_title,
-	format_code, format_display, created_at, updated_at`
+	format_code, format_display, version_id, created_at, updated_at`
 
 func (r *docRefRepoPG) scanDocRef(row pgx.Row) (*DocumentReference, error) {
 	var d DocumentReference
@@ -199,7 +199,7 @@ func (r *docRefRepoPG) scanDocRef(row pgx.Row) (*DocumentReference, error) {
 		&d.CategoryCode, &d.CategoryDisplay, &d.PatientID, &d.AuthorID, &d.CustodianID, &d.EncounterID,
 		&d.Date, &d.Description, &d.SecurityLabel,
 		&d.ContentType, &d.ContentURL, &d.ContentSize, &d.ContentHash, &d.ContentTitle,
-		&d.FormatCode, &d.FormatDisplay, &d.CreatedAt, &d.UpdatedAt)
+		&d.FormatCode, &d.FormatDisplay, &d.VersionID, &d.CreatedAt, &d.UpdatedAt)
 	return &d, err
 }
 
@@ -236,12 +236,12 @@ func (r *docRefRepoPG) Update(ctx context.Context, d *DocumentReference) error {
 		UPDATE document_reference SET status=$2, doc_status=$3, type_code=$4, type_display=$5,
 			category_code=$6, category_display=$7, description=$8, security_label=$9,
 			content_type=$10, content_url=$11, content_size=$12, content_hash=$13, content_title=$14,
-			format_code=$15, format_display=$16, updated_at=NOW()
+			format_code=$15, format_display=$16, version_id=$17, updated_at=NOW()
 		WHERE id = $1`,
 		d.ID, d.Status, d.DocStatus, d.TypeCode, d.TypeDisplay,
 		d.CategoryCode, d.CategoryDisplay, d.Description, d.SecurityLabel,
 		d.ContentType, d.ContentURL, d.ContentSize, d.ContentHash, d.ContentTitle,
-		d.FormatCode, d.FormatDisplay)
+		d.FormatCode, d.FormatDisplay, d.VersionID)
 	return err
 }
 
@@ -454,13 +454,13 @@ func (r *compRepoPG) conn(ctx context.Context) queryable {
 
 const compCols = `id, fhir_id, status, type_code, type_display, category_code, category_display,
 	patient_id, encounter_id, date, author_id, title, confidentiality, custodian_id,
-	created_at, updated_at`
+	version_id, created_at, updated_at`
 
 func (r *compRepoPG) scanComp(row pgx.Row) (*Composition, error) {
 	var c Composition
 	err := row.Scan(&c.ID, &c.FHIRID, &c.Status, &c.TypeCode, &c.TypeDisplay, &c.CategoryCode, &c.CategoryDisplay,
 		&c.PatientID, &c.EncounterID, &c.Date, &c.AuthorID, &c.Title, &c.Confidentiality, &c.CustodianID,
-		&c.CreatedAt, &c.UpdatedAt)
+		&c.VersionID, &c.CreatedAt, &c.UpdatedAt)
 	return &c, err
 }
 
@@ -491,10 +491,10 @@ func (r *compRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*Compositi
 func (r *compRepoPG) Update(ctx context.Context, c *Composition) error {
 	_, err := r.conn(ctx).Exec(ctx, `
 		UPDATE composition SET status=$2, type_code=$3, type_display=$4,
-			category_code=$5, category_display=$6, title=$7, confidentiality=$8, updated_at=NOW()
+			category_code=$5, category_display=$6, title=$7, confidentiality=$8, version_id=$9, updated_at=NOW()
 		WHERE id = $1`,
 		c.ID, c.Status, c.TypeCode, c.TypeDisplay,
-		c.CategoryCode, c.CategoryDisplay, c.Title, c.Confidentiality)
+		c.CategoryCode, c.CategoryDisplay, c.Title, c.Confidentiality, c.VersionID)
 	return err
 }
 

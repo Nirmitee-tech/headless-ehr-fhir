@@ -23,9 +23,16 @@ type CarePlan struct {
 	PeriodEnd       *time.Time `db:"period_end" json:"period_end,omitempty"`
 	AuthorID        *uuid.UUID `db:"author_id" json:"author_id,omitempty"`
 	Note            *string    `db:"note" json:"note,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (cp *CarePlan) GetVersionID() int { return cp.VersionID }
+
+// SetVersionID sets the current version.
+func (cp *CarePlan) SetVersionID(v int) { cp.VersionID = v }
 
 func (cp *CarePlan) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -90,9 +97,16 @@ type Goal struct {
 	TargetDueDate      *time.Time `db:"target_due_date" json:"target_due_date,omitempty"`
 	ExpressedByID      *uuid.UUID `db:"expressed_by_id" json:"expressed_by_id,omitempty"`
 	Note               *string    `db:"note" json:"note,omitempty"`
+	VersionID          int        `db:"version_id" json:"version_id"`
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (g *Goal) GetVersionID() int { return g.VersionID }
+
+// SetVersionID sets the current version.
+func (g *Goal) SetVersionID(v int) { g.VersionID = v }
 
 func (g *Goal) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

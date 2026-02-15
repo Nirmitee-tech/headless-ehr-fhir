@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -12,6 +13,17 @@ type Service struct {
 	slots        SlotRepository
 	appointments AppointmentRepository
 	waitlist     WaitlistRepository
+	vt           *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(sched ScheduleRepository, slot SlotRepository, appt AppointmentRepository, wl WaitlistRepository) *Service {
@@ -28,7 +40,14 @@ func (s *Service) CreateSchedule(ctx context.Context, sched *Schedule) error {
 		active := true
 		sched.Active = &active
 	}
-	return s.schedules.Create(ctx, sched)
+	if err := s.schedules.Create(ctx, sched); err != nil {
+		return err
+	}
+	sched.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Schedule", sched.FHIRID, sched.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetSchedule(ctx context.Context, id uuid.UUID) (*Schedule, error) {
@@ -40,10 +59,22 @@ func (s *Service) GetScheduleByFHIRID(ctx context.Context, fhirID string) (*Sche
 }
 
 func (s *Service) UpdateSchedule(ctx context.Context, sched *Schedule) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Schedule", sched.FHIRID, sched.VersionID, sched.ToFHIR())
+		if err == nil {
+			sched.VersionID = newVer
+		}
+	}
 	return s.schedules.Update(ctx, sched)
 }
 
 func (s *Service) DeleteSchedule(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		sched, err := s.schedules.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Schedule", sched.FHIRID, sched.VersionID)
+		}
+	}
 	return s.schedules.Delete(ctx, id)
 }
 
@@ -78,7 +109,14 @@ func (s *Service) CreateSlot(ctx context.Context, sl *Slot) error {
 	if !validSlotStatuses[sl.Status] {
 		return fmt.Errorf("invalid slot status: %s", sl.Status)
 	}
-	return s.slots.Create(ctx, sl)
+	if err := s.slots.Create(ctx, sl); err != nil {
+		return err
+	}
+	sl.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Slot", sl.FHIRID, sl.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetSlot(ctx context.Context, id uuid.UUID) (*Slot, error) {
@@ -93,10 +131,22 @@ func (s *Service) UpdateSlot(ctx context.Context, sl *Slot) error {
 	if sl.Status != "" && !validSlotStatuses[sl.Status] {
 		return fmt.Errorf("invalid slot status: %s", sl.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Slot", sl.FHIRID, sl.VersionID, sl.ToFHIR())
+		if err == nil {
+			sl.VersionID = newVer
+		}
+	}
 	return s.slots.Update(ctx, sl)
 }
 
 func (s *Service) DeleteSlot(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		sl, err := s.slots.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Slot", sl.FHIRID, sl.VersionID)
+		}
+	}
 	return s.slots.Delete(ctx, id)
 }
 
@@ -129,7 +179,14 @@ func (s *Service) CreateAppointment(ctx context.Context, a *Appointment) error {
 	if !validAppointmentStatuses[a.Status] {
 		return fmt.Errorf("invalid appointment status: %s", a.Status)
 	}
-	return s.appointments.Create(ctx, a)
+	if err := s.appointments.Create(ctx, a); err != nil {
+		return err
+	}
+	a.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Appointment", a.FHIRID, a.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetAppointment(ctx context.Context, id uuid.UUID) (*Appointment, error) {
@@ -144,10 +201,22 @@ func (s *Service) UpdateAppointment(ctx context.Context, a *Appointment) error {
 	if a.Status != "" && !validAppointmentStatuses[a.Status] {
 		return fmt.Errorf("invalid appointment status: %s", a.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Appointment", a.FHIRID, a.VersionID, a.ToFHIR())
+		if err == nil {
+			a.VersionID = newVer
+		}
+	}
 	return s.appointments.Update(ctx, a)
 }
 
 func (s *Service) DeleteAppointment(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		a, err := s.appointments.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Appointment", a.FHIRID, a.VersionID)
+		}
+	}
 	return s.appointments.Delete(ctx, id)
 }
 

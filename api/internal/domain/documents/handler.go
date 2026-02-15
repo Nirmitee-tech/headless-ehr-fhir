@@ -2,6 +2,7 @@ package documents
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -816,72 +817,198 @@ func (h *Handler) handlePatch(c echo.Context, resourceType, fhirID string, apply
 // -- FHIR vread and history endpoints --
 
 func (h *Handler) VreadConsentFHIR(c echo.Context) error {
-	consent, err := h.svc.GetConsentByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+	vidStr := c.Param("vid")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		var vid int
+		if _, err := fmt.Sscanf(vidStr, "%d", &vid); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid version id"))
+		}
+		entry, err := vt.GetVersion(ctx, "Consent", fhirID, vid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", fhirID+"/_history/"+vidStr))
+		}
+		var resource map[string]interface{}
+		if err := json.Unmarshal(entry.Resource, &resource); err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome("failed to parse versioned resource"))
+		}
+		fhir.SetVersionHeaders(c, entry.VersionID, entry.Timestamp.Format("2006-01-02T15:04:05Z"))
+		return c.JSON(http.StatusOK, resource)
+	}
+
+	consent, err := h.svc.GetConsentByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", fhirID))
 	}
 	result := consent.ToFHIR()
-	fhir.SetVersionHeaders(c, 1, consent.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	fhir.SetVersionHeaders(c, consent.VersionID, consent.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) HistoryConsentFHIR(c echo.Context) error {
-	consent, err := h.svc.GetConsentByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		entries, total, err := vt.ListVersions(ctx, "Consent", fhirID, 100, 0)
+		if err != nil || total == 0 {
+			consent, ferr := h.svc.GetConsentByFHIRID(ctx, fhirID)
+			if ferr != nil {
+				return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", fhirID))
+			}
+			result := consent.ToFHIR()
+			raw, _ := json.Marshal(result)
+			entry := &fhir.HistoryEntry{
+				ResourceType: "Consent", ResourceID: consent.FHIRID, VersionID: consent.VersionID,
+				Resource: raw, Action: "create", Timestamp: consent.CreatedAt,
+			}
+			return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+		}
+		return c.JSON(http.StatusOK, fhir.NewHistoryBundle(entries, total, "/fhir"))
+	}
+
+	consent, err := h.svc.GetConsentByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", fhirID))
 	}
 	result := consent.ToFHIR()
 	raw, _ := json.Marshal(result)
 	entry := &fhir.HistoryEntry{
-		ResourceType: "Consent", ResourceID: consent.FHIRID, VersionID: 1,
+		ResourceType: "Consent", ResourceID: consent.FHIRID, VersionID: consent.VersionID,
 		Resource: raw, Action: "create", Timestamp: consent.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
 
 func (h *Handler) VreadDocumentReferenceFHIR(c echo.Context) error {
-	doc, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+	vidStr := c.Param("vid")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		var vid int
+		if _, err := fmt.Sscanf(vidStr, "%d", &vid); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid version id"))
+		}
+		entry, err := vt.GetVersion(ctx, "DocumentReference", fhirID, vid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", fhirID+"/_history/"+vidStr))
+		}
+		var resource map[string]interface{}
+		if err := json.Unmarshal(entry.Resource, &resource); err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome("failed to parse versioned resource"))
+		}
+		fhir.SetVersionHeaders(c, entry.VersionID, entry.Timestamp.Format("2006-01-02T15:04:05Z"))
+		return c.JSON(http.StatusOK, resource)
+	}
+
+	doc, err := h.svc.GetDocumentReferenceByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", fhirID))
 	}
 	result := doc.ToFHIR()
-	fhir.SetVersionHeaders(c, 1, doc.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	fhir.SetVersionHeaders(c, doc.VersionID, doc.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) HistoryDocumentReferenceFHIR(c echo.Context) error {
-	doc, err := h.svc.GetDocumentReferenceByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		entries, total, err := vt.ListVersions(ctx, "DocumentReference", fhirID, 100, 0)
+		if err != nil || total == 0 {
+			doc, ferr := h.svc.GetDocumentReferenceByFHIRID(ctx, fhirID)
+			if ferr != nil {
+				return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", fhirID))
+			}
+			result := doc.ToFHIR()
+			raw, _ := json.Marshal(result)
+			entry := &fhir.HistoryEntry{
+				ResourceType: "DocumentReference", ResourceID: doc.FHIRID, VersionID: doc.VersionID,
+				Resource: raw, Action: "create", Timestamp: doc.CreatedAt,
+			}
+			return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+		}
+		return c.JSON(http.StatusOK, fhir.NewHistoryBundle(entries, total, "/fhir"))
+	}
+
+	doc, err := h.svc.GetDocumentReferenceByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", fhirID))
 	}
 	result := doc.ToFHIR()
 	raw, _ := json.Marshal(result)
 	entry := &fhir.HistoryEntry{
-		ResourceType: "DocumentReference", ResourceID: doc.FHIRID, VersionID: 1,
+		ResourceType: "DocumentReference", ResourceID: doc.FHIRID, VersionID: doc.VersionID,
 		Resource: raw, Action: "create", Timestamp: doc.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
 
 func (h *Handler) VreadCompositionFHIR(c echo.Context) error {
-	comp, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+	vidStr := c.Param("vid")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		var vid int
+		if _, err := fmt.Sscanf(vidStr, "%d", &vid); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid version id"))
+		}
+		entry, err := vt.GetVersion(ctx, "Composition", fhirID, vid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", fhirID+"/_history/"+vidStr))
+		}
+		var resource map[string]interface{}
+		if err := json.Unmarshal(entry.Resource, &resource); err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome("failed to parse versioned resource"))
+		}
+		fhir.SetVersionHeaders(c, entry.VersionID, entry.Timestamp.Format("2006-01-02T15:04:05Z"))
+		return c.JSON(http.StatusOK, resource)
+	}
+
+	comp, err := h.svc.GetCompositionByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", fhirID))
 	}
 	result := comp.ToFHIR()
-	fhir.SetVersionHeaders(c, 1, comp.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	fhir.SetVersionHeaders(c, comp.VersionID, comp.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) HistoryCompositionFHIR(c echo.Context) error {
-	comp, err := h.svc.GetCompositionByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		entries, total, err := vt.ListVersions(ctx, "Composition", fhirID, 100, 0)
+		if err != nil || total == 0 {
+			comp, ferr := h.svc.GetCompositionByFHIRID(ctx, fhirID)
+			if ferr != nil {
+				return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", fhirID))
+			}
+			result := comp.ToFHIR()
+			raw, _ := json.Marshal(result)
+			entry := &fhir.HistoryEntry{
+				ResourceType: "Composition", ResourceID: comp.FHIRID, VersionID: comp.VersionID,
+				Resource: raw, Action: "create", Timestamp: comp.CreatedAt,
+			}
+			return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+		}
+		return c.JSON(http.StatusOK, fhir.NewHistoryBundle(entries, total, "/fhir"))
+	}
+
+	comp, err := h.svc.GetCompositionByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", fhirID))
 	}
 	result := comp.ToFHIR()
 	raw, _ := json.Marshal(result)
 	entry := &fhir.HistoryEntry{
-		ResourceType: "Composition", ResourceID: comp.FHIRID, VersionID: 1,
+		ResourceType: "Composition", ResourceID: comp.FHIRID, VersionID: comp.VersionID,
 		Resource: raw, Action: "create", Timestamp: comp.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))

@@ -4,12 +4,24 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
 // Service provides business logic for the Provenance domain.
 type Service struct {
 	provenances ProvenanceRepository
+	vt          *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 // NewService creates a new Provenance domain service.
@@ -24,7 +36,14 @@ func (s *Service) CreateProvenance(ctx context.Context, p *Provenance) error {
 	if p.TargetID == "" {
 		return fmt.Errorf("target_id is required")
 	}
-	return s.provenances.Create(ctx, p)
+	if err := s.provenances.Create(ctx, p); err != nil {
+		return err
+	}
+	p.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Provenance", p.FHIRID, p.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetProvenance(ctx context.Context, id uuid.UUID) (*Provenance, error) {
@@ -36,10 +55,22 @@ func (s *Service) GetProvenanceByFHIRID(ctx context.Context, fhirID string) (*Pr
 }
 
 func (s *Service) UpdateProvenance(ctx context.Context, p *Provenance) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Provenance", p.FHIRID, p.VersionID, p.ToFHIR())
+		if err == nil {
+			p.VersionID = newVer
+		}
+	}
 	return s.provenances.Update(ctx, p)
 }
 
 func (s *Service) DeleteProvenance(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		p, err := s.provenances.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Provenance", p.FHIRID, p.VersionID)
+		}
+	}
 	return s.provenances.Delete(ctx, id)
 }
 

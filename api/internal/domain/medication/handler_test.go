@@ -1179,3 +1179,277 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 		}
 	}
 }
+
+// -- applyMedicationPatch unit tests --
+
+func TestApplyMedicationPatch_Status(t *testing.T) {
+	m := &Medication{
+		Status:      "active",
+		CodeValue:   "12345",
+		CodeDisplay: "Aspirin",
+	}
+
+	patched := map[string]interface{}{
+		"status": "inactive",
+	}
+	applyMedicationPatch(m, patched)
+
+	if m.Status != "inactive" {
+		t.Errorf("expected status 'inactive', got %q", m.Status)
+	}
+	if m.CodeValue != "12345" {
+		t.Errorf("expected CodeValue unchanged '12345', got %q", m.CodeValue)
+	}
+	if m.CodeDisplay != "Aspirin" {
+		t.Errorf("expected CodeDisplay unchanged 'Aspirin', got %q", m.CodeDisplay)
+	}
+}
+
+func TestApplyMedicationPatch_Code(t *testing.T) {
+	m := &Medication{
+		Status:      "active",
+		CodeValue:   "12345",
+		CodeDisplay: "Aspirin",
+	}
+
+	patched := map[string]interface{}{
+		"code": map[string]interface{}{
+			"coding": []interface{}{
+				map[string]interface{}{
+					"code":    "67890",
+					"display": "Ibuprofen",
+					"system":  "http://www.nlm.nih.gov/research/umls/rxnorm",
+				},
+			},
+		},
+	}
+	applyMedicationPatch(m, patched)
+
+	if m.CodeValue != "67890" {
+		t.Errorf("expected CodeValue '67890', got %q", m.CodeValue)
+	}
+	if m.CodeDisplay != "Ibuprofen" {
+		t.Errorf("expected CodeDisplay 'Ibuprofen', got %q", m.CodeDisplay)
+	}
+	if m.CodeSystem == nil || *m.CodeSystem != "http://www.nlm.nih.gov/research/umls/rxnorm" {
+		t.Errorf("expected CodeSystem to be set, got %v", m.CodeSystem)
+	}
+	if m.Status != "active" {
+		t.Errorf("expected Status unchanged 'active', got %q", m.Status)
+	}
+}
+
+// -- applyMedicationRequestPatch unit tests --
+
+func TestApplyMedicationRequestPatch_StatusIntent(t *testing.T) {
+	mr := &MedicationRequest{
+		Status:       "draft",
+		Intent:       "proposal",
+		PatientID:    uuid.New(),
+		MedicationID: uuid.New(),
+		RequesterID:  uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status":   "active",
+		"intent":   "order",
+		"priority": "urgent",
+	}
+	applyMedicationRequestPatch(mr, patched)
+
+	if mr.Status != "active" {
+		t.Errorf("expected status 'active', got %q", mr.Status)
+	}
+	if mr.Intent != "order" {
+		t.Errorf("expected intent 'order', got %q", mr.Intent)
+	}
+	if mr.Priority == nil || *mr.Priority != "urgent" {
+		t.Errorf("expected priority 'urgent', got %v", mr.Priority)
+	}
+}
+
+func TestApplyMedicationRequestPatch_DosageInstruction(t *testing.T) {
+	mr := &MedicationRequest{
+		Status:       "active",
+		Intent:       "order",
+		PatientID:    uuid.New(),
+		MedicationID: uuid.New(),
+		RequesterID:  uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"dosageInstruction": []interface{}{
+			map[string]interface{}{
+				"text":             "Take 1 tablet daily",
+				"asNeededBoolean":  true,
+				"route": map[string]interface{}{
+					"coding": []interface{}{
+						map[string]interface{}{
+							"code":    "26643006",
+							"display": "Oral",
+						},
+					},
+				},
+				"doseAndRate": []interface{}{
+					map[string]interface{}{
+						"doseQuantity": map[string]interface{}{
+							"value": float64(500),
+							"unit":  "mg",
+						},
+					},
+				},
+			},
+		},
+	}
+	applyMedicationRequestPatch(mr, patched)
+
+	if mr.DosageText == nil || *mr.DosageText != "Take 1 tablet daily" {
+		t.Errorf("expected DosageText 'Take 1 tablet daily', got %v", mr.DosageText)
+	}
+	if mr.AsNeeded == nil || *mr.AsNeeded != true {
+		t.Errorf("expected AsNeeded true, got %v", mr.AsNeeded)
+	}
+	if mr.DosageRouteCode == nil || *mr.DosageRouteCode != "26643006" {
+		t.Errorf("expected DosageRouteCode '26643006', got %v", mr.DosageRouteCode)
+	}
+	if mr.DosageRouteDisplay == nil || *mr.DosageRouteDisplay != "Oral" {
+		t.Errorf("expected DosageRouteDisplay 'Oral', got %v", mr.DosageRouteDisplay)
+	}
+	if mr.DoseQuantity == nil || *mr.DoseQuantity != 500 {
+		t.Errorf("expected DoseQuantity 500, got %v", mr.DoseQuantity)
+	}
+	if mr.DoseUnit == nil || *mr.DoseUnit != "mg" {
+		t.Errorf("expected DoseUnit 'mg', got %v", mr.DoseUnit)
+	}
+	if mr.Status != "active" {
+		t.Errorf("expected Status unchanged 'active', got %q", mr.Status)
+	}
+}
+
+// -- applyMedicationAdministrationPatch unit tests --
+
+func TestApplyMedicationAdministrationPatch_Status(t *testing.T) {
+	ma := &MedicationAdministration{
+		Status:       "in-progress",
+		PatientID:    uuid.New(),
+		MedicationID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status":            "completed",
+		"effectiveDateTime": "2025-06-15T14:30:00Z",
+		"dosage": map[string]interface{}{
+			"text": "500mg IV infusion",
+			"route": map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code":    "47625008",
+						"display": "Intravenous",
+					},
+				},
+			},
+			"dose": map[string]interface{}{
+				"value": float64(500),
+				"unit":  "mg",
+			},
+		},
+	}
+	applyMedicationAdministrationPatch(ma, patched)
+
+	if ma.Status != "completed" {
+		t.Errorf("expected status 'completed', got %q", ma.Status)
+	}
+	if ma.EffectiveDatetime == nil {
+		t.Fatal("expected EffectiveDatetime to be set")
+	}
+	if ma.EffectiveDatetime.Year() != 2025 || ma.EffectiveDatetime.Month() != 6 {
+		t.Errorf("unexpected EffectiveDatetime: %v", *ma.EffectiveDatetime)
+	}
+	if ma.DosageText == nil || *ma.DosageText != "500mg IV infusion" {
+		t.Errorf("expected DosageText '500mg IV infusion', got %v", ma.DosageText)
+	}
+	if ma.DosageRouteCode == nil || *ma.DosageRouteCode != "47625008" {
+		t.Errorf("expected DosageRouteCode '47625008', got %v", ma.DosageRouteCode)
+	}
+	if ma.DoseQuantity == nil || *ma.DoseQuantity != 500 {
+		t.Errorf("expected DoseQuantity 500, got %v", ma.DoseQuantity)
+	}
+	if ma.DoseUnit == nil || *ma.DoseUnit != "mg" {
+		t.Errorf("expected DoseUnit 'mg', got %v", ma.DoseUnit)
+	}
+}
+
+// -- applyMedicationDispensePatch unit tests --
+
+func TestApplyMedicationDispensePatch_Status(t *testing.T) {
+	md := &MedicationDispense{
+		Status:       "preparation",
+		PatientID:    uuid.New(),
+		MedicationID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status": "completed",
+		"quantity": map[string]interface{}{
+			"value": float64(30),
+			"unit":  "tablets",
+		},
+		"daysSupply": map[string]interface{}{
+			"value": float64(30),
+		},
+		"whenPrepared":  "2025-07-01T10:00:00Z",
+		"whenHandedOver": "2025-07-01T11:00:00Z",
+		"substitution": map[string]interface{}{
+			"wasSubstituted": true,
+			"type": map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code": "G",
+					},
+				},
+			},
+			"reason": []interface{}{
+				map[string]interface{}{
+					"text": "generic substitution",
+				},
+			},
+		},
+		"note": []interface{}{
+			map[string]interface{}{
+				"text": "Dispensed at pharmacy",
+			},
+		},
+	}
+	applyMedicationDispensePatch(md, patched)
+
+	if md.Status != "completed" {
+		t.Errorf("expected status 'completed', got %q", md.Status)
+	}
+	if md.QuantityValue == nil || *md.QuantityValue != 30 {
+		t.Errorf("expected QuantityValue 30, got %v", md.QuantityValue)
+	}
+	if md.QuantityUnit == nil || *md.QuantityUnit != "tablets" {
+		t.Errorf("expected QuantityUnit 'tablets', got %v", md.QuantityUnit)
+	}
+	if md.DaysSupply == nil || *md.DaysSupply != 30 {
+		t.Errorf("expected DaysSupply 30, got %v", md.DaysSupply)
+	}
+	if md.WhenPrepared == nil {
+		t.Fatal("expected WhenPrepared to be set")
+	}
+	if md.WhenHandedOver == nil {
+		t.Fatal("expected WhenHandedOver to be set")
+	}
+	if md.WasSubstituted == nil || *md.WasSubstituted != true {
+		t.Errorf("expected WasSubstituted true, got %v", md.WasSubstituted)
+	}
+	if md.SubstitutionTypeCode == nil || *md.SubstitutionTypeCode != "G" {
+		t.Errorf("expected SubstitutionTypeCode 'G', got %v", md.SubstitutionTypeCode)
+	}
+	if md.SubstitutionReason == nil || *md.SubstitutionReason != "generic substitution" {
+		t.Errorf("expected SubstitutionReason 'generic substitution', got %v", md.SubstitutionReason)
+	}
+	if md.Note == nil || *md.Note != "Dispensed at pharmacy" {
+		t.Errorf("expected Note 'Dispensed at pharmacy', got %v", md.Note)
+	}
+}

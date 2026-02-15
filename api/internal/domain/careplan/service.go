@@ -4,12 +4,24 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
 type Service struct {
 	carePlans  CarePlanRepository
 	goals      GoalRepository
+	vt         *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(cp CarePlanRepository, g GoalRepository) *Service {
@@ -43,7 +55,14 @@ func (s *Service) CreateCarePlan(ctx context.Context, cp *CarePlan) error {
 	if !validCPStatuses[cp.Status] {
 		return fmt.Errorf("invalid status: %s", cp.Status)
 	}
-	return s.carePlans.Create(ctx, cp)
+	if err := s.carePlans.Create(ctx, cp); err != nil {
+		return err
+	}
+	cp.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "CarePlan", cp.FHIRID, cp.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetCarePlan(ctx context.Context, id uuid.UUID) (*CarePlan, error) {
@@ -58,10 +77,22 @@ func (s *Service) UpdateCarePlan(ctx context.Context, cp *CarePlan) error {
 	if cp.Status != "" && !validCPStatuses[cp.Status] {
 		return fmt.Errorf("invalid status: %s", cp.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "CarePlan", cp.FHIRID, cp.VersionID, cp.ToFHIR())
+		if err == nil {
+			cp.VersionID = newVer
+		}
+	}
 	return s.carePlans.Update(ctx, cp)
 }
 
 func (s *Service) DeleteCarePlan(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		cp, err := s.carePlans.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "CarePlan", cp.FHIRID, cp.VersionID)
+		}
+	}
 	return s.carePlans.Delete(ctx, id)
 }
 
@@ -108,7 +139,14 @@ func (s *Service) CreateGoal(ctx context.Context, g *Goal) error {
 	if !validGoalStatuses[g.LifecycleStatus] {
 		return fmt.Errorf("invalid lifecycle_status: %s", g.LifecycleStatus)
 	}
-	return s.goals.Create(ctx, g)
+	if err := s.goals.Create(ctx, g); err != nil {
+		return err
+	}
+	g.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Goal", g.FHIRID, g.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetGoal(ctx context.Context, id uuid.UUID) (*Goal, error) {
@@ -123,10 +161,22 @@ func (s *Service) UpdateGoal(ctx context.Context, g *Goal) error {
 	if g.LifecycleStatus != "" && !validGoalStatuses[g.LifecycleStatus] {
 		return fmt.Errorf("invalid lifecycle_status: %s", g.LifecycleStatus)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Goal", g.FHIRID, g.VersionID, g.ToFHIR())
+		if err == nil {
+			g.VersionID = newVer
+		}
+	}
 	return s.goals.Update(ctx, g)
 }
 
 func (s *Service) DeleteGoal(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		g, err := s.goals.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Goal", g.FHIRID, g.VersionID)
+		}
+	}
 	return s.goals.Delete(ctx, id)
 }
 

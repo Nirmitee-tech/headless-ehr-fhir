@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -13,6 +14,17 @@ type Service struct {
 	administrations MedicationAdministrationRepository
 	dispenses       MedicationDispenseRepository
 	statements      MedicationStatementRepository
+	vt              *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(
@@ -128,7 +140,14 @@ func (s *Service) CreateMedicationRequest(ctx context.Context, mr *MedicationReq
 	if !validMedRequestIntents[mr.Intent] {
 		return fmt.Errorf("invalid intent: %s", mr.Intent)
 	}
-	return s.requests.Create(ctx, mr)
+	if err := s.requests.Create(ctx, mr); err != nil {
+		return err
+	}
+	mr.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "MedicationRequest", mr.FHIRID, mr.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetMedicationRequest(ctx context.Context, id uuid.UUID) (*MedicationRequest, error) {
@@ -143,10 +162,22 @@ func (s *Service) UpdateMedicationRequest(ctx context.Context, mr *MedicationReq
 	if mr.Status != "" && !validMedRequestStatuses[mr.Status] {
 		return fmt.Errorf("invalid status: %s", mr.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "MedicationRequest", mr.FHIRID, mr.VersionID, mr.ToFHIR())
+		if err == nil {
+			mr.VersionID = newVer
+		}
+	}
 	return s.requests.Update(ctx, mr)
 }
 
 func (s *Service) DeleteMedicationRequest(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		mr, err := s.requests.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "MedicationRequest", mr.FHIRID, mr.VersionID)
+		}
+	}
 	return s.requests.Delete(ctx, id)
 }
 
@@ -178,7 +209,14 @@ func (s *Service) CreateMedicationAdministration(ctx context.Context, ma *Medica
 	if !validMedAdminStatuses[ma.Status] {
 		return fmt.Errorf("invalid status: %s", ma.Status)
 	}
-	return s.administrations.Create(ctx, ma)
+	if err := s.administrations.Create(ctx, ma); err != nil {
+		return err
+	}
+	ma.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "MedicationAdministration", ma.FHIRID, ma.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetMedicationAdministration(ctx context.Context, id uuid.UUID) (*MedicationAdministration, error) {
@@ -193,10 +231,22 @@ func (s *Service) UpdateMedicationAdministration(ctx context.Context, ma *Medica
 	if ma.Status != "" && !validMedAdminStatuses[ma.Status] {
 		return fmt.Errorf("invalid status: %s", ma.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "MedicationAdministration", ma.FHIRID, ma.VersionID, ma.ToFHIR())
+		if err == nil {
+			ma.VersionID = newVer
+		}
+	}
 	return s.administrations.Update(ctx, ma)
 }
 
 func (s *Service) DeleteMedicationAdministration(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		ma, err := s.administrations.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "MedicationAdministration", ma.FHIRID, ma.VersionID)
+		}
+	}
 	return s.administrations.Delete(ctx, id)
 }
 
@@ -228,7 +278,14 @@ func (s *Service) CreateMedicationDispense(ctx context.Context, md *MedicationDi
 	if !validMedDispenseStatuses[md.Status] {
 		return fmt.Errorf("invalid status: %s", md.Status)
 	}
-	return s.dispenses.Create(ctx, md)
+	if err := s.dispenses.Create(ctx, md); err != nil {
+		return err
+	}
+	md.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "MedicationDispense", md.FHIRID, md.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetMedicationDispense(ctx context.Context, id uuid.UUID) (*MedicationDispense, error) {
@@ -243,10 +300,22 @@ func (s *Service) UpdateMedicationDispense(ctx context.Context, md *MedicationDi
 	if md.Status != "" && !validMedDispenseStatuses[md.Status] {
 		return fmt.Errorf("invalid status: %s", md.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "MedicationDispense", md.FHIRID, md.VersionID, md.ToFHIR())
+		if err == nil {
+			md.VersionID = newVer
+		}
+	}
 	return s.dispenses.Update(ctx, md)
 }
 
 func (s *Service) DeleteMedicationDispense(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		md, err := s.dispenses.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "MedicationDispense", md.FHIRID, md.VersionID)
+		}
+	}
 	return s.dispenses.Delete(ctx, id)
 }
 

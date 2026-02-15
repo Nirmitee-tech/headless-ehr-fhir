@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -759,10 +760,7 @@ func (h *Handler) PatchServiceRequestFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyServiceRequestPatch(existing, patched)
 	if err := h.svc.UpdateServiceRequest(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -803,10 +801,7 @@ func (h *Handler) PatchDiagnosticReportFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyDiagnosticReportPatch(existing, patched)
 	if err := h.svc.UpdateDiagnosticReport(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -847,10 +842,7 @@ func (h *Handler) PatchSpecimenFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applySpecimenPatch(existing, patched)
 	if err := h.svc.UpdateSpecimen(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -891,10 +883,7 @@ func (h *Handler) PatchImagingStudyFHIR(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
 			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
-	if v, ok := patched["status"].(string); ok {
-		existing.Status = v
-	}
+	applyImagingStudyPatch(existing, patched)
 	if err := h.svc.UpdateImagingStudy(c.Request().Context(), existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -997,4 +986,385 @@ func (h *Handler) HistorySpecimenFHIR(c echo.Context) error {
 		Resource: raw, Action: "create", Timestamp: sp.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// -- FHIR PATCH helpers --
+
+func diagPatchCodeableConcept(data map[string]interface{}, key string) (code, display string, ok bool) {
+	v, exists := data[key]
+	if !exists {
+		return "", "", false
+	}
+	if cc, ok := v.(map[string]interface{}); ok {
+		if coding, ok := cc["coding"].([]interface{}); ok && len(coding) > 0 {
+			if c, ok := coding[0].(map[string]interface{}); ok {
+				code, _ = c["code"].(string)
+				display, _ = c["display"].(string)
+				return code, display, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func diagPatchCodeableConceptArray(data map[string]interface{}, key string) (code, display string, ok bool) {
+	v, exists := data[key]
+	if !exists {
+		return "", "", false
+	}
+	if arr, ok := v.([]interface{}); ok && len(arr) > 0 {
+		if cc, ok := arr[0].(map[string]interface{}); ok {
+			if coding, ok := cc["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					code, _ = c["code"].(string)
+					display, _ = c["display"].(string)
+					return code, display, true
+				}
+			}
+		}
+	}
+	return "", "", false
+}
+
+func diagPatchStringPtr(data map[string]interface{}, key string, target **string) {
+	if v, ok := data[key].(string); ok {
+		*target = &v
+	}
+}
+
+func diagPatchFloat64Ptr(data map[string]interface{}, key string, target **float64) {
+	if v, ok := data[key].(float64); ok {
+		*target = &v
+	}
+}
+
+func diagPatchIntPtr(data map[string]interface{}, key string, target **int) {
+	if v, ok := data[key].(float64); ok {
+		iv := int(v)
+		*target = &iv
+	}
+}
+
+func diagPatchTimePtr(data map[string]interface{}, key string, target **time.Time) {
+	if v, ok := data[key].(string); ok {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			*target = &t
+		}
+	}
+}
+
+func applyServiceRequestPatch(sr *ServiceRequest, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		sr.Status = v
+	}
+	if v, ok := patched["intent"].(string); ok {
+		sr.Intent = v
+	}
+	diagPatchStringPtr(patched, "priority", &sr.Priority)
+	// category
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "category"); ok {
+		sr.CategoryCode = &code
+		sr.CategoryDisplay = &display
+	}
+	// code
+	if v, ok := patched["code"]; ok {
+		if cc, ok := v.(map[string]interface{}); ok {
+			if coding, ok := cc["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						sr.CodeValue = code
+					}
+					if display, ok := c["display"].(string); ok {
+						sr.CodeDisplay = display
+					}
+					if system, ok := c["system"].(string); ok {
+						sr.CodeSystem = &system
+					}
+				}
+			}
+			if text, ok := cc["text"].(string); ok {
+				sr.CodeDisplay = text
+			}
+		}
+	}
+	// orderDetail
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "orderDetail"); ok {
+		sr.OrderDetailCode = &code
+		sr.OrderDetailDisplay = &display
+	}
+	// occurrenceDateTime
+	diagPatchTimePtr(patched, "occurrenceDateTime", &sr.OccurrenceDatetime)
+	// occurrencePeriod
+	if v, ok := patched["occurrencePeriod"].(map[string]interface{}); ok {
+		diagPatchTimePtr(v, "start", &sr.OccurrenceStart)
+		diagPatchTimePtr(v, "end", &sr.OccurrenceEnd)
+	}
+	// authoredOn
+	diagPatchTimePtr(patched, "authoredOn", &sr.AuthoredOn)
+	// reasonCode
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "reasonCode"); ok {
+		sr.ReasonCode = &code
+		sr.ReasonDisplay = &display
+	}
+	// bodySite
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "bodySite"); ok {
+		sr.BodySiteCode = &code
+		sr.BodySiteDisplay = &display
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(note, "text", &sr.Note)
+			}
+		}
+	}
+	// patientInstruction
+	diagPatchStringPtr(patched, "patientInstruction", &sr.PatientInstruction)
+	// quantityQuantity
+	if v, ok := patched["quantityQuantity"].(map[string]interface{}); ok {
+		diagPatchFloat64Ptr(v, "value", &sr.QuantityValue)
+		diagPatchStringPtr(v, "unit", &sr.QuantityUnit)
+	}
+}
+
+func applyDiagnosticReportPatch(dr *DiagnosticReport, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		dr.Status = v
+	}
+	// category
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "category"); ok {
+		dr.CategoryCode = &code
+		dr.CategoryDisplay = &display
+	}
+	// code
+	if v, ok := patched["code"]; ok {
+		if cc, ok := v.(map[string]interface{}); ok {
+			if coding, ok := cc["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						dr.CodeValue = code
+					}
+					if display, ok := c["display"].(string); ok {
+						dr.CodeDisplay = display
+					}
+					if system, ok := c["system"].(string); ok {
+						dr.CodeSystem = &system
+					}
+				}
+			}
+			if text, ok := cc["text"].(string); ok {
+				dr.CodeDisplay = text
+			}
+		}
+	}
+	// effectiveDateTime
+	diagPatchTimePtr(patched, "effectiveDateTime", &dr.EffectiveDatetime)
+	// effectivePeriod
+	if v, ok := patched["effectivePeriod"].(map[string]interface{}); ok {
+		diagPatchTimePtr(v, "start", &dr.EffectiveStart)
+		diagPatchTimePtr(v, "end", &dr.EffectiveEnd)
+	}
+	// issued
+	diagPatchTimePtr(patched, "issued", &dr.Issued)
+	// conclusion
+	diagPatchStringPtr(patched, "conclusion", &dr.Conclusion)
+	// conclusionCode
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "conclusionCode"); ok {
+		dr.ConclusionCode = &code
+		dr.ConclusionDisplay = &display
+	}
+	// presentedForm
+	if v, ok := patched["presentedForm"]; ok {
+		if forms, ok := v.([]interface{}); ok && len(forms) > 0 {
+			if form, ok := forms[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(form, "url", &dr.PresentedFormURL)
+				diagPatchStringPtr(form, "contentType", &dr.PresentedFormType)
+			}
+		}
+	}
+	// performer
+	if v, ok := patched["performer"]; ok {
+		if performers, ok := v.([]interface{}); ok && len(performers) > 0 {
+			if perf, ok := performers[0].(map[string]interface{}); ok {
+				if ref, ok := perf["reference"].(string); ok {
+					parts := strings.Split(ref, "/")
+					if len(parts) >= 2 {
+						if id, err := uuid.Parse(parts[len(parts)-1]); err == nil {
+							dr.PerformerID = &id
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func applySpecimenPatch(sp *Specimen, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		sp.Status = v
+	}
+	// type
+	if code, display, ok := diagPatchCodeableConcept(patched, "type"); ok {
+		sp.TypeCode = &code
+		sp.TypeDisplay = &display
+	}
+	// accessionIdentifier
+	if v, ok := patched["accessionIdentifier"].(map[string]interface{}); ok {
+		diagPatchStringPtr(v, "value", &sp.AccessionID)
+	}
+	// receivedTime
+	diagPatchTimePtr(patched, "receivedTime", &sp.ReceivedTime)
+	// collection
+	if v, ok := patched["collection"].(map[string]interface{}); ok {
+		// collectedDateTime
+		diagPatchTimePtr(v, "collectedDateTime", &sp.CollectionDatetime)
+		// quantity
+		if qty, ok := v["quantity"].(map[string]interface{}); ok {
+			diagPatchFloat64Ptr(qty, "value", &sp.CollectionQuantity)
+			diagPatchStringPtr(qty, "unit", &sp.CollectionUnit)
+		}
+		// method
+		if method, ok := v["method"].(map[string]interface{}); ok {
+			if coding, ok := method["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						sp.CollectionMethod = &code
+					}
+				}
+			}
+		}
+		// bodySite
+		if bodySite, ok := v["bodySite"].(map[string]interface{}); ok {
+			if coding, ok := bodySite["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						sp.CollectionBodySite = &code
+					}
+				}
+			}
+		}
+		// collector
+		if collector, ok := v["collector"].(map[string]interface{}); ok {
+			if ref, ok := collector["reference"].(string); ok {
+				parts := strings.Split(ref, "/")
+				if len(parts) >= 2 {
+					if id, err := uuid.Parse(parts[len(parts)-1]); err == nil {
+						sp.CollectionCollector = &id
+					}
+				}
+			}
+		}
+	}
+	// condition
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "condition"); ok {
+		sp.ConditionCode = &code
+		sp.ConditionDisplay = &display
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(note, "text", &sp.Note)
+			}
+		}
+	}
+	// container
+	if v, ok := patched["container"]; ok {
+		if containers, ok := v.([]interface{}); ok && len(containers) > 0 {
+			if container, ok := containers[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(container, "description", &sp.ContainerDesc)
+				if code, _, ok := diagPatchCodeableConcept(container, "type"); ok {
+					sp.ContainerType = &code
+				}
+			}
+		}
+	}
+	// processing
+	if v, ok := patched["processing"]; ok {
+		if procs, ok := v.([]interface{}); ok && len(procs) > 0 {
+			if proc, ok := procs[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(proc, "description", &sp.ProcessingDesc)
+				diagPatchTimePtr(proc, "timeDateTime", &sp.ProcessingDatetime)
+				if procedure, ok := proc["procedure"].(map[string]interface{}); ok {
+					if coding, ok := procedure["coding"].([]interface{}); ok && len(coding) > 0 {
+						if c, ok := coding[0].(map[string]interface{}); ok {
+							if code, ok := c["code"].(string); ok {
+								sp.ProcessingProcedure = &code
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func applyImagingStudyPatch(is *ImagingStudy, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		is.Status = v
+	}
+	// modality
+	if v, ok := patched["modality"]; ok {
+		if modalities, ok := v.([]interface{}); ok && len(modalities) > 0 {
+			if mod, ok := modalities[0].(map[string]interface{}); ok {
+				if code, ok := mod["code"].(string); ok {
+					is.ModalityCode = &code
+				}
+				if display, ok := mod["display"].(string); ok {
+					is.ModalityDisplay = &display
+				}
+			}
+		}
+	}
+	// description
+	diagPatchStringPtr(patched, "description", &is.Description)
+	// started
+	diagPatchTimePtr(patched, "started", &is.Started)
+	// numberOfSeries
+	diagPatchIntPtr(patched, "numberOfSeries", &is.NumberOfSeries)
+	// numberOfInstances
+	diagPatchIntPtr(patched, "numberOfInstances", &is.NumberOfInstances)
+	// reasonCode
+	if code, display, ok := diagPatchCodeableConceptArray(patched, "reasonCode"); ok {
+		is.ReasonCode = &code
+		is.ReasonDisplay = &display
+	}
+	// endpoint
+	if v, ok := patched["endpoint"]; ok {
+		if endpoints, ok := v.([]interface{}); ok && len(endpoints) > 0 {
+			if ep, ok := endpoints[0].(map[string]interface{}); ok {
+				if ref, ok := ep["reference"].(string); ok {
+					is.Endpoint = &ref
+				}
+			}
+		}
+	}
+	// identifier (studyUID)
+	if v, ok := patched["identifier"]; ok {
+		if idents, ok := v.([]interface{}); ok && len(idents) > 0 {
+			if ident, ok := idents[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(ident, "value", &is.StudyUID)
+			}
+		}
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				diagPatchStringPtr(note, "text", &is.Note)
+			}
+		}
+	}
+	// referrer
+	if v, ok := patched["referrer"].(map[string]interface{}); ok {
+		if ref, ok := v["reference"].(string); ok {
+			parts := strings.Split(ref, "/")
+			if len(parts) >= 2 {
+				if id, err := uuid.Parse(parts[len(parts)-1]); err == nil {
+					is.ReferrerID = &id
+				}
+			}
+		}
+	}
 }

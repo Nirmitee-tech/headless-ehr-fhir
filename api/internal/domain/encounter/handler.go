@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -327,7 +328,7 @@ func (h *Handler) PatchEncounterFHIR(c echo.Context) error {
 	} else {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome("PATCH requires application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
+	applyEncounterPatch(existing, patched)
 	if err := h.svc.UpdateEncounter(ctx, existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -358,4 +359,92 @@ func (h *Handler) HistoryEncounterFHIR(c echo.Context) error {
 		Resource: raw, Action: "create", Timestamp: enc.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// -- FHIR PATCH helpers --
+
+func applyEncounterPatch(e *Encounter, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		e.Status = v
+	}
+	// class
+	if v, ok := patched["class"]; ok {
+		if cls, ok := v.(map[string]interface{}); ok {
+			if code, ok := cls["code"].(string); ok {
+				e.ClassCode = code
+			}
+			if display, ok := cls["display"].(string); ok {
+				e.ClassDisplay = &display
+			}
+		}
+	}
+	// type
+	if v, ok := patched["type"]; ok {
+		if types, ok := v.([]interface{}); ok && len(types) > 0 {
+			if t, ok := types[0].(map[string]interface{}); ok {
+				if coding, ok := t["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							e.TypeCode = &code
+						}
+						if display, ok := c["display"].(string); ok {
+							e.TypeDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// serviceType
+	if v, ok := patched["serviceType"]; ok {
+		if st, ok := v.(map[string]interface{}); ok {
+			if coding, ok := st["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						e.ServiceTypeCode = &code
+					}
+					if display, ok := c["display"].(string); ok {
+						e.ServiceTypeDisplay = &display
+					}
+				}
+			}
+		}
+	}
+	// priority
+	if v, ok := patched["priority"]; ok {
+		if pri, ok := v.(map[string]interface{}); ok {
+			if coding, ok := pri["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						e.PriorityCode = &code
+					}
+				}
+			}
+		}
+	}
+	// period
+	if v, ok := patched["period"]; ok {
+		if period, ok := v.(map[string]interface{}); ok {
+			if start, ok := period["start"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, start); err == nil {
+					e.PeriodStart = t
+				}
+			}
+			if end, ok := period["end"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, end); err == nil {
+					e.PeriodEnd = &t
+				}
+			}
+		}
+	}
+	// reasonCode
+	if v, ok := patched["reasonCode"]; ok {
+		if reasons, ok := v.([]interface{}); ok && len(reasons) > 0 {
+			if reason, ok := reasons[0].(map[string]interface{}); ok {
+				if text, ok := reason["text"].(string); ok {
+					e.ReasonText = &text
+				}
+			}
+		}
+	}
 }

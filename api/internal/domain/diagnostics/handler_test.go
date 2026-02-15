@@ -1207,3 +1207,345 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 		}
 	}
 }
+
+// -- applyServiceRequestPatch unit tests --
+
+func TestApplyServiceRequestPatch_Status(t *testing.T) {
+	sr := &ServiceRequest{
+		Status:      "draft",
+		Intent:      "order",
+		CodeValue:   "CBC",
+		CodeDisplay: "Complete Blood Count",
+		PatientID:   uuid.New(),
+		RequesterID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status":   "active",
+		"intent":   "plan",
+		"priority": "urgent",
+	}
+	applyServiceRequestPatch(sr, patched)
+
+	if sr.Status != "active" {
+		t.Errorf("expected status 'active', got %q", sr.Status)
+	}
+	if sr.Intent != "plan" {
+		t.Errorf("expected intent 'plan', got %q", sr.Intent)
+	}
+	if sr.Priority == nil || *sr.Priority != "urgent" {
+		t.Errorf("expected priority 'urgent', got %v", sr.Priority)
+	}
+	if sr.CodeValue != "CBC" {
+		t.Errorf("expected CodeValue unchanged 'CBC', got %q", sr.CodeValue)
+	}
+}
+
+func TestApplyServiceRequestPatch_Code(t *testing.T) {
+	sr := &ServiceRequest{
+		Status:      "draft",
+		Intent:      "order",
+		CodeValue:   "CBC",
+		CodeDisplay: "Complete Blood Count",
+		PatientID:   uuid.New(),
+		RequesterID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"code": map[string]interface{}{
+			"coding": []interface{}{
+				map[string]interface{}{
+					"code":    "CMP",
+					"display": "Comprehensive Metabolic Panel",
+					"system":  "http://loinc.org",
+				},
+			},
+		},
+		"bodySite": []interface{}{
+			map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code":    "368209003",
+						"display": "Right arm",
+					},
+				},
+			},
+		},
+		"note": []interface{}{
+			map[string]interface{}{
+				"text": "Fasting required",
+			},
+		},
+		"patientInstruction": "Do not eat for 12 hours before test",
+	}
+	applyServiceRequestPatch(sr, patched)
+
+	if sr.CodeValue != "CMP" {
+		t.Errorf("expected CodeValue 'CMP', got %q", sr.CodeValue)
+	}
+	if sr.CodeDisplay != "Comprehensive Metabolic Panel" {
+		t.Errorf("expected CodeDisplay 'Comprehensive Metabolic Panel', got %q", sr.CodeDisplay)
+	}
+	if sr.CodeSystem == nil || *sr.CodeSystem != "http://loinc.org" {
+		t.Errorf("expected CodeSystem 'http://loinc.org', got %v", sr.CodeSystem)
+	}
+	if sr.BodySiteCode == nil || *sr.BodySiteCode != "368209003" {
+		t.Errorf("expected BodySiteCode '368209003', got %v", sr.BodySiteCode)
+	}
+	if sr.BodySiteDisplay == nil || *sr.BodySiteDisplay != "Right arm" {
+		t.Errorf("expected BodySiteDisplay 'Right arm', got %v", sr.BodySiteDisplay)
+	}
+	if sr.Note == nil || *sr.Note != "Fasting required" {
+		t.Errorf("expected Note 'Fasting required', got %v", sr.Note)
+	}
+	if sr.PatientInstruction == nil || *sr.PatientInstruction != "Do not eat for 12 hours before test" {
+		t.Errorf("expected PatientInstruction set, got %v", sr.PatientInstruction)
+	}
+	if sr.Status != "draft" {
+		t.Errorf("expected Status unchanged 'draft', got %q", sr.Status)
+	}
+}
+
+// -- applyDiagnosticReportPatch unit tests --
+
+func TestApplyDiagnosticReportPatch_StatusConclusion(t *testing.T) {
+	dr := &DiagnosticReport{
+		Status:      "preliminary",
+		CodeValue:   "CBC",
+		CodeDisplay: "Complete Blood Count",
+		PatientID:   uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status":     "final",
+		"conclusion": "All values within normal range",
+		"issued":     "2025-07-15T08:00:00Z",
+		"conclusionCode": []interface{}{
+			map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code":    "N",
+						"display": "Normal",
+					},
+				},
+			},
+		},
+		"presentedForm": []interface{}{
+			map[string]interface{}{
+				"url":         "https://example.com/report.pdf",
+				"contentType": "application/pdf",
+			},
+		},
+	}
+	applyDiagnosticReportPatch(dr, patched)
+
+	if dr.Status != "final" {
+		t.Errorf("expected status 'final', got %q", dr.Status)
+	}
+	if dr.Conclusion == nil || *dr.Conclusion != "All values within normal range" {
+		t.Errorf("expected Conclusion set, got %v", dr.Conclusion)
+	}
+	if dr.Issued == nil {
+		t.Fatal("expected Issued to be set")
+	}
+	if dr.ConclusionCode == nil || *dr.ConclusionCode != "N" {
+		t.Errorf("expected ConclusionCode 'N', got %v", dr.ConclusionCode)
+	}
+	if dr.ConclusionDisplay == nil || *dr.ConclusionDisplay != "Normal" {
+		t.Errorf("expected ConclusionDisplay 'Normal', got %v", dr.ConclusionDisplay)
+	}
+	if dr.PresentedFormURL == nil || *dr.PresentedFormURL != "https://example.com/report.pdf" {
+		t.Errorf("expected PresentedFormURL set, got %v", dr.PresentedFormURL)
+	}
+	if dr.PresentedFormType == nil || *dr.PresentedFormType != "application/pdf" {
+		t.Errorf("expected PresentedFormType 'application/pdf', got %v", dr.PresentedFormType)
+	}
+	if dr.CodeValue != "CBC" {
+		t.Errorf("expected CodeValue unchanged 'CBC', got %q", dr.CodeValue)
+	}
+}
+
+// -- applySpecimenPatch unit tests --
+
+func TestApplySpecimenPatch_Status(t *testing.T) {
+	sp := &Specimen{
+		Status:    "available",
+		PatientID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status": "unavailable",
+		"type": map[string]interface{}{
+			"coding": []interface{}{
+				map[string]interface{}{
+					"code":    "122555007",
+					"display": "Venous blood specimen",
+				},
+			},
+		},
+		"accessionIdentifier": map[string]interface{}{
+			"value": "ACC-12345",
+		},
+		"receivedTime": "2025-08-01T09:00:00Z",
+		"collection": map[string]interface{}{
+			"collectedDateTime": "2025-08-01T08:30:00Z",
+			"quantity": map[string]interface{}{
+				"value": float64(10),
+				"unit":  "mL",
+			},
+			"method": map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code": "venipuncture",
+					},
+				},
+			},
+			"bodySite": map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code": "368209003",
+					},
+				},
+			},
+		},
+		"condition": []interface{}{
+			map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code":    "ROOM",
+						"display": "Room temperature",
+					},
+				},
+			},
+		},
+		"note": []interface{}{
+			map[string]interface{}{
+				"text": "Handle with care",
+			},
+		},
+	}
+	applySpecimenPatch(sp, patched)
+
+	if sp.Status != "unavailable" {
+		t.Errorf("expected status 'unavailable', got %q", sp.Status)
+	}
+	if sp.TypeCode == nil || *sp.TypeCode != "122555007" {
+		t.Errorf("expected TypeCode '122555007', got %v", sp.TypeCode)
+	}
+	if sp.TypeDisplay == nil || *sp.TypeDisplay != "Venous blood specimen" {
+		t.Errorf("expected TypeDisplay 'Venous blood specimen', got %v", sp.TypeDisplay)
+	}
+	if sp.AccessionID == nil || *sp.AccessionID != "ACC-12345" {
+		t.Errorf("expected AccessionID 'ACC-12345', got %v", sp.AccessionID)
+	}
+	if sp.ReceivedTime == nil {
+		t.Fatal("expected ReceivedTime to be set")
+	}
+	if sp.CollectionDatetime == nil {
+		t.Fatal("expected CollectionDatetime to be set")
+	}
+	if sp.CollectionQuantity == nil || *sp.CollectionQuantity != 10 {
+		t.Errorf("expected CollectionQuantity 10, got %v", sp.CollectionQuantity)
+	}
+	if sp.CollectionUnit == nil || *sp.CollectionUnit != "mL" {
+		t.Errorf("expected CollectionUnit 'mL', got %v", sp.CollectionUnit)
+	}
+	if sp.CollectionMethod == nil || *sp.CollectionMethod != "venipuncture" {
+		t.Errorf("expected CollectionMethod 'venipuncture', got %v", sp.CollectionMethod)
+	}
+	if sp.CollectionBodySite == nil || *sp.CollectionBodySite != "368209003" {
+		t.Errorf("expected CollectionBodySite '368209003', got %v", sp.CollectionBodySite)
+	}
+	if sp.ConditionCode == nil || *sp.ConditionCode != "ROOM" {
+		t.Errorf("expected ConditionCode 'ROOM', got %v", sp.ConditionCode)
+	}
+	if sp.Note == nil || *sp.Note != "Handle with care" {
+		t.Errorf("expected Note 'Handle with care', got %v", sp.Note)
+	}
+}
+
+// -- applyImagingStudyPatch unit tests --
+
+func TestApplyImagingStudyPatch_StatusModality(t *testing.T) {
+	is := &ImagingStudy{
+		Status:    "registered",
+		PatientID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status": "available",
+		"modality": []interface{}{
+			map[string]interface{}{
+				"code":    "CT",
+				"display": "Computed Tomography",
+			},
+		},
+		"description":       "CT scan of abdomen",
+		"started":           "2025-09-01T10:00:00Z",
+		"numberOfSeries":    float64(3),
+		"numberOfInstances": float64(120),
+		"reasonCode": []interface{}{
+			map[string]interface{}{
+				"coding": []interface{}{
+					map[string]interface{}{
+						"code":    "R10.9",
+						"display": "Abdominal pain",
+					},
+				},
+			},
+		},
+		"endpoint": []interface{}{
+			map[string]interface{}{
+				"reference": "Endpoint/pacs-1",
+			},
+		},
+		"identifier": []interface{}{
+			map[string]interface{}{
+				"value": "1.2.840.113619.2.55.3.604688119",
+			},
+		},
+		"note": []interface{}{
+			map[string]interface{}{
+				"text": "Contrast administered",
+			},
+		},
+	}
+	applyImagingStudyPatch(is, patched)
+
+	if is.Status != "available" {
+		t.Errorf("expected status 'available', got %q", is.Status)
+	}
+	if is.ModalityCode == nil || *is.ModalityCode != "CT" {
+		t.Errorf("expected ModalityCode 'CT', got %v", is.ModalityCode)
+	}
+	if is.ModalityDisplay == nil || *is.ModalityDisplay != "Computed Tomography" {
+		t.Errorf("expected ModalityDisplay 'Computed Tomography', got %v", is.ModalityDisplay)
+	}
+	if is.Description == nil || *is.Description != "CT scan of abdomen" {
+		t.Errorf("expected Description 'CT scan of abdomen', got %v", is.Description)
+	}
+	if is.Started == nil {
+		t.Fatal("expected Started to be set")
+	}
+	if is.NumberOfSeries == nil || *is.NumberOfSeries != 3 {
+		t.Errorf("expected NumberOfSeries 3, got %v", is.NumberOfSeries)
+	}
+	if is.NumberOfInstances == nil || *is.NumberOfInstances != 120 {
+		t.Errorf("expected NumberOfInstances 120, got %v", is.NumberOfInstances)
+	}
+	if is.ReasonCode == nil || *is.ReasonCode != "R10.9" {
+		t.Errorf("expected ReasonCode 'R10.9', got %v", is.ReasonCode)
+	}
+	if is.ReasonDisplay == nil || *is.ReasonDisplay != "Abdominal pain" {
+		t.Errorf("expected ReasonDisplay 'Abdominal pain', got %v", is.ReasonDisplay)
+	}
+	if is.Endpoint == nil || *is.Endpoint != "Endpoint/pacs-1" {
+		t.Errorf("expected Endpoint 'Endpoint/pacs-1', got %v", is.Endpoint)
+	}
+	if is.StudyUID == nil || *is.StudyUID != "1.2.840.113619.2.55.3.604688119" {
+		t.Errorf("expected StudyUID set, got %v", is.StudyUID)
+	}
+	if is.Note == nil || *is.Note != "Contrast administered" {
+		t.Errorf("expected Note 'Contrast administered', got %v", is.Note)
+	}
+}

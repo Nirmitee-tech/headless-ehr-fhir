@@ -16,13 +16,13 @@ import (
 // SMARTConfiguration represents the SMART on FHIR well-known configuration
 // as defined by the SMART App Launch Framework (HL7).
 type SMARTConfiguration struct {
-	AuthorizationEndpoint      string   `json:"authorization_endpoint"`
-	TokenEndpoint              string   `json:"token_endpoint"`
-	TokenEndpointAuthMethods   []string `json:"token_endpoint_auth_methods_supported"`
-	GrantTypes                 []string `json:"grant_types_supported"`
-	Scopes                    []string `json:"scopes_supported"`
-	ResponseTypes             []string `json:"response_types_supported"`
-	Capabilities              []string `json:"capabilities"`
+	AuthorizationEndpoint        string   `json:"authorization_endpoint"`
+	TokenEndpoint                string   `json:"token_endpoint"`
+	TokenEndpointAuthMethods     []string `json:"token_endpoint_auth_methods_supported"`
+	GrantTypes                   []string `json:"grant_types_supported"`
+	Scopes                       []string `json:"scopes_supported"`
+	ResponseTypes                []string `json:"response_types_supported"`
+	Capabilities                 []string `json:"capabilities"`
 	CodeChallengeMethodsSupported []string `json:"code_challenge_methods_supported"`
 }
 
@@ -37,6 +37,38 @@ type LaunchContext struct {
 	CreatedAt   time.Time `json:"-"`
 }
 
+// launchContextJSON is used for DB serialization so that CreatedAt is included.
+type launchContextJSON struct {
+	LaunchToken string    `json:"launch"`
+	PatientID   string    `json:"patient,omitempty"`
+	EncounterID string    `json:"encounter,omitempty"`
+	FHIRUser    string    `json:"fhirUser,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// launchContextToJSON converts a LaunchContext to its JSON-serializable form
+// that includes CreatedAt.
+func launchContextToJSON(lc *LaunchContext) launchContextJSON {
+	return launchContextJSON{
+		LaunchToken: lc.LaunchToken,
+		PatientID:   lc.PatientID,
+		EncounterID: lc.EncounterID,
+		FHIRUser:    lc.FHIRUser,
+		CreatedAt:   lc.CreatedAt,
+	}
+}
+
+// launchContextFromJSON converts the JSON-serializable form back to LaunchContext.
+func launchContextFromJSON(j launchContextJSON) *LaunchContext {
+	return &LaunchContext{
+		LaunchToken: j.LaunchToken,
+		PatientID:   j.PatientID,
+		EncounterID: j.EncounterID,
+		FHIRUser:    j.FHIRUser,
+		CreatedAt:   j.CreatedAt,
+	}
+}
+
 // SMARTScope represents a parsed SMART on FHIR scope.
 // Format: <context>/<resourceType>.<operation>
 // Examples: patient/Patient.read, user/Observation.write, patient/*.read
@@ -46,30 +78,133 @@ type SMARTScope struct {
 	Operation    string // "read", "write", or "*"
 }
 
-// LaunchContextStore provides thread-safe in-memory storage for launch contexts.
-// In production this would typically be backed by Redis or a database.
-type LaunchContextStore struct {
+// ---------------------------------------------------------------------------
+// LaunchContextStorer interface
+// ---------------------------------------------------------------------------
+
+// LaunchContextStorer defines the contract for storing and retrieving SMART
+// launch contexts. Implementations may be backed by in-memory maps, a
+// relational database, Redis, etc.
+type LaunchContextStorer interface {
+	// Save persists a launch context under the given ID. If the ID already
+	// exists it is overwritten.
+	Save(ctx context.Context, id string, lc *LaunchContext) error
+
+	// Get retrieves a launch context by ID. Returns (nil, nil) when the ID
+	// does not exist or the entry has expired.
+	Get(ctx context.Context, id string) (*LaunchContext, error)
+
+	// Consume atomically retrieves and deletes a launch context (one-time use).
+	// Returns (nil, nil) when the ID does not exist or the entry has expired.
+	Consume(ctx context.Context, id string) (*LaunchContext, error)
+}
+
+// ---------------------------------------------------------------------------
+// InMemoryLaunchContextStore
+// ---------------------------------------------------------------------------
+
+// InMemoryLaunchContextStore provides thread-safe in-memory storage for launch
+// contexts. It implements LaunchContextStorer.
+type InMemoryLaunchContextStore struct {
 	mu       sync.RWMutex
 	contexts map[string]*LaunchContext
 	ttl      time.Duration
 }
 
-// NewLaunchContextStore creates a new store with the given TTL for launch tokens.
-func NewLaunchContextStore(ttl time.Duration) *LaunchContextStore {
-	return &LaunchContextStore{
+// NewInMemoryLaunchContextStore creates a new in-memory store with the given TTL.
+func NewInMemoryLaunchContextStore(ttl time.Duration) *InMemoryLaunchContextStore {
+	return &InMemoryLaunchContextStore{
 		contexts: make(map[string]*LaunchContext),
 		ttl:      ttl,
 	}
 }
 
+// Save implements LaunchContextStorer.
+func (s *InMemoryLaunchContextStore) Save(_ context.Context, id string, lc *LaunchContext) error {
+	s.mu.Lock()
+	s.contexts[id] = lc
+	s.mu.Unlock()
+	return nil
+}
+
+// Get implements LaunchContextStorer.
+func (s *InMemoryLaunchContextStore) Get(_ context.Context, id string) (*LaunchContext, error) {
+	s.mu.RLock()
+	lc, ok := s.contexts[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, nil
+	}
+
+	if time.Since(lc.CreatedAt) > s.ttl {
+		s.mu.Lock()
+		delete(s.contexts, id)
+		s.mu.Unlock()
+		return nil, nil
+	}
+
+	return lc, nil
+}
+
+// Consume implements LaunchContextStorer.
+func (s *InMemoryLaunchContextStore) Consume(_ context.Context, id string) (*LaunchContext, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	lc, ok := s.contexts[id]
+	if !ok {
+		return nil, nil
+	}
+
+	if time.Since(lc.CreatedAt) > s.ttl {
+		delete(s.contexts, id)
+		return nil, nil
+	}
+
+	delete(s.contexts, id)
+	return lc, nil
+}
+
+// Cleanup removes expired launch contexts from the in-memory store.
+func (s *InMemoryLaunchContextStore) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for token, lc := range s.contexts {
+		if now.Sub(lc.CreatedAt) > s.ttl {
+			delete(s.contexts, token)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// LaunchContextStore - backward-compatible alias
+// ---------------------------------------------------------------------------
+
+// LaunchContextStore is the original in-memory implementation kept for backward
+// compatibility. New code should use LaunchContextStorer and
+// NewInMemoryLaunchContextStore.
+type LaunchContextStore = InMemoryLaunchContextStore
+
+// NewLaunchContextStore creates a new in-memory store with the given TTL.
+// It is an alias for NewInMemoryLaunchContextStore and is kept for backward
+// compatibility.
+func NewLaunchContextStore(ttl time.Duration) *LaunchContextStore {
+	return NewInMemoryLaunchContextStore(ttl)
+}
+
 // Create generates a new launch token and stores the associated context.
-func (s *LaunchContextStore) Create(patientID, encounterID, fhirUser string) (*LaunchContext, error) {
+// This is a convenience method on the in-memory store, retained for backward
+// compatibility. It wraps Save with a generated token.
+func (s *InMemoryLaunchContextStore) Create(patientID, encounterID, fhirUser string) (*LaunchContext, error) {
 	token, err := generateLaunchToken()
 	if err != nil {
 		return nil, fmt.Errorf("generating launch token: %w", err)
 	}
 
-	ctx := &LaunchContext{
+	lc := &LaunchContext{
 		LaunchToken: token,
 		PatientID:   patientID,
 		EncounterID: encounterID,
@@ -78,62 +213,10 @@ func (s *LaunchContextStore) Create(patientID, encounterID, fhirUser string) (*L
 	}
 
 	s.mu.Lock()
-	s.contexts[token] = ctx
+	s.contexts[token] = lc
 	s.mu.Unlock()
 
-	return ctx, nil
-}
-
-// Get retrieves a launch context by token. Returns nil if not found or expired.
-func (s *LaunchContextStore) Get(token string) *LaunchContext {
-	s.mu.RLock()
-	ctx, ok := s.contexts[token]
-	s.mu.RUnlock()
-
-	if !ok {
-		return nil
-	}
-
-	if time.Since(ctx.CreatedAt) > s.ttl {
-		s.mu.Lock()
-		delete(s.contexts, token)
-		s.mu.Unlock()
-		return nil
-	}
-
-	return ctx
-}
-
-// Consume retrieves and removes a launch context by token (one-time use).
-func (s *LaunchContextStore) Consume(token string) *LaunchContext {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	ctx, ok := s.contexts[token]
-	if !ok {
-		return nil
-	}
-
-	if time.Since(ctx.CreatedAt) > s.ttl {
-		delete(s.contexts, token)
-		return nil
-	}
-
-	delete(s.contexts, token)
-	return ctx
-}
-
-// Cleanup removes expired launch contexts from the store.
-func (s *LaunchContextStore) Cleanup() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	for token, ctx := range s.contexts {
-		if now.Sub(ctx.CreatedAt) > s.ttl {
-			delete(s.contexts, token)
-		}
-	}
+	return lc, nil
 }
 
 // generateLaunchToken creates a cryptographically random launch token.
@@ -327,36 +410,44 @@ func RequireSMARTScope(resourceType string) echo.MiddlewareFunc {
 }
 
 // RegisterSMARTEndpoints registers the SMART on FHIR discovery and launch endpoints.
-func RegisterSMARTEndpoints(g *echo.Group, issuer string) {
-	store := NewLaunchContextStore(5 * time.Minute)
-
-	// Start background cleanup of expired launch contexts
-	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			store.Cleanup()
-		}
-	}()
+// It accepts a LaunchContextStorer so the caller can inject either the in-memory
+// or DB-backed implementation. If store is nil, a default in-memory store with
+// a 5-minute TTL is created.
+func RegisterSMARTEndpoints(g *echo.Group, issuer string, store ...LaunchContextStorer) {
+	var s LaunchContextStorer
+	if len(store) > 0 && store[0] != nil {
+		s = store[0]
+	} else {
+		mem := NewInMemoryLaunchContextStore(5 * time.Minute)
+		// Start background cleanup of expired launch contexts for in-memory store
+		go func() {
+			ticker := time.NewTicker(1 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				mem.Cleanup()
+			}
+		}()
+		s = mem
+	}
 
 	// SMART Configuration (well-known endpoint)
 	g.GET("/.well-known/smart-configuration", smartConfigurationHandler(issuer))
 
 	// EHR Launch endpoint - generates a launch context and returns a launch token
-	g.POST("/launch", ehrLaunchHandler(store))
+	g.POST("/launch", ehrLaunchHandler(s))
 
 	// Launch context resolution - exchanges a launch token for context parameters
-	g.GET("/launch-context", launchContextHandler(store))
+	g.GET("/launch-context", launchContextHandler(s))
 }
 
 // smartConfigurationHandler returns the SMART on FHIR well-known configuration.
 func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		cfg := SMARTConfiguration{
-			AuthorizationEndpoint:      issuer + "/protocol/openid-connect/auth",
-			TokenEndpoint:              issuer + "/protocol/openid-connect/token",
-			TokenEndpointAuthMethods:   []string{"client_secret_basic", "client_secret_post"},
-			GrantTypes:                 []string{"authorization_code", "client_credentials"},
+			AuthorizationEndpoint:    issuer + "/protocol/openid-connect/auth",
+			TokenEndpoint:            issuer + "/protocol/openid-connect/token",
+			TokenEndpointAuthMethods: []string{"client_secret_basic", "client_secret_post"},
+			GrantTypes:               []string{"authorization_code", "client_credentials"},
 			Scopes: []string{
 				"openid", "profile", "fhirUser",
 				"launch", "launch/patient",
@@ -392,7 +483,7 @@ type ehrLaunchResponse struct {
 // ehrLaunchHandler handles EHR-initiated launch requests. The EHR creates a
 // launch context with patient/encounter information and receives a launch token
 // that the client app will include in the authorization request.
-func ehrLaunchHandler(store *LaunchContextStore) echo.HandlerFunc {
+func ehrLaunchHandler(store LaunchContextStorer) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req ehrLaunchRequest
 		if err := c.Bind(&req); err != nil {
@@ -403,8 +494,20 @@ func ehrLaunchHandler(store *LaunchContextStore) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "patient_id is required")
 		}
 
-		launchCtx, err := store.Create(req.PatientID, req.EncounterID, req.FHIRUser)
+		token, err := generateLaunchToken()
 		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to create launch context")
+		}
+
+		launchCtx := &LaunchContext{
+			LaunchToken: token,
+			PatientID:   req.PatientID,
+			EncounterID: req.EncounterID,
+			FHIRUser:    req.FHIRUser,
+			CreatedAt:   time.Now(),
+		}
+
+		if err := store.Save(c.Request().Context(), token, launchCtx); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to create launch context")
 		}
 
@@ -423,14 +526,17 @@ func ehrLaunchHandler(store *LaunchContextStore) echo.HandlerFunc {
 
 // launchContextHandler resolves a launch token to its associated context.
 // This is called after authorization to add context parameters to the token response.
-func launchContextHandler(store *LaunchContextStore) echo.HandlerFunc {
+func launchContextHandler(store LaunchContextStorer) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		token := c.QueryParam("launch")
 		if token == "" {
 			return echo.NewHTTPError(http.StatusBadRequest, "launch parameter is required")
 		}
 
-		launchCtx := store.Consume(token)
+		launchCtx, err := store.Consume(c.Request().Context(), token)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve launch context")
+		}
 		if launchCtx == nil {
 			return echo.NewHTTPError(http.StatusNotFound, "launch context not found or expired")
 		}

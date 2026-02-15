@@ -31,9 +31,16 @@ type Organization struct {
 	Phone           *string    `db:"phone" json:"phone,omitempty"`
 	Email           *string    `db:"email" json:"email,omitempty"`
 	Website         *string    `db:"website" json:"website,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (o *Organization) GetVersionID() int { return o.VersionID }
+
+// SetVersionID sets the current version.
+func (o *Organization) SetVersionID(v int) { o.VersionID = v }
 
 func (o *Organization) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -131,8 +138,15 @@ type Location struct {
 	Longitude         *float64   `db:"longitude" json:"longitude,omitempty"`
 	Phone             *string    `db:"phone" json:"phone,omitempty"`
 	Email             *string    `db:"email" json:"email,omitempty"`
+	VersionID         int        `db:"version_id" json:"version_id"`
 	CreatedAt         time.Time  `db:"created_at" json:"created_at"`
 }
+
+// GetVersionID returns the current version.
+func (l *Location) GetVersionID() int { return l.VersionID }
+
+// SetVersionID sets the current version.
+func (l *Location) SetVersionID(v int) { l.VersionID = v }
 
 func (l *Location) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

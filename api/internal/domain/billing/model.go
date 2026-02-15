@@ -50,9 +50,16 @@ type Coverage struct {
 	Currency         *string    `db:"currency" json:"currency,omitempty"`
 	CoverageOrder    *int       `db:"coverage_order" json:"coverage_order,omitempty"`
 	Note             *string    `db:"note" json:"note,omitempty"`
+	VersionID        int        `db:"version_id" json:"version_id"`
 	CreatedAt        time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (c *Coverage) GetVersionID() int { return c.VersionID }
+
+// SetVersionID sets the current version.
+func (c *Coverage) SetVersionID(v int) { c.VersionID = v }
 
 func (c *Coverage) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -127,9 +134,16 @@ type Claim struct {
 	ROHINIClaimID         *string    `db:"rohini_claim_id" json:"rohini_claim_id,omitempty"`
 	RelatedClaimID        *uuid.UUID `db:"related_claim_id" json:"related_claim_id,omitempty"`
 	RelatedClaimRelation  *string    `db:"related_claim_relationship" json:"related_claim_relationship,omitempty"`
+	VersionID             int        `db:"version_id" json:"version_id"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (cl *Claim) GetVersionID() int { return cl.VersionID }
+
+// SetVersionID sets the current version.
+func (cl *Claim) SetVersionID(v int) { cl.VersionID = v }
 
 func (cl *Claim) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -264,8 +278,15 @@ type ClaimResponse struct {
 	TotalAmount              *float64   `db:"total_amount" json:"total_amount,omitempty"`
 	ProcessNote              *string    `db:"process_note" json:"process_note,omitempty"`
 	CommunicationRequest     *string    `db:"communication_request" json:"communication_request,omitempty"`
+	VersionID                int        `db:"version_id" json:"version_id"`
 	CreatedAt                time.Time  `db:"created_at" json:"created_at"`
 }
+
+// GetVersionID returns the current version.
+func (cr *ClaimResponse) GetVersionID() int { return cr.VersionID }
+
+// SetVersionID sets the current version.
+func (cr *ClaimResponse) SetVersionID(v int) { cr.VersionID = v }
 
 func (cr *ClaimResponse) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

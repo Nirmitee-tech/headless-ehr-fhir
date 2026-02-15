@@ -2,9 +2,11 @@ package identity
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -529,7 +531,7 @@ func (h *Handler) PatchPatientFHIR(c echo.Context) error {
 	} else {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome("PATCH requires application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
+	applyPatientPatch(existing, patched)
 	if err := h.svc.UpdatePatient(ctx, existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -570,7 +572,7 @@ func (h *Handler) PatchPractitionerFHIR(c echo.Context) error {
 	} else {
 		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome("PATCH requires application/json-patch+json or application/merge-patch+json"))
 	}
-	_ = patched
+	applyPractitionerPatch(existing, patched)
 	if err := h.svc.UpdatePractitioner(ctx, existing); err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -580,49 +582,393 @@ func (h *Handler) PatchPractitionerFHIR(c echo.Context) error {
 // -- FHIR vread and history endpoints --
 
 func (h *Handler) VreadPatientFHIR(c echo.Context) error {
-	p, err := h.svc.GetPatientByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+	vidStr := c.Param("vid")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		var vid int
+		if _, err := fmt.Sscanf(vidStr, "%d", &vid); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid version id"))
+		}
+		entry, err := vt.GetVersion(ctx, "Patient", fhirID, vid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Patient", fhirID+"/_history/"+vidStr))
+		}
+		var resource map[string]interface{}
+		if err := json.Unmarshal(entry.Resource, &resource); err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome("failed to parse versioned resource"))
+		}
+		fhir.SetVersionHeaders(c, entry.VersionID, entry.Timestamp.Format("2006-01-02T15:04:05Z"))
+		return c.JSON(http.StatusOK, resource)
+	}
+
+	// Fallback: no version tracker, return current version
+	p, err := h.svc.GetPatientByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Patient", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Patient", fhirID))
 	}
 	result := p.ToFHIR()
-	fhir.SetVersionHeaders(c, 1, p.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	fhir.SetVersionHeaders(c, p.VersionID, p.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) HistoryPatientFHIR(c echo.Context) error {
-	p, err := h.svc.GetPatientByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		entries, total, err := vt.ListVersions(ctx, "Patient", fhirID, 100, 0)
+		if err != nil || total == 0 {
+			// Fall through to current-resource fallback if no history recorded yet
+			p, ferr := h.svc.GetPatientByFHIRID(ctx, fhirID)
+			if ferr != nil {
+				return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Patient", fhirID))
+			}
+			result := p.ToFHIR()
+			raw, _ := json.Marshal(result)
+			entry := &fhir.HistoryEntry{
+				ResourceType: "Patient", ResourceID: p.FHIRID, VersionID: p.VersionID,
+				Resource: raw, Action: "create", Timestamp: p.CreatedAt,
+			}
+			return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+		}
+		return c.JSON(http.StatusOK, fhir.NewHistoryBundle(entries, total, "/fhir"))
+	}
+
+	// Fallback: no version tracker
+	p, err := h.svc.GetPatientByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Patient", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Patient", fhirID))
 	}
 	result := p.ToFHIR()
 	raw, _ := json.Marshal(result)
 	entry := &fhir.HistoryEntry{
-		ResourceType: "Patient", ResourceID: p.FHIRID, VersionID: 1,
+		ResourceType: "Patient", ResourceID: p.FHIRID, VersionID: p.VersionID,
 		Resource: raw, Action: "create", Timestamp: p.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
 
 func (h *Handler) VreadPractitionerFHIR(c echo.Context) error {
-	p, err := h.svc.GetPractitionerByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+	vidStr := c.Param("vid")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		var vid int
+		if _, err := fmt.Sscanf(vidStr, "%d", &vid); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid version id"))
+		}
+		entry, err := vt.GetVersion(ctx, "Practitioner", fhirID, vid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Practitioner", fhirID+"/_history/"+vidStr))
+		}
+		var resource map[string]interface{}
+		if err := json.Unmarshal(entry.Resource, &resource); err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome("failed to parse versioned resource"))
+		}
+		fhir.SetVersionHeaders(c, entry.VersionID, entry.Timestamp.Format("2006-01-02T15:04:05Z"))
+		return c.JSON(http.StatusOK, resource)
+	}
+
+	// Fallback: no version tracker
+	p, err := h.svc.GetPractitionerByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Practitioner", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Practitioner", fhirID))
 	}
 	result := p.ToFHIR()
-	fhir.SetVersionHeaders(c, 1, p.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	fhir.SetVersionHeaders(c, p.VersionID, p.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) HistoryPractitionerFHIR(c echo.Context) error {
-	p, err := h.svc.GetPractitionerByFHIRID(c.Request().Context(), c.Param("id"))
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		entries, total, err := vt.ListVersions(ctx, "Practitioner", fhirID, 100, 0)
+		if err != nil || total == 0 {
+			p, ferr := h.svc.GetPractitionerByFHIRID(ctx, fhirID)
+			if ferr != nil {
+				return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Practitioner", fhirID))
+			}
+			result := p.ToFHIR()
+			raw, _ := json.Marshal(result)
+			entry := &fhir.HistoryEntry{
+				ResourceType: "Practitioner", ResourceID: p.FHIRID, VersionID: p.VersionID,
+				Resource: raw, Action: "create", Timestamp: p.CreatedAt,
+			}
+			return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+		}
+		return c.JSON(http.StatusOK, fhir.NewHistoryBundle(entries, total, "/fhir"))
+	}
+
+	// Fallback: no version tracker
+	p, err := h.svc.GetPractitionerByFHIRID(ctx, fhirID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Practitioner", c.Param("id")))
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Practitioner", fhirID))
 	}
 	result := p.ToFHIR()
 	raw, _ := json.Marshal(result)
 	entry := &fhir.HistoryEntry{
-		ResourceType: "Practitioner", ResourceID: p.FHIRID, VersionID: 1,
+		ResourceType: "Practitioner", ResourceID: p.FHIRID, VersionID: p.VersionID,
 		Resource: raw, Action: "create", Timestamp: p.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// -- FHIR PATCH helpers --
+
+func applyPatientPatch(p *Patient, patched map[string]interface{}) {
+	if v, ok := patched["active"].(bool); ok {
+		p.Active = v
+	}
+	if v, ok := patched["gender"].(string); ok {
+		p.Gender = &v
+	}
+	if v, ok := patched["birthDate"].(string); ok {
+		if t, err := time.Parse("2006-01-02", v); err == nil {
+			p.BirthDate = &t
+		}
+	}
+	if v, ok := patched["deceasedBoolean"].(bool); ok {
+		p.DeceasedBoolean = v
+	}
+	if v, ok := patched["deceasedDateTime"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			p.DeceasedDatetime = &t
+		}
+	}
+	// name array
+	if v, ok := patched["name"]; ok {
+		if names, ok := v.([]interface{}); ok && len(names) > 0 {
+			if name, ok := names[0].(map[string]interface{}); ok {
+				if family, ok := name["family"].(string); ok {
+					p.LastName = family
+				}
+				if given, ok := name["given"].([]interface{}); ok {
+					if len(given) > 0 {
+						if first, ok := given[0].(string); ok {
+							p.FirstName = first
+						}
+					}
+					if len(given) > 1 {
+						if middle, ok := given[1].(string); ok {
+							p.MiddleName = &middle
+						}
+					}
+				}
+				if prefix, ok := name["prefix"].([]interface{}); ok && len(prefix) > 0 {
+					if pv, ok := prefix[0].(string); ok {
+						p.Prefix = &pv
+					}
+				}
+				if suffix, ok := name["suffix"].([]interface{}); ok && len(suffix) > 0 {
+					if sv, ok := suffix[0].(string); ok {
+						p.Suffix = &sv
+					}
+				}
+			}
+		}
+	}
+	// telecom array
+	if v, ok := patched["telecom"]; ok {
+		if telecoms, ok := v.([]interface{}); ok {
+			for _, tc := range telecoms {
+				if cp, ok := tc.(map[string]interface{}); ok {
+					system, _ := cp["system"].(string)
+					value, _ := cp["value"].(string)
+					use, _ := cp["use"].(string)
+					if system == "phone" {
+						switch use {
+						case "mobile":
+							p.PhoneMobile = &value
+						case "home":
+							p.PhoneHome = &value
+						case "work":
+							p.PhoneWork = &value
+						default:
+							p.PhoneMobile = &value
+						}
+					} else if system == "email" {
+						p.Email = &value
+					}
+				}
+			}
+		}
+	}
+	// address array
+	if v, ok := patched["address"]; ok {
+		if addrs, ok := v.([]interface{}); ok && len(addrs) > 0 {
+			if addr, ok := addrs[0].(map[string]interface{}); ok {
+				if use, ok := addr["use"].(string); ok {
+					p.AddressUse = &use
+				}
+				if lines, ok := addr["line"].([]interface{}); ok {
+					if len(lines) > 0 {
+						if l1, ok := lines[0].(string); ok {
+							p.AddressLine1 = &l1
+						}
+					}
+					if len(lines) > 1 {
+						if l2, ok := lines[1].(string); ok {
+							p.AddressLine2 = &l2
+						}
+					}
+				}
+				if city, ok := addr["city"].(string); ok {
+					p.City = &city
+				}
+				if district, ok := addr["district"].(string); ok {
+					p.District = &district
+				}
+				if state, ok := addr["state"].(string); ok {
+					p.State = &state
+				}
+				if postalCode, ok := addr["postalCode"].(string); ok {
+					p.PostalCode = &postalCode
+				}
+				if country, ok := addr["country"].(string); ok {
+					p.Country = &country
+				}
+			}
+		}
+	}
+	// maritalStatus
+	if v, ok := patched["maritalStatus"]; ok {
+		if ms, ok := v.(map[string]interface{}); ok {
+			if coding, ok := ms["coding"].([]interface{}); ok && len(coding) > 0 {
+				if c, ok := coding[0].(map[string]interface{}); ok {
+					if code, ok := c["code"].(string); ok {
+						p.MaritalStatus = &code
+					}
+				}
+			}
+		}
+	}
+	// communication / preferredLanguage
+	if v, ok := patched["communication"]; ok {
+		if comms, ok := v.([]interface{}); ok && len(comms) > 0 {
+			if comm, ok := comms[0].(map[string]interface{}); ok {
+				if lang, ok := comm["language"].(map[string]interface{}); ok {
+					if coding, ok := lang["coding"].([]interface{}); ok && len(coding) > 0 {
+						if c, ok := coding[0].(map[string]interface{}); ok {
+							if code, ok := c["code"].(string); ok {
+								p.PreferredLanguage = &code
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// photo
+	if v, ok := patched["photo"]; ok {
+		if photos, ok := v.([]interface{}); ok && len(photos) > 0 {
+			if photo, ok := photos[0].(map[string]interface{}); ok {
+				if url, ok := photo["url"].(string); ok {
+					p.PhotoURL = &url
+				}
+			}
+		}
+	}
+}
+
+func applyPractitionerPatch(p *Practitioner, patched map[string]interface{}) {
+	if v, ok := patched["active"].(bool); ok {
+		p.Active = v
+	}
+	if v, ok := patched["gender"].(string); ok {
+		p.Gender = &v
+	}
+	if v, ok := patched["birthDate"].(string); ok {
+		if t, err := time.Parse("2006-01-02", v); err == nil {
+			p.BirthDate = &t
+		}
+	}
+	// name array
+	if v, ok := patched["name"]; ok {
+		if names, ok := v.([]interface{}); ok && len(names) > 0 {
+			if name, ok := names[0].(map[string]interface{}); ok {
+				if family, ok := name["family"].(string); ok {
+					p.LastName = family
+				}
+				if given, ok := name["given"].([]interface{}); ok {
+					if len(given) > 0 {
+						if first, ok := given[0].(string); ok {
+							p.FirstName = first
+						}
+					}
+					if len(given) > 1 {
+						if middle, ok := given[1].(string); ok {
+							p.MiddleName = &middle
+						}
+					}
+				}
+				if prefix, ok := name["prefix"].([]interface{}); ok && len(prefix) > 0 {
+					if pv, ok := prefix[0].(string); ok {
+						p.Prefix = &pv
+					}
+				}
+				if suffix, ok := name["suffix"].([]interface{}); ok && len(suffix) > 0 {
+					if sv, ok := suffix[0].(string); ok {
+						p.Suffix = &sv
+					}
+				}
+			}
+		}
+	}
+	// telecom array
+	if v, ok := patched["telecom"]; ok {
+		if telecoms, ok := v.([]interface{}); ok {
+			for _, tc := range telecoms {
+				if cp, ok := tc.(map[string]interface{}); ok {
+					system, _ := cp["system"].(string)
+					value, _ := cp["value"].(string)
+					if system == "phone" {
+						p.Phone = &value
+					} else if system == "email" {
+						p.Email = &value
+					}
+				}
+			}
+		}
+	}
+	// address array
+	if v, ok := patched["address"]; ok {
+		if addrs, ok := v.([]interface{}); ok && len(addrs) > 0 {
+			if addr, ok := addrs[0].(map[string]interface{}); ok {
+				if lines, ok := addr["line"].([]interface{}); ok && len(lines) > 0 {
+					if l1, ok := lines[0].(string); ok {
+						p.AddressLine1 = &l1
+					}
+				}
+				if city, ok := addr["city"].(string); ok {
+					p.City = &city
+				}
+				if state, ok := addr["state"].(string); ok {
+					p.State = &state
+				}
+				if postalCode, ok := addr["postalCode"].(string); ok {
+					p.PostalCode = &postalCode
+				}
+				if country, ok := addr["country"].(string); ok {
+					p.Country = &country
+				}
+			}
+		}
+	}
+	// qualification
+	if v, ok := patched["qualification"]; ok {
+		if quals, ok := v.([]interface{}); ok && len(quals) > 0 {
+			if qual, ok := quals[0].(map[string]interface{}); ok {
+				if code, ok := qual["code"].(map[string]interface{}); ok {
+					if text, ok := code["text"].(string); ok {
+						p.QualificationSummary = &text
+					}
+				}
+			}
+		}
+	}
 }

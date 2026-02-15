@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -929,5 +930,94 @@ func TestAppointmentToFHIR(t *testing.T) {
 	}
 	if fhirRes["status"] != "booked" {
 		t.Errorf("expected booked, got %v", fhirRes["status"])
+	}
+}
+
+// =========== Version Tracking Tests ===========
+
+func TestCreateSchedule_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	s := &Schedule{PractitionerID: uuid.New()}
+	if err := svc.CreateSchedule(context.Background(), s); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", s.VersionID)
+	}
+}
+
+func TestCreateAppointment_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	if err := svc.CreateAppointment(context.Background(), a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", a.VersionID)
+	}
+}
+
+func TestCreateSchedule_NilVersionTracker_NoError(t *testing.T) {
+	svc := newTestService()
+	s := &Schedule{PractitionerID: uuid.New()}
+	if err := svc.CreateSchedule(context.Background(), s); err != nil {
+		t.Fatalf("unexpected error with nil version tracker: %v", err)
+	}
+	if s.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create (even with nil tracker), got %d", s.VersionID)
+	}
+}
+
+func TestUpdateAppointment_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+
+	a.Status = "booked"
+	if err := svc.UpdateAppointment(context.Background(), a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteAppointment_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	start := time.Now()
+	a := &Appointment{PatientID: uuid.New(), StartTime: &start}
+	svc.CreateAppointment(context.Background(), a)
+
+	if err := svc.DeleteAppointment(context.Background(), a.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSchedulingVersionTrackerAccessor(t *testing.T) {
+	svc := newTestService()
+	if svc.VersionTracker() != nil {
+		t.Error("expected nil VersionTracker initially")
+	}
+
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+	if svc.VersionTracker() != vt {
+		t.Error("expected VersionTracker to match")
 	}
 }

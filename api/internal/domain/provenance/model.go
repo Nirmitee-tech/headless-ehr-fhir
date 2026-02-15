@@ -18,9 +18,16 @@ type Provenance struct {
 	ActivityDisplay *string   `db:"activity_display" json:"activity_display,omitempty"`
 	ReasonCode      *string   `db:"reason_code" json:"reason_code,omitempty"`
 	ReasonDisplay   *string   `db:"reason_display" json:"reason_display,omitempty"`
+	VersionID       int       `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (p *Provenance) GetVersionID() int { return p.VersionID }
+
+// SetVersionID sets the current version.
+func (p *Provenance) SetVersionID(v int) { p.VersionID = v }
 
 func (p *Provenance) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

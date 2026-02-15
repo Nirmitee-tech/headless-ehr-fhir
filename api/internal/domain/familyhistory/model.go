@@ -22,9 +22,16 @@ type FamilyMemberHistory struct {
 	DeceasedBoolean     *bool      `db:"deceased_boolean" json:"deceased_boolean,omitempty"`
 	DeceasedAge         *int       `db:"deceased_age" json:"deceased_age,omitempty"`
 	Note                *string    `db:"note" json:"note,omitempty"`
+	VersionID           int        `db:"version_id" json:"version_id"`
 	CreatedAt           time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt           time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (f *FamilyMemberHistory) GetVersionID() int { return f.VersionID }
+
+// SetVersionID sets the current version.
+func (f *FamilyMemberHistory) SetVersionID(v int) { f.VersionID = v }
 
 func (f *FamilyMemberHistory) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

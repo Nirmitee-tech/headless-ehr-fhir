@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -1216,5 +1217,121 @@ func TestSearchProcedures(t *testing.T) {
 	}
 	if len(items) < 1 {
 		t.Error("expected items")
+	}
+}
+
+// =========== Version Tracking Tests ===========
+
+func TestCreateCondition_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI"}
+	if err := svc.CreateCondition(context.Background(), c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", c.VersionID)
+	}
+}
+
+func TestCreateObservation_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	o := &Observation{PatientID: uuid.New(), CodeValue: "8310-5"}
+	if err := svc.CreateObservation(context.Background(), o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if o.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", o.VersionID)
+	}
+}
+
+func TestCreateAllergy_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	a := &AllergyIntolerance{PatientID: uuid.New()}
+	if err := svc.CreateAllergy(context.Background(), a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", a.VersionID)
+	}
+}
+
+func TestCreateProcedure_WithVersionTracker_SetsVersion1(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	p := &ProcedureRecord{PatientID: uuid.New(), CodeValue: "80146002"}
+	if err := svc.CreateProcedure(context.Background(), p); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create, got %d", p.VersionID)
+	}
+}
+
+func TestCreateCondition_NilVersionTracker_NoError(t *testing.T) {
+	svc := newTestService()
+	c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI"}
+	if err := svc.CreateCondition(context.Background(), c); err != nil {
+		t.Fatalf("unexpected error with nil version tracker: %v", err)
+	}
+	if c.VersionID != 1 {
+		t.Errorf("expected VersionID 1 after create (even with nil tracker), got %d", c.VersionID)
+	}
+}
+
+func TestUpdateCondition_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI"}
+	svc.CreateCondition(context.Background(), c)
+
+	c.ClinicalStatus = "resolved"
+	if err := svc.UpdateCondition(context.Background(), c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteCondition_WithVersionTracker(t *testing.T) {
+	svc := newTestService()
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+
+	c := &Condition{PatientID: uuid.New(), CodeValue: "J06.9", CodeDisplay: "URI"}
+	svc.CreateCondition(context.Background(), c)
+
+	if err := svc.DeleteCondition(context.Background(), c.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClinicalVersionTrackerAccessor(t *testing.T) {
+	svc := newTestService()
+	if svc.VersionTracker() != nil {
+		t.Error("expected nil VersionTracker initially")
+	}
+
+	histRepo := fhir.NewHistoryRepository()
+	vt := fhir.NewVersionTracker(histRepo)
+	svc.SetVersionTracker(vt)
+	if svc.VersionTracker() != vt {
+		t.Error("expected VersionTracker to match")
 	}
 }

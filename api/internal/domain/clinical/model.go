@@ -41,9 +41,16 @@ type Condition struct {
 	EvidenceDisplay    *string    `db:"evidence_display" json:"evidence_display,omitempty"`
 	RecordedDate       *time.Time `db:"recorded_date" json:"recorded_date,omitempty"`
 	Note               *string    `db:"note" json:"note,omitempty"`
+	VersionID          int        `db:"version_id" json:"version_id"`
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (c *Condition) GetVersionID() int { return c.VersionID }
+
+// SetVersionID sets the current version.
+func (c *Condition) SetVersionID(v int) { c.VersionID = v }
 
 func (c *Condition) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -141,9 +148,16 @@ type Observation struct {
 	BodySiteDisplay       *string    `db:"body_site_display" json:"body_site_display,omitempty"`
 	DataAbsentReason      *string    `db:"data_absent_reason" json:"data_absent_reason,omitempty"`
 	Note                  *string    `db:"note" json:"note,omitempty"`
+	VersionID             int        `db:"version_id" json:"version_id"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (o *Observation) GetVersionID() int { return o.VersionID }
+
+// SetVersionID sets the current version.
+func (o *Observation) SetVersionID(v int) { o.VersionID = v }
 
 func (o *Observation) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -255,9 +269,16 @@ type AllergyIntolerance struct {
 	RecordedDate       *time.Time `db:"recorded_date" json:"recorded_date,omitempty"`
 	LastOccurrence     *time.Time `db:"last_occurrence" json:"last_occurrence,omitempty"`
 	Note               *string    `db:"note" json:"note,omitempty"`
+	VersionID          int        `db:"version_id" json:"version_id"`
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (a *AllergyIntolerance) GetVersionID() int { return a.VersionID }
+
+// SetVersionID sets the current version.
+func (a *AllergyIntolerance) SetVersionID(v int) { a.VersionID = v }
 
 func (a *AllergyIntolerance) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -354,9 +375,16 @@ type ProcedureRecord struct {
 	CPTCode            *string    `db:"cpt_code" json:"cpt_code,omitempty"`
 	HCPCSCode          *string    `db:"hcpcs_code" json:"hcpcs_code,omitempty"`
 	Note               *string    `db:"note" json:"note,omitempty"`
+	VersionID          int        `db:"version_id" json:"version_id"`
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (p *ProcedureRecord) GetVersionID() int { return p.VersionID }
+
+// SetVersionID sets the current version.
+func (p *ProcedureRecord) SetVersionID(v int) { p.VersionID = v }
 
 func (p *ProcedureRecord) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

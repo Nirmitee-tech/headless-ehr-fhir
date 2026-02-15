@@ -27,9 +27,16 @@ type RelatedPerson struct {
 	AddressPostalCode   *string    `db:"address_postal_code" json:"address_postal_code,omitempty"`
 	PeriodStart         *time.Time `db:"period_start" json:"period_start,omitempty"`
 	PeriodEnd           *time.Time `db:"period_end" json:"period_end,omitempty"`
+	VersionID           int        `db:"version_id" json:"version_id"`
 	CreatedAt           time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt           time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (rp *RelatedPerson) GetVersionID() int { return rp.VersionID }
+
+// SetVersionID sets the current version.
+func (rp *RelatedPerson) SetVersionID(v int) { rp.VersionID = v }
 
 func (rp *RelatedPerson) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

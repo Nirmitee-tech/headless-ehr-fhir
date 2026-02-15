@@ -107,9 +107,16 @@ type MedicationRequest struct {
 	ERxReference          *string    `db:"erx_reference" json:"erx_reference,omitempty"`
 	ABDMPrescriptionID    *string    `db:"abdm_prescription_id" json:"abdm_prescription_id,omitempty"`
 	Note                  *string    `db:"note" json:"note,omitempty"`
+	VersionID             int        `db:"version_id" json:"version_id"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (mr *MedicationRequest) GetVersionID() int { return mr.VersionID }
+
+// SetVersionID sets the current version.
+func (mr *MedicationRequest) SetVersionID(v int) { mr.VersionID = v }
 
 func (mr *MedicationRequest) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -259,9 +266,16 @@ type MedicationAdministration struct {
 	RateQuantity          *float64   `db:"rate_quantity" json:"rate_quantity,omitempty"`
 	RateUnit              *string    `db:"rate_unit" json:"rate_unit,omitempty"`
 	Note                  *string    `db:"note" json:"note,omitempty"`
+	VersionID             int        `db:"version_id" json:"version_id"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (ma *MedicationAdministration) GetVersionID() int { return ma.VersionID }
+
+// SetVersionID sets the current version.
+func (ma *MedicationAdministration) SetVersionID(v int) { ma.VersionID = v }
 
 func (ma *MedicationAdministration) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -374,9 +388,16 @@ type MedicationDispense struct {
 	SubstitutionTypeCode  *string    `db:"substitution_type_code" json:"substitution_type_code,omitempty"`
 	SubstitutionReason    *string    `db:"substitution_reason" json:"substitution_reason,omitempty"`
 	Note                  *string    `db:"note" json:"note,omitempty"`
+	VersionID             int        `db:"version_id" json:"version_id"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (md *MedicationDispense) GetVersionID() int { return md.VersionID }
+
+// SetVersionID sets the current version.
+func (md *MedicationDispense) SetVersionID(v int) { md.VersionID = v }
 
 func (md *MedicationDispense) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -12,6 +13,17 @@ type Service struct {
 	claims         ClaimRepository
 	claimResponses ClaimResponseRepository
 	invoices       InvoiceRepository
+	vt             *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(cov CoverageRepository, cl ClaimRepository, cr ClaimResponseRepository, inv InvoiceRepository) *Service {
@@ -37,7 +49,14 @@ func (s *Service) CreateCoverage(ctx context.Context, c *Coverage) error {
 	if !validCoverageStatuses[c.Status] {
 		return fmt.Errorf("invalid coverage status: %s", c.Status)
 	}
-	return s.coverages.Create(ctx, c)
+	if err := s.coverages.Create(ctx, c); err != nil {
+		return err
+	}
+	c.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Coverage", c.FHIRID, c.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetCoverage(ctx context.Context, id uuid.UUID) (*Coverage, error) {
@@ -52,10 +71,22 @@ func (s *Service) UpdateCoverage(ctx context.Context, c *Coverage) error {
 	if c.Status != "" && !validCoverageStatuses[c.Status] {
 		return fmt.Errorf("invalid coverage status: %s", c.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Coverage", c.FHIRID, c.VersionID, c.ToFHIR())
+		if err == nil {
+			c.VersionID = newVer
+		}
+	}
 	return s.coverages.Update(ctx, c)
 }
 
 func (s *Service) DeleteCoverage(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		c, err := s.coverages.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Coverage", c.FHIRID, c.VersionID)
+		}
+	}
 	return s.coverages.Delete(ctx, id)
 }
 
@@ -83,7 +114,14 @@ func (s *Service) CreateClaim(ctx context.Context, c *Claim) error {
 	if !validClaimStatuses[c.Status] {
 		return fmt.Errorf("invalid claim status: %s", c.Status)
 	}
-	return s.claims.Create(ctx, c)
+	if err := s.claims.Create(ctx, c); err != nil {
+		return err
+	}
+	c.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Claim", c.FHIRID, c.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetClaim(ctx context.Context, id uuid.UUID) (*Claim, error) {
@@ -98,10 +136,22 @@ func (s *Service) UpdateClaim(ctx context.Context, c *Claim) error {
 	if c.Status != "" && !validClaimStatuses[c.Status] {
 		return fmt.Errorf("invalid claim status: %s", c.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Claim", c.FHIRID, c.VersionID, c.ToFHIR())
+		if err == nil {
+			c.VersionID = newVer
+		}
+	}
 	return s.claims.Update(ctx, c)
 }
 
 func (s *Service) DeleteClaim(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		c, err := s.claims.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Claim", c.FHIRID, c.VersionID)
+		}
+	}
 	return s.claims.Delete(ctx, id)
 }
 
@@ -164,7 +214,14 @@ func (s *Service) CreateClaimResponse(ctx context.Context, cr *ClaimResponse) er
 	if cr.Status == "" {
 		cr.Status = "active"
 	}
-	return s.claimResponses.Create(ctx, cr)
+	if err := s.claimResponses.Create(ctx, cr); err != nil {
+		return err
+	}
+	cr.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "ClaimResponse", cr.FHIRID, cr.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetClaimResponse(ctx context.Context, id uuid.UUID) (*ClaimResponse, error) {

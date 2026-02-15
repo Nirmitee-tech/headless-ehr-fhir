@@ -1,6 +1,7 @@
 package documents
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -32,17 +33,25 @@ type Consent struct {
 	SignatureData   *string    `db:"signature_data" json:"signature_data,omitempty"`
 	DateTime        *time.Time `db:"date_time" json:"date_time,omitempty"`
 	Note            *string    `db:"note" json:"note,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+func (c *Consent) GetVersionID() int  { return c.VersionID }
+func (c *Consent) SetVersionID(v int) { c.VersionID = v }
+
 func (c *Consent) ToFHIR() map[string]interface{} {
+	versionID := c.VersionID
+	if versionID == 0 {
+		versionID = 1
+	}
 	result := map[string]interface{}{
 		"resourceType": "Consent",
 		"id":           c.FHIRID,
 		"status":       c.Status,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", c.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: c.UpdatedAt},
+		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: c.UpdatedAt},
 	}
 	if c.Scope != nil {
 		result["scope"] = fhir.CodeableConcept{
@@ -107,17 +116,25 @@ type DocumentReference struct {
 	ContentTitle    *string    `db:"content_title" json:"content_title,omitempty"`
 	FormatCode      *string    `db:"format_code" json:"format_code,omitempty"`
 	FormatDisplay   *string    `db:"format_display" json:"format_display,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+func (d *DocumentReference) GetVersionID() int  { return d.VersionID }
+func (d *DocumentReference) SetVersionID(v int) { d.VersionID = v }
+
 func (d *DocumentReference) ToFHIR() map[string]interface{} {
+	versionID := d.VersionID
+	if versionID == 0 {
+		versionID = 1
+	}
 	result := map[string]interface{}{
 		"resourceType": "DocumentReference",
 		"id":           d.FHIRID,
 		"status":       d.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", d.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: d.UpdatedAt},
+		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: d.UpdatedAt},
 	}
 	if d.DocStatus != nil {
 		result["docStatus"] = *d.DocStatus
@@ -227,17 +244,25 @@ type Composition struct {
 	Title           *string    `db:"title" json:"title,omitempty"`
 	Confidentiality *string    `db:"confidentiality" json:"confidentiality,omitempty"`
 	CustodianID     *uuid.UUID `db:"custodian_id" json:"custodian_id,omitempty"`
+	VersionID       int        `db:"version_id" json:"version_id"`
 	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+func (comp *Composition) GetVersionID() int  { return comp.VersionID }
+func (comp *Composition) SetVersionID(v int) { comp.VersionID = v }
+
 func (comp *Composition) ToFHIR() map[string]interface{} {
+	versionID := comp.VersionID
+	if versionID == 0 {
+		versionID = 1
+	}
 	result := map[string]interface{}{
 		"resourceType": "Composition",
 		"id":           comp.FHIRID,
 		"status":       comp.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", comp.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: comp.UpdatedAt},
+		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: comp.UpdatedAt},
 	}
 	if comp.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{

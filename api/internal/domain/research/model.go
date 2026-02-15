@@ -36,9 +36,16 @@ type ResearchStudy struct {
 	InclusionCriteria        *string    `db:"inclusion_criteria" json:"inclusion_criteria,omitempty"`
 	ExclusionCriteria        *string    `db:"exclusion_criteria" json:"exclusion_criteria,omitempty"`
 	Note                     *string    `db:"note" json:"note,omitempty"`
+	VersionID                int        `db:"version_id" json:"version_id"`
 	CreatedAt                time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt                time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (s *ResearchStudy) GetVersionID() int { return s.VersionID }
+
+// SetVersionID sets the current version.
+func (s *ResearchStudy) SetVersionID(v int) { s.VersionID = v }
 
 func (s *ResearchStudy) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -13,6 +14,17 @@ type Service struct {
 	questionnaires QuestionnaireRepository
 	responses     QuestionnaireResponseRepository
 	checkins      PatientCheckinRepository
+	vt            *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(
@@ -136,7 +148,14 @@ func (s *Service) CreateQuestionnaire(ctx context.Context, q *Questionnaire) err
 	if !validQuestionnaireStatuses[q.Status] {
 		return fmt.Errorf("invalid status: %s", q.Status)
 	}
-	return s.questionnaires.Create(ctx, q)
+	if err := s.questionnaires.Create(ctx, q); err != nil {
+		return err
+	}
+	q.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Questionnaire", q.FHIRID, q.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetQuestionnaire(ctx context.Context, id uuid.UUID) (*Questionnaire, error) {
@@ -151,10 +170,22 @@ func (s *Service) UpdateQuestionnaire(ctx context.Context, q *Questionnaire) err
 	if q.Status != "" && !validQuestionnaireStatuses[q.Status] {
 		return fmt.Errorf("invalid status: %s", q.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Questionnaire", q.FHIRID, q.VersionID, q.ToFHIR())
+		if err == nil {
+			q.VersionID = newVer
+		}
+	}
 	return s.questionnaires.Update(ctx, q)
 }
 
 func (s *Service) DeleteQuestionnaire(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		q, err := s.questionnaires.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Questionnaire", q.FHIRID, q.VersionID)
+		}
+	}
 	return s.questionnaires.Delete(ctx, id)
 }
 
@@ -203,7 +234,14 @@ func (s *Service) CreateQuestionnaireResponse(ctx context.Context, qr *Questionn
 	if !validQRStatuses[qr.Status] {
 		return fmt.Errorf("invalid status: %s", qr.Status)
 	}
-	return s.responses.Create(ctx, qr)
+	if err := s.responses.Create(ctx, qr); err != nil {
+		return err
+	}
+	qr.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "QuestionnaireResponse", qr.FHIRID, qr.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetQuestionnaireResponse(ctx context.Context, id uuid.UUID) (*QuestionnaireResponse, error) {
@@ -218,10 +256,22 @@ func (s *Service) UpdateQuestionnaireResponse(ctx context.Context, qr *Questionn
 	if qr.Status != "" && !validQRStatuses[qr.Status] {
 		return fmt.Errorf("invalid status: %s", qr.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "QuestionnaireResponse", qr.FHIRID, qr.VersionID, qr.ToFHIR())
+		if err == nil {
+			qr.VersionID = newVer
+		}
+	}
 	return s.responses.Update(ctx, qr)
 }
 
 func (s *Service) DeleteQuestionnaireResponse(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		qr, err := s.responses.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "QuestionnaireResponse", qr.FHIRID, qr.VersionID)
+		}
+	}
 	return s.responses.Delete(ctx, id)
 }
 

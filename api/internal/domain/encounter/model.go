@@ -1,6 +1,7 @@
 package encounter
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -38,9 +39,16 @@ type Encounter struct {
 	ReasonText               *string    `db:"reason_text" json:"reason_text,omitempty"`
 	DRGCode                  *string    `db:"drg_code" json:"drg_code,omitempty"`
 	DRGType                  *string    `db:"drg_type" json:"drg_type,omitempty"`
+	VersionID                int        `db:"version_id" json:"version_id"`
 	CreatedAt                time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt                time.Time  `db:"updated_at" json:"updated_at"`
 }
+
+// GetVersionID returns the current version.
+func (e *Encounter) GetVersionID() int { return e.VersionID }
+
+// SetVersionID sets the current version.
+func (e *Encounter) SetVersionID(v int) { e.VersionID = v }
 
 func (e *Encounter) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -59,7 +67,7 @@ func (e *Encounter) ToFHIR() map[string]interface{} {
 			Start: &e.PeriodStart,
 			End:   e.PeriodEnd,
 		},
-		"meta": fhir.Meta{LastUpdated: e.UpdatedAt},
+		"meta": fhir.Meta{VersionID: fmt.Sprintf("%d", e.VersionID), LastUpdated: e.UpdatedAt},
 	}
 
 	if e.TypeCode != nil {

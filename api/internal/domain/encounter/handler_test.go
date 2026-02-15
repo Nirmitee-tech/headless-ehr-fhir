@@ -726,3 +726,100 @@ func TestHandler_HistoryEncounterFHIR_NotFound(t *testing.T) {
 		t.Errorf("expected 404, got %d", rec.Code)
 	}
 }
+
+// -- applyEncounterPatch unit tests --
+
+func TestApplyEncounterPatch_Status(t *testing.T) {
+	enc := &Encounter{
+		Status:    "planned",
+		ClassCode: "AMB",
+		PatientID: uuid.New(),
+	}
+
+	patched := map[string]interface{}{
+		"status": "in-progress",
+	}
+	applyEncounterPatch(enc, patched)
+
+	if enc.Status != "in-progress" {
+		t.Errorf("expected status 'in-progress', got %q", enc.Status)
+	}
+	if enc.ClassCode != "AMB" {
+		t.Errorf("expected ClassCode unchanged 'AMB', got %q", enc.ClassCode)
+	}
+}
+
+func TestApplyEncounterPatch_Class(t *testing.T) {
+	enc := &Encounter{
+		Status:    "planned",
+		ClassCode: "AMB",
+	}
+
+	patched := map[string]interface{}{
+		"class": map[string]interface{}{
+			"code":    "IMP",
+			"display": "inpatient encounter",
+		},
+	}
+	applyEncounterPatch(enc, patched)
+
+	if enc.ClassCode != "IMP" {
+		t.Errorf("expected ClassCode 'IMP', got %q", enc.ClassCode)
+	}
+	if enc.ClassDisplay == nil || *enc.ClassDisplay != "inpatient encounter" {
+		t.Errorf("expected ClassDisplay 'inpatient encounter', got %v", enc.ClassDisplay)
+	}
+	if enc.Status != "planned" {
+		t.Errorf("expected Status unchanged 'planned', got %q", enc.Status)
+	}
+}
+
+func TestApplyEncounterPatch_Period(t *testing.T) {
+	enc := &Encounter{
+		Status:    "in-progress",
+		ClassCode: "AMB",
+	}
+
+	patched := map[string]interface{}{
+		"period": map[string]interface{}{
+			"start": "2025-06-01T09:00:00Z",
+			"end":   "2025-06-01T10:30:00Z",
+		},
+	}
+	applyEncounterPatch(enc, patched)
+
+	if enc.PeriodStart.IsZero() {
+		t.Fatal("expected PeriodStart to be set")
+	}
+	if enc.PeriodStart.Year() != 2025 || enc.PeriodStart.Month() != 6 || enc.PeriodStart.Day() != 1 {
+		t.Errorf("unexpected PeriodStart: %v", enc.PeriodStart)
+	}
+	if enc.PeriodEnd == nil {
+		t.Fatal("expected PeriodEnd to be set")
+	}
+	if enc.PeriodEnd.Hour() != 10 || enc.PeriodEnd.Minute() != 30 {
+		t.Errorf("unexpected PeriodEnd: %v", *enc.PeriodEnd)
+	}
+}
+
+func TestApplyEncounterPatch_EmptyMap(t *testing.T) {
+	orig := "AMB"
+	enc := &Encounter{
+		Status:    "planned",
+		ClassCode: "AMB",
+		ClassDisplay: &orig,
+	}
+
+	patched := map[string]interface{}{}
+	applyEncounterPatch(enc, patched)
+
+	if enc.Status != "planned" {
+		t.Errorf("expected Status unchanged 'planned', got %q", enc.Status)
+	}
+	if enc.ClassCode != "AMB" {
+		t.Errorf("expected ClassCode unchanged 'AMB', got %q", enc.ClassCode)
+	}
+	if enc.ClassDisplay == nil || *enc.ClassDisplay != "AMB" {
+		t.Errorf("expected ClassDisplay unchanged")
+	}
+}

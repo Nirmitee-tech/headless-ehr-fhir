@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -14,6 +15,17 @@ type Service struct {
 	diagnosticReports DiagnosticReportRepository
 	imagingStudies    ImagingStudyRepository
 	statusHistory     OrderStatusHistoryRepository
+	vt                *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(sr ServiceRequestRepository, sp SpecimenRepository, dr DiagnosticReportRepository, is ImagingStudyRepository, sh OrderStatusHistoryRepository) *Service {
@@ -119,7 +131,14 @@ func (s *Service) CreateServiceRequest(ctx context.Context, sr *ServiceRequest) 
 	if sr.Intent == "" {
 		sr.Intent = "order"
 	}
-	return s.serviceRequests.Create(ctx, sr)
+	if err := s.serviceRequests.Create(ctx, sr); err != nil {
+		return err
+	}
+	sr.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "ServiceRequest", sr.FHIRID, sr.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetServiceRequest(ctx context.Context, id uuid.UUID) (*ServiceRequest, error) {
@@ -134,10 +153,22 @@ func (s *Service) UpdateServiceRequest(ctx context.Context, sr *ServiceRequest) 
 	if sr.Status != "" && !validSRStatuses[sr.Status] {
 		return fmt.Errorf("invalid status: %s", sr.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "ServiceRequest", sr.FHIRID, sr.VersionID, sr.ToFHIR())
+		if err == nil {
+			sr.VersionID = newVer
+		}
+	}
 	return s.serviceRequests.Update(ctx, sr)
 }
 
 func (s *Service) DeleteServiceRequest(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		sr, err := s.serviceRequests.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "ServiceRequest", sr.FHIRID, sr.VersionID)
+		}
+	}
 	return s.serviceRequests.Delete(ctx, id)
 }
 
@@ -165,7 +196,14 @@ func (s *Service) CreateSpecimen(ctx context.Context, sp *Specimen) error {
 	if !validSpecimenStatuses[sp.Status] {
 		return fmt.Errorf("invalid status: %s", sp.Status)
 	}
-	return s.specimens.Create(ctx, sp)
+	if err := s.specimens.Create(ctx, sp); err != nil {
+		return err
+	}
+	sp.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Specimen", sp.FHIRID, sp.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetSpecimen(ctx context.Context, id uuid.UUID) (*Specimen, error) {
@@ -180,10 +218,22 @@ func (s *Service) UpdateSpecimen(ctx context.Context, sp *Specimen) error {
 	if sp.Status != "" && !validSpecimenStatuses[sp.Status] {
 		return fmt.Errorf("invalid status: %s", sp.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Specimen", sp.FHIRID, sp.VersionID, sp.ToFHIR())
+		if err == nil {
+			sp.VersionID = newVer
+		}
+	}
 	return s.specimens.Update(ctx, sp)
 }
 
 func (s *Service) DeleteSpecimen(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		sp, err := s.specimens.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Specimen", sp.FHIRID, sp.VersionID)
+		}
+	}
 	return s.specimens.Delete(ctx, id)
 }
 
@@ -216,7 +266,14 @@ func (s *Service) CreateDiagnosticReport(ctx context.Context, dr *DiagnosticRepo
 	if !validDRStatuses[dr.Status] {
 		return fmt.Errorf("invalid status: %s", dr.Status)
 	}
-	return s.diagnosticReports.Create(ctx, dr)
+	if err := s.diagnosticReports.Create(ctx, dr); err != nil {
+		return err
+	}
+	dr.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "DiagnosticReport", dr.FHIRID, dr.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetDiagnosticReport(ctx context.Context, id uuid.UUID) (*DiagnosticReport, error) {
@@ -231,10 +288,22 @@ func (s *Service) UpdateDiagnosticReport(ctx context.Context, dr *DiagnosticRepo
 	if dr.Status != "" && !validDRStatuses[dr.Status] {
 		return fmt.Errorf("invalid status: %s", dr.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "DiagnosticReport", dr.FHIRID, dr.VersionID, dr.ToFHIR())
+		if err == nil {
+			dr.VersionID = newVer
+		}
+	}
 	return s.diagnosticReports.Update(ctx, dr)
 }
 
 func (s *Service) DeleteDiagnosticReport(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		dr, err := s.diagnosticReports.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "DiagnosticReport", dr.FHIRID, dr.VersionID)
+		}
+	}
 	return s.diagnosticReports.Delete(ctx, id)
 }
 
@@ -281,7 +350,14 @@ func (s *Service) CreateImagingStudy(ctx context.Context, is *ImagingStudy) erro
 	if !validISStatuses[is.Status] {
 		return fmt.Errorf("invalid status: %s", is.Status)
 	}
-	return s.imagingStudies.Create(ctx, is)
+	if err := s.imagingStudies.Create(ctx, is); err != nil {
+		return err
+	}
+	is.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "ImagingStudy", is.FHIRID, is.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetImagingStudy(ctx context.Context, id uuid.UUID) (*ImagingStudy, error) {
@@ -296,10 +372,22 @@ func (s *Service) UpdateImagingStudy(ctx context.Context, is *ImagingStudy) erro
 	if is.Status != "" && !validISStatuses[is.Status] {
 		return fmt.Errorf("invalid status: %s", is.Status)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "ImagingStudy", is.FHIRID, is.VersionID, is.ToFHIR())
+		if err == nil {
+			is.VersionID = newVer
+		}
+	}
 	return s.imagingStudies.Update(ctx, is)
 }
 
 func (s *Service) DeleteImagingStudy(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		is, err := s.imagingStudies.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "ImagingStudy", is.FHIRID, is.VersionID)
+		}
+	}
 	return s.imagingStudies.Delete(ctx, id)
 }
 

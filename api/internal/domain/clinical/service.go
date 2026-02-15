@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/google/uuid"
 )
 
@@ -12,6 +13,17 @@ type Service struct {
 	observations ObservationRepository
 	allergies    AllergyRepository
 	procedures   ProcedureRepository
+	vt           *fhir.VersionTracker
+}
+
+// SetVersionTracker attaches an optional VersionTracker to the service.
+func (s *Service) SetVersionTracker(vt *fhir.VersionTracker) {
+	s.vt = vt
+}
+
+// VersionTracker returns the service's VersionTracker (may be nil).
+func (s *Service) VersionTracker() *fhir.VersionTracker {
+	return s.vt
 }
 
 func NewService(cond ConditionRepository, obs ObservationRepository, allergy AllergyRepository, proc ProcedureRepository) *Service {
@@ -41,7 +53,14 @@ func (s *Service) CreateCondition(ctx context.Context, c *Condition) error {
 	if !validClinicalStatuses[c.ClinicalStatus] {
 		return fmt.Errorf("invalid clinical_status: %s", c.ClinicalStatus)
 	}
-	return s.conditions.Create(ctx, c)
+	if err := s.conditions.Create(ctx, c); err != nil {
+		return err
+	}
+	c.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Condition", c.FHIRID, c.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetCondition(ctx context.Context, id uuid.UUID) (*Condition, error) {
@@ -56,10 +75,22 @@ func (s *Service) UpdateCondition(ctx context.Context, c *Condition) error {
 	if c.ClinicalStatus != "" && !validClinicalStatuses[c.ClinicalStatus] {
 		return fmt.Errorf("invalid clinical_status: %s", c.ClinicalStatus)
 	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Condition", c.FHIRID, c.VersionID, c.ToFHIR())
+		if err == nil {
+			c.VersionID = newVer
+		}
+	}
 	return s.conditions.Update(ctx, c)
 }
 
 func (s *Service) DeleteCondition(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		c, err := s.conditions.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Condition", c.FHIRID, c.VersionID)
+		}
+	}
 	return s.conditions.Delete(ctx, id)
 }
 
@@ -91,7 +122,14 @@ func (s *Service) CreateObservation(ctx context.Context, o *Observation) error {
 	if !validObsStatuses[o.Status] {
 		return fmt.Errorf("invalid status: %s", o.Status)
 	}
-	return s.observations.Create(ctx, o)
+	if err := s.observations.Create(ctx, o); err != nil {
+		return err
+	}
+	o.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Observation", o.FHIRID, o.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetObservation(ctx context.Context, id uuid.UUID) (*Observation, error) {
@@ -103,10 +141,22 @@ func (s *Service) GetObservationByFHIRID(ctx context.Context, fhirID string) (*O
 }
 
 func (s *Service) UpdateObservation(ctx context.Context, o *Observation) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Observation", o.FHIRID, o.VersionID, o.ToFHIR())
+		if err == nil {
+			o.VersionID = newVer
+		}
+	}
 	return s.observations.Update(ctx, o)
 }
 
 func (s *Service) DeleteObservation(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		o, err := s.observations.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Observation", o.FHIRID, o.VersionID)
+		}
+	}
 	return s.observations.Delete(ctx, id)
 }
 
@@ -142,7 +192,14 @@ func (s *Service) CreateAllergy(ctx context.Context, a *AllergyIntolerance) erro
 		status := "active"
 		a.ClinicalStatus = &status
 	}
-	return s.allergies.Create(ctx, a)
+	if err := s.allergies.Create(ctx, a); err != nil {
+		return err
+	}
+	a.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "AllergyIntolerance", a.FHIRID, a.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetAllergy(ctx context.Context, id uuid.UUID) (*AllergyIntolerance, error) {
@@ -154,10 +211,22 @@ func (s *Service) GetAllergyByFHIRID(ctx context.Context, fhirID string) (*Aller
 }
 
 func (s *Service) UpdateAllergy(ctx context.Context, a *AllergyIntolerance) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "AllergyIntolerance", a.FHIRID, a.VersionID, a.ToFHIR())
+		if err == nil {
+			a.VersionID = newVer
+		}
+	}
 	return s.allergies.Update(ctx, a)
 }
 
 func (s *Service) DeleteAllergy(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		a, err := s.allergies.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "AllergyIntolerance", a.FHIRID, a.VersionID)
+		}
+	}
 	return s.allergies.Delete(ctx, id)
 }
 
@@ -207,7 +276,14 @@ func (s *Service) CreateProcedure(ctx context.Context, p *ProcedureRecord) error
 	if !validProcStatuses[p.Status] {
 		return fmt.Errorf("invalid status: %s", p.Status)
 	}
-	return s.procedures.Create(ctx, p)
+	if err := s.procedures.Create(ctx, p); err != nil {
+		return err
+	}
+	p.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "Procedure", p.FHIRID, p.ToFHIR())
+	}
+	return nil
 }
 
 func (s *Service) GetProcedure(ctx context.Context, id uuid.UUID) (*ProcedureRecord, error) {
@@ -219,10 +295,22 @@ func (s *Service) GetProcedureByFHIRID(ctx context.Context, fhirID string) (*Pro
 }
 
 func (s *Service) UpdateProcedure(ctx context.Context, p *ProcedureRecord) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "Procedure", p.FHIRID, p.VersionID, p.ToFHIR())
+		if err == nil {
+			p.VersionID = newVer
+		}
+	}
 	return s.procedures.Update(ctx, p)
 }
 
 func (s *Service) DeleteProcedure(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		p, err := s.procedures.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "Procedure", p.FHIRID, p.VersionID)
+		}
+	}
 	return s.procedures.Delete(ctx, id)
 }
 
