@@ -2528,6 +2528,13 @@ func runServer() error {
 	validateHandler := fhir.NewValidateHandler(resourceValidator)
 	validateHandler.RegisterRoutes(fhirGroup)
 
+	// US Core Profile Validation (USCDI v3) — StructureDefinition-based profile validation
+	profileRegistry := fhir.NewProfileRegistry()
+	fhir.RegisterUSCoreProfiles(profileRegistry)
+	profileValidator := fhir.NewProfileValidator(profileRegistry)
+	profileHandler := fhir.NewProfileHandler(profileValidator, profileRegistry)
+	profileHandler.RegisterRoutes(fhirGroup)
+
 	// C-CDA Generation & Parsing — Continuity of Care Documents
 	ccdaGenerator := ccda.NewGenerator("EHR System", "2.16.840.1.113883.3.0000")
 	ccdaParser := ccda.NewParser()

@@ -17,6 +17,8 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **29 domains** covering 200+ database tables (identity, encounter, clinical, medication, diagnostics, scheduling, billing, documents, inbox, surgery, emergency, obstetrics, oncology, nursing, behavioral, research, portal, admin, CDS, subscription, careplan, careteam, device, immunization, familyhistory, relatedperson, provenance, task, terminology)
 - **FHIR R4 REST API** with 40+ resource types (including Group, Binary, NutritionOrder) and full CRUD, search, history, patch, transaction bundles
 - **FHIR $validate** operation for resource validation against structure rules, required fields, and business rules
+- **FHIRPath Engine** — full expression evaluator with path navigation, comparisons, logical/collection/string/math/date functions, indexing, and union
+- **US Core Profile Validation (USCDI v3)** — 10 built-in US Core IG v6.1.0 profiles with cardinality, MustSupport, choice type, and terminology binding validation
 - **C-CDA 2.1 Generation & Parsing** — produce and consume Continuity of Care Documents (10 clinical sections)
 - **SMART on FHIR App Launch v2.0** — full OAuth2 authorization server with EHR launch, standalone launch, PKCE, dynamic client registration
 - **FHIR R4 Subscriptions** with REST-hook webhook delivery, criteria matching, retry with exponential backoff
@@ -808,6 +810,18 @@ Content negotiation: returns raw bytes when Accept matches the stored contentTyp
 | DELETE | `/api/v1/nutrition-orders/:id` | Delete nutrition order |
 
 Supports oral diet (nutrients, texture modifiers, fluid consistency), supplements, enteral formula with administration rates. Status state machine: draft → active → on-hold → completed/revoked. FHIR R4 NutritionOrder mapping.
+
+### US Core Profile Validation
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/StructureDefinition` | List all registered profiles |
+| GET | `/fhir/StructureDefinition/:id` | Get profile by name or URL |
+| POST | `/fhir/$validate` | Validate resource against profile (with `profile` query param) |
+| GET | `/fhir/metadata/profiles` | List profiles by resource type |
+| POST | `/fhir/metadata/profiles` | Register custom profile |
+
+10 built-in US Core IG v6.1.0 profiles: Patient, Condition, Observation Lab, AllergyIntolerance, MedicationRequest, Encounter, Procedure, Immunization, DiagnosticReport Lab, DocumentReference. Validates cardinality (min/max), MustSupport fields (warnings), choice types (`medication[x]`, `effective[x]`, etc.), and terminology bindings.
 
 ### Role-Based Access Control
 
