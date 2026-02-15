@@ -471,6 +471,22 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **Patient Self-Scheduling** -- Patient-facing API for appointment booking. Slot search with date range, service type, and schedule ID filtering. Booking with double-booking prevention via slot-level locking. Cancellation with automatic slot freeing. Patient-scoped appointment listing and detail retrieval. Thread-safe in-memory manager with `sync.RWMutex`. Located in `internal/platform/scheduling/self_schedule.go`.
 
+- **WebSocket Real-time Updates** (`GET /api/v1/ws`) -- Central Hub for WebSocket connections with topic-based subscriptions. Clients subscribe to topics (e.g., `Patient/123`, `Encounter/*`) and receive real-time events on resource creation, update, and deletion. Thread-safe Hub with `sync.RWMutex`, 256-capacity send buffers per client, gorilla/websocket upgrader, and `EventPublisher` interface for integration with domain services. Located in `internal/platform/websocket/hub.go`.
+
+- **Email/SMS Notification Service** -- Template-based notification system supporting email and SMS channels. Five built-in templates (appointment-reminder, lab-result-ready, prescription-filled, password-reset, visit-summary) with `{{key}}` variable substitution. `NotificationManager` handles send, retry, delivery tracking, and per-recipient listing. Pluggable `EmailSender`/`SMSSender` interfaces for Twilio, SendGrid, or custom providers. Located in `internal/platform/notification/notification.go`.
+
+- **Document/Blob Storage** -- File storage API for clinical images, radiology scans, lab reports, and other attachments. `BlobStore` interface with `Upload`, `Download`, `Delete`, `Search` operations. SHA-256 integrity hashing, 100MB max file size, 10 medical MIME types, patient-scoped listing with category filtering. In-memory implementation for dev; S3/MinIO adapter pattern for production. Located in `internal/platform/blobstore/blobstore.go`.
+
+- **HTTP Cache/ETag Middleware** -- Three composable middleware functions: `ETagMiddleware` (weak ETags via MD5, 304 responses, Cache-Control headers), `ConditionalRequestMiddleware` (If-None-Match, If-Modified-Since, 412 Precondition Failed), and `ResponseCacheMiddleware` (in-memory response cache with TTL, X-Cache HIT/MISS headers). Default config is PHI-safe (private, 5-min max-age). Located in `internal/platform/middleware/cache.go`.
+
+- **Audit Trail Search/Export** -- Query audit logs by user, patient, action, resource type, date range, outcome, and source IP. Supports pagination, sorting (timestamp/user/action, asc/desc), CSV export with Content-Disposition headers, JSON export, and aggregate summaries (counts by action/resource/outcome/user with time range). Located in `internal/platform/hipaa/audit_search.go`.
+
+- **FHIR Bulk Import/Edit** (`POST /fhir/$import`, `POST /fhir/$bulk-edit`, `POST /fhir/$bulk-delete`) -- Asynchronous bulk operations for data management. Import: NDJSON parsing with per-resource validation and error tracking. Edit: criteria-based matching with bulk update/patch/delete. Job tracking with status polling, concurrent job limits (default 5), and cancellation. Located in `internal/platform/fhir/bulk_ops.go`.
+
+- **FHIR $graphql** (`POST /fhir/$graphql`, `GET /fhir/$graphql`) -- GraphQL query interface for FHIR resources. Supports single resource by ID (`{ Patient(id: "123") { ... } }`), list queries with search parameters (`{ PatientList(name: "Smith") { ... } }`), field selection, and variable substitution. Pluggable `GraphQLResourceResolver` interface. Located in `internal/platform/fhir/graphql_op.go`.
+
+- **CodeSystem/$closure** (`POST /fhir/CodeSystem/$closure`) -- Manages transitive closure tables for code system hierarchies. Initialize named closure tables, then incrementally add concepts to compute subsumption relationships. Built-in SNOMED CT hierarchy (25+ relationships across Clinical finding, Disease, Body structure domains). Returns ConceptMap with equivalence relationships (subsumes, specializes, equal). Located in `internal/platform/fhir/closure_op.go`.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.

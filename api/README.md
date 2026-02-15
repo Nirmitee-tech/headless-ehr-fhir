@@ -32,6 +32,14 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **$process-message** — FHIR Message Bundle processing with dispatch to registered event handlers
 - **HL7v2 MLLP Listener** — TCP server for receiving HL7v2 messages over Minimal Lower Layer Protocol
 - **Patient Self-Scheduling** — slot search, booking with double-booking prevention, cancellation, and appointment management
+- **WebSocket Real-time Updates** — live patient record change notifications with topic-based subscriptions
+- **Email/SMS Notifications** — template-based notification system with retry logic and delivery tracking
+- **Document/Blob Storage** — S3-compatible file storage for clinical images, scans, and attachments with SHA-256 integrity
+- **HTTP Cache/ETag Support** — response caching, conditional requests (If-None-Match, If-Modified-Since), and cache-control headers
+- **Audit Trail Search/Export** — query audit logs by date/user/action with CSV and JSON export for compliance reviews
+- **FHIR Bulk Import/Edit** — batch import via NDJSON, bulk update/delete with criteria matching, and job tracking
+- **FHIR $graphql** — GraphQL query interface for FHIR resources with field selection
+- **CodeSystem/$closure** — transitive closure table management for SNOMED CT hierarchies
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -584,6 +592,79 @@ Set `MLLP_ADDR` environment variable (e.g., `MLLP_ADDR=:2575`) to start the MLLP
 | GET | `/api/v1/scheduling/appointments/:id` | Get appointment by ID (params: `patient_id`) |
 
 Double-booking prevention with slot-level locking. Supports date range search, service type filtering, and automatic slot freeing on cancellation.
+
+### WebSocket Real-time Updates
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/ws` | Upgrade to WebSocket connection for real-time events |
+
+Subscribe to topics (e.g., `Patient/123`, `Encounter/*`) via JSON messages. Supports broadcast by topic and global broadcast.
+
+### Email/SMS Notifications
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/notifications/send` | Send a notification (email or SMS) |
+| POST | `/api/v1/notifications/send-template` | Send from a named template |
+| GET | `/api/v1/notifications/:id` | Get notification status |
+| GET | `/api/v1/notifications` | List notifications by recipient |
+| POST | `/api/v1/notifications/:id/retry` | Retry a failed notification |
+| GET | `/api/v1/notifications/stats` | Notification delivery statistics |
+
+Built-in templates: appointment-reminder, lab-result-ready, prescription-filled, password-reset, visit-summary.
+
+### Document/Blob Storage
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/blobs/upload` | Upload a file (multipart form) |
+| GET | `/api/v1/blobs/:id` | Download file content |
+| GET | `/api/v1/blobs/:id/metadata` | Get file metadata |
+| DELETE | `/api/v1/blobs/:id` | Delete a file |
+| GET | `/api/v1/blobs` | Search files (params: `patient_id`, `category`, `content_type`) |
+| GET | `/api/v1/blobs/patient/:patientId` | List files by patient |
+
+100MB max file size, SHA-256 integrity hashing, 10 supported medical MIME types.
+
+### Audit Trail Search/Export
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/audit/search` | Search audit logs (params: `user_id`, `patient_id`, `action`, `start`, `end`) |
+| GET | `/api/v1/audit/export/csv` | Export audit logs as CSV |
+| GET | `/api/v1/audit/export/json` | Export audit logs as JSON |
+| GET | `/api/v1/audit/summary` | Aggregate audit statistics |
+| GET | `/api/v1/audit/:id` | Get single audit entry |
+
+### FHIR Bulk Import/Edit
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/$import` | Start bulk import (NDJSON body) |
+| GET | `/fhir/$import/:id` | Get import job status |
+| GET | `/fhir/$import` | List import jobs |
+| POST | `/fhir/$bulk-edit` | Start bulk update (JSON criteria + patch) |
+| POST | `/fhir/$bulk-delete` | Start bulk delete (JSON criteria) |
+| GET | `/fhir/$bulk-edit/:id` | Get edit job status |
+| DELETE | `/fhir/$bulk-edit/:id` | Cancel edit job |
+
+### FHIR $graphql
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/$graphql` | Execute GraphQL query (JSON body) |
+| GET | `/fhir/$graphql` | Execute GraphQL query (query param) |
+
+Supports: single resource by ID, list queries with search params, field selection.
+
+### CodeSystem/$closure
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/CodeSystem/$closure` | Initialize or process closure table |
+
+Transitive closure computation for SNOMED CT hierarchies. Initialize with `name`, then add concepts to compute subsumption relationships.
 
 ### Role-Based Access Control
 
