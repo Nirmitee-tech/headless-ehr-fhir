@@ -29,6 +29,9 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **ValueSet/$validate-code** — code membership validation against 10 built-in FHIR R4 required value sets
 - **Composition/$document** — generate complete FHIR Document Bundles from Compositions with reference resolution
 - **_has and _filter** — advanced FHIR search: reverse chaining (_has) and filter expressions (_filter) with SQL generation
+- **$process-message** — FHIR Message Bundle processing with dispatch to registered event handlers
+- **HL7v2 MLLP Listener** — TCP server for receiving HL7v2 messages over Minimal Lower Layer Protocol
+- **Patient Self-Scheduling** — slot search, booking with double-booking prevention, cancellation, and appointment management
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -557,6 +560,30 @@ Accepts a FHIR Parameters resource with a Patient resource and returns a scored 
 | GET | `/fhir/ConceptMap/:id/$translate` | Translate using specific map |
 
 Built-in maps: SNOMED CT ↔ ICD-10-CM (15 conditions), LOINC → SNOMED CT (10 lab tests).
+
+### FHIR $process-message
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/$process-message` | Process a FHIR Message Bundle |
+
+Built-in event handlers: `notification`, `patient-link`, `diagnostic-report`. Custom handlers can be registered at startup.
+
+### HL7v2 MLLP TCP Listener
+
+Set `MLLP_ADDR` environment variable (e.g., `MLLP_ADDR=:2575`) to start the MLLP TCP listener. Receives HL7v2 messages over the Minimal Lower Layer Protocol with automatic ACK generation.
+
+### Patient Self-Scheduling
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/scheduling/slots` | Search available slots (params: `start`, `end`, `service_type`, `schedule_id`) |
+| POST | `/api/v1/scheduling/book` | Book an appointment (body: `slot_id`, `patient_id`, `reason`) |
+| POST | `/api/v1/scheduling/cancel/:id` | Cancel appointment (body: `patient_id`, `reason`) |
+| GET | `/api/v1/scheduling/appointments` | List patient appointments (params: `patient_id`, `status`, `limit`) |
+| GET | `/api/v1/scheduling/appointments/:id` | Get appointment by ID (params: `patient_id`) |
+
+Double-booking prevention with slot-level locking. Supports date range search, service type filtering, and automatic slot freeing on cancellation.
 
 ### Role-Based Access Control
 

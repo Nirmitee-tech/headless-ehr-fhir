@@ -56,6 +56,7 @@ import (
 	"github.com/ehr/ehr/internal/platform/hipaa"
 	"github.com/ehr/ehr/internal/platform/hl7v2"
 	"github.com/ehr/ehr/internal/platform/middleware"
+	selfsched "github.com/ehr/ehr/internal/platform/scheduling"
 	"github.com/ehr/ehr/internal/platform/openapi"
 	"github.com/ehr/ehr/internal/platform/reporting"
 )
@@ -2553,6 +2554,28 @@ func runServer() error {
 	documentGenerator := fhir.NewDocumentGenerator(documentResolver)
 	documentHandler := fhir.NewDocumentHandler(documentGenerator)
 	documentHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR $process-message — process FHIR Message Bundles
+	messageProcessor := fhir.NewMessageProcessor()
+	messageHandler := fhir.NewMessageHandler(messageProcessor)
+	messageHandler.RegisterRoutes(fhirGroup)
+
+	// HL7v2 MLLP TCP listener (optional, started when MLLP_ADDR is set)
+	if mllpAddr := os.Getenv("MLLP_ADDR"); mllpAddr != "" {
+		mllpServer := hl7v2.NewMLLPServer(mllpAddr, hl7v2.DefaultHandler())
+		go func() {
+			if err := mllpServer.Start(); err != nil {
+				logger.Error().Err(err).Msg("MLLP server failed")
+			}
+		}()
+		defer mllpServer.Stop()
+		logger.Info().Str("addr", mllpAddr).Msg("MLLP server started")
+	}
+
+	// Patient self-scheduling API
+	selfSchedMgr := selfsched.NewSelfScheduleManager()
+	selfSchedHandler := selfsched.NewSelfScheduleHandler(selfSchedMgr, selfSchedMgr)
+	selfSchedHandler.RegisterRoutes(apiV1)
 
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))

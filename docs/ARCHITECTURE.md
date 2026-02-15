@@ -465,6 +465,12 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **Advanced Search: _has and _filter** -- Library for parsing and SQL generation of advanced FHIR search parameters. `_has` (reverse chaining) generates EXISTS subqueries for finding resources referenced by other resources (e.g., find Patients with specific Observations). `_filter` parses structured filter expressions (eq, ne, gt, lt, ge, le, co, sw, ew operators with and/or combiners) and generates parameterized PostgreSQL WHERE clauses. Located in `internal/platform/fhir/search_advanced.go`.
 
+- **$process-message** (`POST /fhir/$process-message`) -- Processes FHIR Message Bundles by dispatching to registered event handlers. Validates bundle type, extracts MessageHeader, resolves focus resources, and routes to handlers by event code. Ships with 3 built-in handlers: `notification` (acknowledgement), `patient-link` (merge/link patients), `diagnostic-report` (process reports). Returns response Message Bundle or OperationOutcome. Located in `internal/platform/fhir/message_op.go`.
+
+- **HL7v2 MLLP TCP Listener** -- Production-ready TCP server implementing the Minimal Lower Layer Protocol (MLLP) for HL7v2 message exchange. Supports 0x0B/0x1C/0x0D framing, 1MB message size limit, 30s read timeout, concurrent connection tracking, graceful shutdown, and automatic ACK generation. Enabled via `MLLP_ADDR` environment variable (e.g., `:2575`). Located in `internal/platform/hl7v2/mllp.go`.
+
+- **Patient Self-Scheduling** -- Patient-facing API for appointment booking. Slot search with date range, service type, and schedule ID filtering. Booking with double-booking prevention via slot-level locking. Cancellation with automatic slot freeing. Patient-scoped appointment listing and detail retrieval. Thread-safe in-memory manager with `sync.RWMutex`. Located in `internal/platform/scheduling/self_schedule.go`.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.
