@@ -15,14 +15,14 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 ## Features
 
 - **29 domains** covering 200+ database tables (identity, encounter, clinical, medication, diagnostics, scheduling, billing, documents, inbox, surgery, emergency, obstetrics, oncology, nursing, behavioral, research, portal, admin, CDS, subscription, careplan, careteam, device, immunization, familyhistory, relatedperson, provenance, task, terminology)
-- **FHIR R4 REST API** with 35+ resource types and full CRUD, search, history, patch, transaction bundles
+- **FHIR R4 REST API** with 40+ resource types (including Group, Binary, NutritionOrder) and full CRUD, search, history, patch, transaction bundles
 - **FHIR $validate** operation for resource validation against structure rules, required fields, and business rules
 - **C-CDA 2.1 Generation & Parsing** — produce and consume Continuity of Care Documents (10 clinical sections)
 - **SMART on FHIR App Launch v2.0** — full OAuth2 authorization server with EHR launch, standalone launch, PKCE, dynamic client registration
 - **FHIR R4 Subscriptions** with REST-hook webhook delivery, criteria matching, retry with exponential backoff
 - **Patient/$everything** aggregating 28 resource types from the patient compartment
 - **Bulk Data Export** ($export) with 29 resource type exporters, job limits, expiration, progress tracking
-- **HL7v2 Interface Engine** — parse and generate ADT (A01-A08), ORM (O01), ORU (R01) messages with FHIR conversion
+- **HL7v2 Interface Engine** — parse and generate ADT (A01-A08, A40-A41 merge), ORM (O01), ORU (R01), RGV (O15 pharmacy give), BAR (P01/P05 billing) messages with FHIR conversion
 - **Patient/$match** — probabilistic patient matching with Jaro-Winkler similarity scoring and configurable weights
 - **ConceptMap/$translate** — code system translation (SNOMED↔ICD-10, LOINC→SNOMED) with 3 built-in concept maps
 - **CodeSystem/$subsumes** — hierarchical subsumption testing for SNOMED CT and ICD-10 code systems
@@ -46,7 +46,10 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **Webhook Management API** — register endpoints, test connectivity, view delivery logs, retry failures, HMAC-SHA256 signatures
 - **API Usage Analytics** — per-endpoint/client/resource metrics, time-series data, P95 latency tracking
 - **Sandbox & Synthetic Data** — generate realistic FHIR patients with encounters, observations, conditions, medications
-- **Detailed CapabilityStatement** — 38 resource types with search params, 12 operations, custom search parameter API
+- **Detailed CapabilityStatement** — 40+ resource types with search params, 12 operations, custom search parameter API
+- **FHIR Group Resource** — patient cohorts, research populations, practitioner/device groups with member management and $export integration
+- **FHIR Binary Resource** — raw binary content with content negotiation (raw bytes vs FHIR JSON), base64 encoding, 50MB limit
+- **NutritionOrder** — oral diet, supplement, enteral formula with nutrient/texture modifiers, food preferences, status state machine
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -760,7 +763,51 @@ Generates realistic patients with ICD-10 conditions, LOINC observations, RxNorm 
 | GET | `/fhir/metadata/search-params` | List custom search parameters |
 | DELETE | `/fhir/metadata/search-params/:type/:name` | Delete custom search parameter |
 
-38 resource types with detailed search parameters (20+ for Patient), 12 server-level operations, custom search parameter API.
+40+ resource types with detailed search parameters (20+ for Patient), 12 server-level operations, custom search parameter API.
+
+### FHIR Group Resource
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/groups` | List groups (filter by type) |
+| POST | `/api/v1/groups` | Create group |
+| GET | `/api/v1/groups/:id` | Get group |
+| PUT | `/api/v1/groups/:id` | Update group |
+| DELETE | `/api/v1/groups/:id` | Delete group |
+| POST | `/api/v1/groups/:id/members` | Add member |
+| DELETE | `/api/v1/groups/:id/members/:member_id` | Remove member |
+| GET | `/api/v1/groups/:id/members` | List members |
+| GET | `/fhir/Group` | FHIR search |
+| POST | `/fhir/Group` | FHIR create |
+| GET | `/fhir/Group/:id` | FHIR read |
+| PUT | `/fhir/Group/:id` | FHIR update |
+| DELETE | `/fhir/Group/:id` | FHIR delete |
+
+Supports 6 group types (person, animal, practitioner, device, medication, substance). Integrated with $export Group-level export for patient cohort data extraction.
+
+### FHIR Binary Resource
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/Binary` | Search binaries (paginated) |
+| POST | `/fhir/Binary` | Create binary (base64 data) |
+| GET | `/fhir/Binary/:id` | Read binary (content negotiation) |
+| PUT | `/fhir/Binary/:id` | Update binary |
+| DELETE | `/fhir/Binary/:id` | Delete binary |
+
+Content negotiation: returns raw bytes when Accept matches the stored contentType, otherwise FHIR JSON with base64-encoded data. 50MB size limit.
+
+### NutritionOrder
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/nutrition-orders` | List by patient_id or encounter_id |
+| POST | `/api/v1/nutrition-orders` | Create nutrition order |
+| GET | `/api/v1/nutrition-orders/:id` | Get nutrition order |
+| PUT | `/api/v1/nutrition-orders/:id` | Update nutrition order |
+| DELETE | `/api/v1/nutrition-orders/:id` | Delete nutrition order |
+
+Supports oral diet (nutrients, texture modifiers, fluid consistency), supplements, enteral formula with administration rates. Status state machine: draft → active → on-hold → completed/revoked. FHIR R4 NutritionOrder mapping.
 
 ### Role-Based Access Control
 

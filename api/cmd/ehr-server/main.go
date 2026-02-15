@@ -708,6 +708,12 @@ func runServer() error {
 	adminHandler := admin.NewHandler(adminSvc)
 	adminHandler.RegisterRoutes(apiV1, fhirGroup)
 
+	// FHIR Group resource
+	fhirGroupRepo := admin.NewInMemoryGroupRepo()
+	fhirGroupSvc := admin.NewGroupService(fhirGroupRepo)
+	fhirGroupHandler := admin.NewGroupHandler(fhirGroupSvc)
+	fhirGroupHandler.RegisterGroupRoutes(apiV1, fhirGroup)
+
 	// Identity domain (with optional PHI encryption)
 	var phiEncryptor hipaa.FieldEncryptor
 	if cfg.HIPAAEncryptionKey != "" {
@@ -759,6 +765,12 @@ func runServer() error {
 	clinicalSvc.SetVersionTracker(versionTracker)
 	clinicalHandler := clinical.NewHandler(clinicalSvc)
 	clinicalHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// NutritionOrder domain
+	nutritionRepo := clinical.NewInMemoryNutritionOrderRepo()
+	nutritionSvc := clinical.NewNutritionOrderService(nutritionRepo)
+	nutritionHandler := clinical.NewNutritionOrderHandler(nutritionSvc)
+	nutritionHandler.RegisterNutritionOrderRoutes(apiV1)
 
 	// Diagnostics domain
 	srRepo := diagnostics.NewServiceRequestRepoPG(pool)
@@ -1820,11 +1832,30 @@ func runServer() error {
 
 	// Group export resolver — returns 404 until a Group domain is implemented.
 	exportManager.SetGroupResolver(func(ctx context.Context, groupID string) ([]string, error) {
-		return nil, fmt.Errorf("group not found: %s (Group resource type not yet supported)", groupID)
+		gid, err := uuid.Parse(groupID)
+		if err != nil {
+			return nil, fmt.Errorf("group not found: %s", groupID)
+		}
+		members, err := fhirGroupSvc.ListMembers(ctx, gid)
+		if err != nil {
+			return nil, fmt.Errorf("group not found: %s", groupID)
+		}
+		var patientIDs []string
+		for _, m := range members {
+			if !m.Inactive {
+				patientIDs = append(patientIDs, m.EntityID)
+			}
+		}
+		return patientIDs, nil
 	})
 
 	exportHandler := fhir.NewExportHandler(exportManager)
 	exportHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR Binary resource
+	binaryStore := fhir.NewInMemoryBinaryStore()
+	binaryHandler := fhir.NewBinaryHandler(binaryStore)
+	binaryHandler.RegisterRoutes(fhirGroup)
 
 	// FHIR Patient/$everything — aggregates all patient compartment data
 	everythingHandler := fhir.NewEverythingHandler()
