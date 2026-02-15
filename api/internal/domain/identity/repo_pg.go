@@ -941,6 +941,181 @@ func (r *practRepoPG) decryptPractitionerPII(p *Practitioner) error {
 	return nil
 }
 
+// -- PractitionerRole Repository --
+
+type practRoleRepoPG struct {
+	pool *pgxpool.Pool
+}
+
+func NewPractitionerRoleRepoPG(pool *pgxpool.Pool) PractitionerRoleRepository {
+	return &practRoleRepoPG{pool: pool}
+}
+
+func (r *practRoleRepoPG) conn(ctx context.Context) querier {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+const practRoleCols = `id, fhir_id, practitioner_id, organization_id, department_id,
+	role_code, role_display, period_start, period_end, active,
+	telehealth_capable, accepting_patients, version_id, created_at, updated_at`
+
+func scanPractitionerRole(row pgx.Row) (*PractitionerRole, error) {
+	var r PractitionerRole
+	err := row.Scan(
+		&r.ID, &r.FHIRID, &r.PractitionerID, &r.OrganizationID, &r.DepartmentID,
+		&r.RoleCode, &r.RoleDisplay, &r.PeriodStart, &r.PeriodEnd, &r.Active,
+		&r.TelehealthCapable, &r.AcceptingPatients, &r.VersionID, &r.CreatedAt, &r.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func scanPractitionerRoleRows(rows pgx.Rows) (*PractitionerRole, error) {
+	var r PractitionerRole
+	err := rows.Scan(
+		&r.ID, &r.FHIRID, &r.PractitionerID, &r.OrganizationID, &r.DepartmentID,
+		&r.RoleCode, &r.RoleDisplay, &r.PeriodStart, &r.PeriodEnd, &r.Active,
+		&r.TelehealthCapable, &r.AcceptingPatients, &r.VersionID, &r.CreatedAt, &r.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (r *practRoleRepoPG) Create(ctx context.Context, role *PractitionerRole) error {
+	role.ID = uuid.New()
+	if role.FHIRID == "" {
+		role.FHIRID = role.ID.String()
+	}
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO practitioner_role (
+			id, fhir_id, practitioner_id, organization_id, department_id,
+			role_code, role_display, period_start, period_end, active,
+			telehealth_capable, accepting_patients
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		role.ID, role.FHIRID, role.PractitionerID, role.OrganizationID, role.DepartmentID,
+		role.RoleCode, role.RoleDisplay, role.PeriodStart, role.PeriodEnd, role.Active,
+		role.TelehealthCapable, role.AcceptingPatients,
+	)
+	return err
+}
+
+func (r *practRoleRepoPG) GetByID(ctx context.Context, id uuid.UUID) (*PractitionerRole, error) {
+	return scanPractitionerRole(r.conn(ctx).QueryRow(ctx, `SELECT `+practRoleCols+` FROM practitioner_role WHERE id = $1`, id))
+}
+
+func (r *practRoleRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*PractitionerRole, error) {
+	return scanPractitionerRole(r.conn(ctx).QueryRow(ctx, `SELECT `+practRoleCols+` FROM practitioner_role WHERE fhir_id = $1`, fhirID))
+}
+
+func (r *practRoleRepoPG) Update(ctx context.Context, role *PractitionerRole) error {
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE practitioner_role SET
+			role_code=$2, role_display=$3, active=$4, period_start=$5, period_end=$6,
+			accepting_patients=$7, telehealth_capable=$8, version_id=$9, updated_at=NOW()
+		WHERE id = $1`,
+		role.ID, role.RoleCode, role.RoleDisplay, role.Active, role.PeriodStart, role.PeriodEnd,
+		role.AcceptingPatients, role.TelehealthCapable, role.VersionID,
+	)
+	return err
+}
+
+func (r *practRoleRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM practitioner_role WHERE id = $1`, id)
+	return err
+}
+
+func (r *practRoleRepoPG) List(ctx context.Context, limit, offset int) ([]*PractitionerRole, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM practitioner_role`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+practRoleCols+` FROM practitioner_role ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var roles []*PractitionerRole
+	for rows.Next() {
+		role, err := scanPractitionerRoleRows(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		roles = append(roles, role)
+	}
+	return roles, total, nil
+}
+
+func (r *practRoleRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PractitionerRole, int, error) {
+	query := `SELECT ` + practRoleCols + ` FROM practitioner_role WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM practitioner_role WHERE 1=1`
+	var args []interface{}
+	idx := 1
+
+	if v, ok := params["practitioner"]; ok {
+		clause := fmt.Sprintf(` AND practitioner_id = $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, v)
+		idx++
+	}
+	if v, ok := params["organization"]; ok {
+		clause := fmt.Sprintf(` AND organization_id = $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, v)
+		idx++
+	}
+	if v, ok := params["role"]; ok {
+		clause := fmt.Sprintf(` AND role_code = $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, v)
+		idx++
+	}
+	if v, ok := params["active"]; ok {
+		clause := fmt.Sprintf(` AND active = $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, v == "true")
+		idx++
+	}
+
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var roles []*PractitionerRole
+	for rows.Next() {
+		role, err := scanPractitionerRoleRows(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		roles = append(roles, role)
+	}
+	return roles, total, nil
+}
+
 type querier interface {
 	Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)

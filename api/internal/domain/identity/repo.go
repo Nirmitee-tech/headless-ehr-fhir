@@ -48,3 +48,13 @@ type PractitionerRepository interface {
 	GetRoles(ctx context.Context, practitionerID uuid.UUID) ([]*PractitionerRole, error)
 	RemoveRole(ctx context.Context, id uuid.UUID) error
 }
+
+type PractitionerRoleRepository interface {
+	Create(ctx context.Context, role *PractitionerRole) error
+	GetByID(ctx context.Context, id uuid.UUID) (*PractitionerRole, error)
+	GetByFHIRID(ctx context.Context, fhirID string) (*PractitionerRole, error)
+	Update(ctx context.Context, role *PractitionerRole) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context, limit, offset int) ([]*PractitionerRole, int, error)
+	Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PractitionerRole, int, error)
+}

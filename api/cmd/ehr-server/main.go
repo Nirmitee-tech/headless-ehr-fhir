@@ -401,6 +401,12 @@ func runServer() error {
 		{Name: "family", Type: "string"},
 		{Name: "identifier", Type: "token"},
 	})
+	capBuilder.AddResource("PractitionerRole", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "practitioner", Type: "reference"},
+		{Name: "organization", Type: "reference"},
+		{Name: "role", Type: "token"},
+		{Name: "active", Type: "token"},
+	})
 
 	// Admin domain
 	capBuilder.AddResource("Organization", fhir.DefaultInteractions(), []fhir.SearchParam{
@@ -901,7 +907,8 @@ func runServer() error {
 		practRepo = identity.NewPractitionerRepo(pool)
 	}
 	patientLinkRepo := identity.NewPatientLinkRepo(pool)
-	identitySvc := identity.NewService(patientRepo, practRepo, patientLinkRepo)
+	practRoleRepo := identity.NewPractitionerRoleRepoPG(pool)
+	identitySvc := identity.NewService(patientRepo, practRepo, patientLinkRepo, practRoleRepo)
 	identitySvc.SetVersionTracker(versionTracker)
 	identityHandler := identity.NewHandler(identitySvc)
 	identityHandler.RegisterRoutes(apiV1, fhirGroup)

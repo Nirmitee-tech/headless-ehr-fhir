@@ -14,11 +14,12 @@ type Service struct {
 	patients      PatientRepository
 	practitioners PractitionerRepository
 	links         PatientLinkRepository
+	practRoles    PractitionerRoleRepository
 	vt            *fhir.VersionTracker
 }
 
-func NewService(patients PatientRepository, practitioners PractitionerRepository, links PatientLinkRepository) *Service {
-	return &Service{patients: patients, practitioners: practitioners, links: links}
+func NewService(patients PatientRepository, practitioners PractitionerRepository, links PatientLinkRepository, practRoles PractitionerRoleRepository) *Service {
+	return &Service{patients: patients, practitioners: practitioners, links: links, practRoles: practRoles}
 }
 
 // SetVersionTracker attaches an optional VersionTracker to the service.
@@ -304,4 +305,62 @@ func (s *Service) GetPractitionerRoles(ctx context.Context, practitionerID uuid.
 
 func (s *Service) RemovePractitionerRole(ctx context.Context, id uuid.UUID) error {
 	return s.practitioners.RemoveRole(ctx, id)
+}
+
+// -- PractitionerRole (first-class resource) --
+
+func (s *Service) CreatePractitionerRole(ctx context.Context, role *PractitionerRole) error {
+	if role.PractitionerID == uuid.Nil {
+		return fmt.Errorf("practitioner_id is required")
+	}
+	if role.RoleCode == "" {
+		return fmt.Errorf("role_code is required")
+	}
+	role.Active = true
+	if err := s.practRoles.Create(ctx, role); err != nil {
+		return err
+	}
+	role.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "PractitionerRole", role.FHIRID, role.ToFHIR())
+	}
+	return nil
+}
+
+func (s *Service) GetPractitionerRole(ctx context.Context, id uuid.UUID) (*PractitionerRole, error) {
+	return s.practRoles.GetByID(ctx, id)
+}
+
+func (s *Service) GetPractitionerRoleByFHIRID(ctx context.Context, fhirID string) (*PractitionerRole, error) {
+	return s.practRoles.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdatePractitionerRole(ctx context.Context, role *PractitionerRole) error {
+	if role.PractitionerID == uuid.Nil {
+		return fmt.Errorf("practitioner_id is required")
+	}
+	if role.RoleCode == "" {
+		return fmt.Errorf("role_code is required")
+	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "PractitionerRole", role.FHIRID, role.VersionID, role.ToFHIR())
+		if err == nil {
+			role.VersionID = newVer
+		}
+	}
+	return s.practRoles.Update(ctx, role)
+}
+
+func (s *Service) DeletePractitionerRole(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		role, err := s.practRoles.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "PractitionerRole", role.FHIRID, role.VersionID)
+		}
+	}
+	return s.practRoles.Delete(ctx, id)
+}
+
+func (s *Service) SearchPractitionerRoles(ctx context.Context, params map[string]string, limit, offset int) ([]*PractitionerRole, int, error) {
+	return s.practRoles.Search(ctx, params, limit, offset)
 }

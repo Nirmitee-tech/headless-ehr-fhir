@@ -223,6 +223,66 @@ func (m *mockPractRepo) RemoveRole(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// -- Mock PractitionerRole Repository --
+
+type mockPractRoleRepo struct {
+	roles map[uuid.UUID]*PractitionerRole
+}
+
+func newMockPractRoleRepo() *mockPractRoleRepo {
+	return &mockPractRoleRepo{roles: make(map[uuid.UUID]*PractitionerRole)}
+}
+
+func (m *mockPractRoleRepo) Create(_ context.Context, role *PractitionerRole) error {
+	role.ID = uuid.New()
+	if role.FHIRID == "" {
+		role.FHIRID = role.ID.String()
+	}
+	role.CreatedAt = time.Now()
+	role.UpdatedAt = time.Now()
+	m.roles[role.ID] = role
+	return nil
+}
+
+func (m *mockPractRoleRepo) GetByID(_ context.Context, id uuid.UUID) (*PractitionerRole, error) {
+	r, ok := m.roles[id]
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	return r, nil
+}
+
+func (m *mockPractRoleRepo) GetByFHIRID(_ context.Context, fhirID string) (*PractitionerRole, error) {
+	for _, r := range m.roles {
+		if r.FHIRID == fhirID {
+			return r, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (m *mockPractRoleRepo) Update(_ context.Context, role *PractitionerRole) error {
+	m.roles[role.ID] = role
+	return nil
+}
+
+func (m *mockPractRoleRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.roles, id)
+	return nil
+}
+
+func (m *mockPractRoleRepo) List(_ context.Context, limit, offset int) ([]*PractitionerRole, int, error) {
+	var result []*PractitionerRole
+	for _, r := range m.roles {
+		result = append(result, r)
+	}
+	return result, len(result), nil
+}
+
+func (m *mockPractRoleRepo) Search(_ context.Context, params map[string]string, limit, offset int) ([]*PractitionerRole, int, error) {
+	return m.List(context.Background(), limit, offset)
+}
+
 // -- Mock Patient Link Repository --
 
 type mockPatientLinkRepo struct {
@@ -257,7 +317,7 @@ func (m *mockPatientLinkRepo) Delete(_ context.Context, id uuid.UUID) error {
 // -- Tests --
 
 func newTestService() *Service {
-	return NewService(newMockPatientRepo(), newMockPractRepo(), newMockPatientLinkRepo())
+	return NewService(newMockPatientRepo(), newMockPractRepo(), newMockPatientLinkRepo(), newMockPractRoleRepo())
 }
 
 func TestCreatePatient(t *testing.T) {

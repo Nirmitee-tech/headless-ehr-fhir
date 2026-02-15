@@ -72,15 +72,26 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirWrite.DELETE("/Practitioner/:id", h.DeletePractitionerFHIR)
 	fhirWrite.PATCH("/Practitioner/:id", h.PatchPractitionerFHIR)
 
+	// PractitionerRole FHIR endpoints
+	fhirRead.GET("/PractitionerRole", h.SearchPractitionerRolesFHIR)
+	fhirRead.GET("/PractitionerRole/:id", h.GetPractitionerRoleFHIR)
+	fhirWrite.POST("/PractitionerRole", h.CreatePractitionerRoleFHIR)
+	fhirWrite.PUT("/PractitionerRole/:id", h.UpdatePractitionerRoleFHIR)
+	fhirWrite.DELETE("/PractitionerRole/:id", h.DeletePractitionerRoleFHIR)
+	fhirWrite.PATCH("/PractitionerRole/:id", h.PatchPractitionerRoleFHIR)
+
 	// FHIR POST _search endpoints
 	fhirRead.POST("/Patient/_search", h.SearchPatientsFHIR)
 	fhirRead.POST("/Practitioner/_search", h.SearchPractitionersFHIR)
+	fhirRead.POST("/PractitionerRole/_search", h.SearchPractitionerRolesFHIR)
 
 	// FHIR vread and history endpoints
 	fhirRead.GET("/Patient/:id/_history/:vid", h.VreadPatientFHIR)
 	fhirRead.GET("/Patient/:id/_history", h.HistoryPatientFHIR)
 	fhirRead.GET("/Practitioner/:id/_history/:vid", h.VreadPractitionerFHIR)
 	fhirRead.GET("/Practitioner/:id/_history", h.HistoryPractitionerFHIR)
+	fhirRead.GET("/PractitionerRole/:id/_history/:vid", h.VreadPractitionerRoleFHIR)
+	fhirRead.GET("/PractitionerRole/:id/_history", h.HistoryPractitionerRoleFHIR)
 }
 
 // -- Patient Operational Handlers --
@@ -493,6 +504,187 @@ func (h *Handler) DeletePractitionerFHIR(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// -- FHIR PractitionerRole Handlers --
+
+func (h *Handler) SearchPractitionerRolesFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, key := range []string{"practitioner", "organization", "role", "active"} {
+		if v := c.QueryParam(key); v != "" {
+			params[key] = v
+		}
+	}
+
+	roles, total, err := h.svc.SearchPractitionerRoles(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+
+	resources := make([]interface{}, len(roles))
+	for i, r := range roles {
+		resources[i] = r.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/PractitionerRole"))
+}
+
+func (h *Handler) GetPractitionerRoleFHIR(c echo.Context) error {
+	role, err := h.svc.GetPractitionerRoleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, role.ToFHIR())
+}
+
+func (h *Handler) CreatePractitionerRoleFHIR(c echo.Context) error {
+	var role PractitionerRole
+	if err := c.Bind(&role); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreatePractitionerRole(c.Request().Context(), &role); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/PractitionerRole/"+role.FHIRID)
+	return c.JSON(http.StatusCreated, role.ToFHIR())
+}
+
+func (h *Handler) UpdatePractitionerRoleFHIR(c echo.Context) error {
+	existing, err := h.svc.GetPractitionerRoleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", c.Param("id")))
+	}
+	var role PractitionerRole
+	if err := c.Bind(&role); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	role.ID = existing.ID
+	role.FHIRID = existing.FHIRID
+	role.PractitionerID = existing.PractitionerID
+	if err := h.svc.UpdatePractitionerRole(c.Request().Context(), &role); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, role.ToFHIR())
+}
+
+func (h *Handler) DeletePractitionerRoleFHIR(c echo.Context) error {
+	role, err := h.svc.GetPractitionerRoleByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", c.Param("id")))
+	}
+	if err := h.svc.DeletePractitionerRole(c.Request().Context(), role.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) PatchPractitionerRoleFHIR(c echo.Context) error {
+	ctx := c.Request().Context()
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetPractitionerRoleByFHIRID(ctx, c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome("PATCH requires application/json-patch+json or application/merge-patch+json"))
+	}
+	applyPractitionerRolePatch(existing, patched)
+	if err := h.svc.UpdatePractitionerRole(ctx, existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *Handler) VreadPractitionerRoleFHIR(c echo.Context) error {
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+	vidStr := c.Param("vid")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		var vid int
+		if _, err := fmt.Sscanf(vidStr, "%d", &vid); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid version id"))
+		}
+		entry, err := vt.GetVersion(ctx, "PractitionerRole", fhirID, vid)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", fhirID+"/_history/"+vidStr))
+		}
+		var resource map[string]interface{}
+		if err := json.Unmarshal(entry.Resource, &resource); err != nil {
+			return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome("failed to parse versioned resource"))
+		}
+		fhir.SetVersionHeaders(c, entry.VersionID, entry.Timestamp.Format("2006-01-02T15:04:05Z"))
+		return c.JSON(http.StatusOK, resource)
+	}
+
+	// Fallback: no version tracker
+	role, err := h.svc.GetPractitionerRoleByFHIRID(ctx, fhirID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", fhirID))
+	}
+	result := role.ToFHIR()
+	fhir.SetVersionHeaders(c, role.VersionID, role.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryPractitionerRoleFHIR(c echo.Context) error {
+	ctx := c.Request().Context()
+	fhirID := c.Param("id")
+
+	if vt := h.svc.VersionTracker(); vt != nil {
+		entries, total, err := vt.ListVersions(ctx, "PractitionerRole", fhirID, 100, 0)
+		if err != nil || total == 0 {
+			role, ferr := h.svc.GetPractitionerRoleByFHIRID(ctx, fhirID)
+			if ferr != nil {
+				return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", fhirID))
+			}
+			result := role.ToFHIR()
+			raw, _ := json.Marshal(result)
+			entry := &fhir.HistoryEntry{
+				ResourceType: "PractitionerRole", ResourceID: role.FHIRID, VersionID: role.VersionID,
+				Resource: raw, Action: "create", Timestamp: role.CreatedAt,
+			}
+			return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+		}
+		return c.JSON(http.StatusOK, fhir.NewHistoryBundle(entries, total, "/fhir"))
+	}
+
+	// Fallback: no version tracker
+	role, err := h.svc.GetPractitionerRoleByFHIRID(ctx, fhirID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PractitionerRole", fhirID))
+	}
+	result := role.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "PractitionerRole", ResourceID: role.FHIRID, VersionID: role.VersionID,
+		Resource: raw, Action: "create", Timestamp: role.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
 
 // -- FHIR PATCH Endpoints --
@@ -967,6 +1159,44 @@ func applyPractitionerPatch(p *Practitioner, patched map[string]interface{}) {
 					if text, ok := code["text"].(string); ok {
 						p.QualificationSummary = &text
 					}
+				}
+			}
+		}
+	}
+}
+
+func applyPractitionerRolePatch(r *PractitionerRole, patched map[string]interface{}) {
+	if v, ok := patched["active"].(bool); ok {
+		r.Active = v
+	}
+	// code array
+	if v, ok := patched["code"]; ok {
+		if codes, ok := v.([]interface{}); ok && len(codes) > 0 {
+			if cc, ok := codes[0].(map[string]interface{}); ok {
+				if coding, ok := cc["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							r.RoleCode = code
+						}
+						if display, ok := c["display"].(string); ok {
+							r.RoleDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// period
+	if v, ok := patched["period"]; ok {
+		if period, ok := v.(map[string]interface{}); ok {
+			if start, ok := period["start"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, start); err == nil {
+					r.PeriodStart = &t
+				}
+			}
+			if end, ok := period["end"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, end); err == nil {
+					r.PeriodEnd = &t
 				}
 			}
 		}

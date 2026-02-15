@@ -377,17 +377,70 @@ type PatientMatchResult struct {
 
 // PractitionerRole maps to the practitioner_role table.
 type PractitionerRole struct {
-	ID               uuid.UUID  `db:"id" json:"id"`
-	FHIRID           string     `db:"fhir_id" json:"fhir_id"`
-	PractitionerID   uuid.UUID  `db:"practitioner_id" json:"practitioner_id"`
-	OrganizationID   *uuid.UUID `db:"organization_id" json:"organization_id,omitempty"`
-	DepartmentID     *uuid.UUID `db:"department_id" json:"department_id,omitempty"`
-	RoleCode         string     `db:"role_code" json:"role_code"`
-	RoleDisplay      *string    `db:"role_display" json:"role_display,omitempty"`
-	PeriodStart      *time.Time `db:"period_start" json:"period_start,omitempty"`
-	PeriodEnd        *time.Time `db:"period_end" json:"period_end,omitempty"`
-	Active           bool       `db:"active" json:"active"`
-	TelehealthCapable bool     `db:"telehealth_capable" json:"telehealth_capable"`
-	AcceptingPatients bool      `db:"accepting_patients" json:"accepting_patients"`
-	CreatedAt        time.Time  `db:"created_at" json:"created_at"`
+	ID                uuid.UUID  `db:"id" json:"id"`
+	FHIRID            string     `db:"fhir_id" json:"fhir_id"`
+	PractitionerID    uuid.UUID  `db:"practitioner_id" json:"practitioner_id"`
+	OrganizationID    *uuid.UUID `db:"organization_id" json:"organization_id,omitempty"`
+	DepartmentID      *uuid.UUID `db:"department_id" json:"department_id,omitempty"`
+	RoleCode          string     `db:"role_code" json:"role_code"`
+	RoleDisplay       *string    `db:"role_display" json:"role_display,omitempty"`
+	PeriodStart       *time.Time `db:"period_start" json:"period_start,omitempty"`
+	PeriodEnd         *time.Time `db:"period_end" json:"period_end,omitempty"`
+	Active            bool       `db:"active" json:"active"`
+	TelehealthCapable bool       `db:"telehealth_capable" json:"telehealth_capable"`
+	AcceptingPatients bool       `db:"accepting_patients" json:"accepting_patients"`
+	VersionID         int        `db:"version_id" json:"version_id"`
+	CreatedAt         time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt         time.Time  `db:"updated_at" json:"updated_at"`
+}
+
+func (r *PractitionerRole) GetVersionID() int  { return r.VersionID }
+func (r *PractitionerRole) SetVersionID(v int) { r.VersionID = v }
+
+func (r *PractitionerRole) ToFHIR() map[string]interface{} {
+	versionID := r.VersionID
+	if versionID == 0 {
+		versionID = 1
+	}
+	result := map[string]interface{}{
+		"resourceType": "PractitionerRole",
+		"id":           r.FHIRID,
+		"active":       r.Active,
+		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: r.UpdatedAt},
+	}
+
+	// Practitioner reference
+	result["practitioner"] = fhir.Reference{
+		Reference: fhir.FormatReference("Practitioner", r.PractitionerID.String()),
+	}
+
+	// Organization reference
+	if r.OrganizationID != nil {
+		result["organization"] = fhir.Reference{
+			Reference: fhir.FormatReference("Organization", r.OrganizationID.String()),
+		}
+	}
+
+	// Code
+	coding := fhir.Coding{Code: r.RoleCode}
+	if r.RoleDisplay != nil {
+		coding.Display = *r.RoleDisplay
+	}
+	result["code"] = []fhir.CodeableConcept{
+		{Coding: []fhir.Coding{coding}},
+	}
+
+	// Period
+	if r.PeriodStart != nil || r.PeriodEnd != nil {
+		period := fhir.Period{}
+		if r.PeriodStart != nil {
+			period.Start = r.PeriodStart
+		}
+		if r.PeriodEnd != nil {
+			period.End = r.PeriodEnd
+		}
+		result["period"] = period
+	}
+
+	return result
 }
