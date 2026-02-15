@@ -2,8 +2,18 @@ package fhir
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 )
+
+// testListener implements ResourceEventListener for testing.
+type testListener struct {
+	events []ResourceEvent
+}
+
+func (l *testListener) OnResourceEvent(_ context.Context, event ResourceEvent) {
+	l.events = append(l.events, event)
+}
 
 func TestNewVersionTracker(t *testing.T) {
 	repo := NewHistoryRepository()
@@ -124,4 +134,112 @@ func TestNilVersionTracker(t *testing.T) {
 	if vt != nil {
 		t.Error("nil VersionTracker should be nil")
 	}
+}
+
+// -- Listener tests --
+
+func TestAddListener(t *testing.T) {
+	repo := NewHistoryRepository()
+	vt := NewVersionTracker(repo)
+
+	l := &testListener{}
+	vt.AddListener(l)
+
+	vt.mu.RLock()
+	defer vt.mu.RUnlock()
+	if len(vt.listeners) != 1 {
+		t.Errorf("expected 1 listener, got %d", len(vt.listeners))
+	}
+}
+
+func TestAddListener_Multiple(t *testing.T) {
+	repo := NewHistoryRepository()
+	vt := NewVersionTracker(repo)
+
+	vt.AddListener(&testListener{})
+	vt.AddListener(&testListener{})
+	vt.AddListener(&testListener{})
+
+	vt.mu.RLock()
+	defer vt.mu.RUnlock()
+	if len(vt.listeners) != 3 {
+		t.Errorf("expected 3 listeners, got %d", len(vt.listeners))
+	}
+}
+
+func TestFireEvent_CallsListener(t *testing.T) {
+	repo := NewHistoryRepository()
+	vt := NewVersionTracker(repo)
+
+	l := &testListener{}
+	vt.AddListener(l)
+
+	event := ResourceEvent{
+		ResourceType: "Patient",
+		ResourceID:   "pat-1",
+		VersionID:    1,
+		Action:       "create",
+		Resource:     json.RawMessage(`{"resourceType":"Patient","id":"pat-1"}`),
+	}
+	vt.fireEvent(context.Background(), event)
+
+	if len(l.events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(l.events))
+	}
+	if l.events[0].ResourceType != "Patient" {
+		t.Errorf("expected resource type 'Patient', got %q", l.events[0].ResourceType)
+	}
+	if l.events[0].ResourceID != "pat-1" {
+		t.Errorf("expected resource ID 'pat-1', got %q", l.events[0].ResourceID)
+	}
+	if l.events[0].Action != "create" {
+		t.Errorf("expected action 'create', got %q", l.events[0].Action)
+	}
+	if l.events[0].VersionID != 1 {
+		t.Errorf("expected version 1, got %d", l.events[0].VersionID)
+	}
+}
+
+func TestFireEvent_MultipleListeners(t *testing.T) {
+	repo := NewHistoryRepository()
+	vt := NewVersionTracker(repo)
+
+	l1 := &testListener{}
+	l2 := &testListener{}
+	vt.AddListener(l1)
+	vt.AddListener(l2)
+
+	event := ResourceEvent{
+		ResourceType: "Observation",
+		ResourceID:   "obs-1",
+		VersionID:    2,
+		Action:       "update",
+		Resource:     json.RawMessage(`{"resourceType":"Observation","id":"obs-1"}`),
+	}
+	vt.fireEvent(context.Background(), event)
+
+	if len(l1.events) != 1 {
+		t.Errorf("listener 1: expected 1 event, got %d", len(l1.events))
+	}
+	if len(l2.events) != 1 {
+		t.Errorf("listener 2: expected 1 event, got %d", len(l2.events))
+	}
+	if l1.events[0].Action != "update" {
+		t.Errorf("listener 1: expected action 'update', got %q", l1.events[0].Action)
+	}
+}
+
+func TestFireEvent_NoListeners(t *testing.T) {
+	repo := NewHistoryRepository()
+	vt := NewVersionTracker(repo)
+
+	// Should not panic with no listeners
+	event := ResourceEvent{
+		ResourceType: "Patient",
+		ResourceID:   "pat-1",
+		VersionID:    1,
+		Action:       "delete",
+		Resource:     json.RawMessage(`null`),
+	}
+	vt.fireEvent(context.Background(), event)
 }

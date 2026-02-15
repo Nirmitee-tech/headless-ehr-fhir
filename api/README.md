@@ -2,7 +2,7 @@
 
 **A headless, API-first Electronic Health Record system built in Go.**
 
-OpenEHR Server provides a complete clinical data platform with dual REST APIs: a standards-compliant FHIR R4 interface for interoperability and an operational REST API for internal UI consumption. It is designed for multi-tenant deployments, HIPAA-grade security, and extensibility across 19 clinical domains.
+OpenEHR Server provides a complete clinical data platform with dual REST APIs: a standards-compliant FHIR R4 interface for interoperability and an operational REST API for internal UI consumption. It is designed for multi-tenant deployments, HIPAA-grade security, and extensibility across 20 domains.
 
 ![Go Version](https://img.shields.io/badge/Go-1.22-blue)
 ![License](https://img.shields.io/badge/License-Apache%202.0-green)
@@ -14,8 +14,9 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 
 ## Features
 
-- **19 clinical domains** covering 200+ database tables (identity, encounter, clinical, medication, diagnostics, scheduling, billing, documents, inbox, surgery, emergency, obstetrics, oncology, nursing, behavioral, research, portal, admin, CDS)
-- **FHIR R4 REST API** with 21 resource types (Patient, Practitioner, Encounter, Condition, Observation, and more)
+- **20 domains** covering 200+ database tables (identity, encounter, clinical, medication, diagnostics, scheduling, billing, documents, inbox, surgery, emergency, obstetrics, oncology, nursing, behavioral, research, portal, admin, CDS, subscription)
+- **FHIR R4 REST API** with 22 resource types (Patient, Practitioner, Encounter, Condition, Observation, Subscription, and more)
+- **FHIR R4 Subscriptions** with REST-hook webhook delivery, criteria matching, retry with exponential backoff
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -310,6 +311,17 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | GET | `/fhir/Communication` | Search communications |
 | POST | `/fhir/Communication` | Create communication |
 
+**Subscription** (Admin only)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/Subscription` | Search subscriptions |
+| GET | `/fhir/Subscription/:id` | Read subscription |
+| POST | `/fhir/Subscription` | Create subscription |
+| PUT | `/fhir/Subscription/:id` | Update subscription |
+| DELETE | `/fhir/Subscription/:id` | Delete subscription |
+| PATCH | `/fhir/Subscription/:id` | Patch subscription |
+
 **Research**
 
 | Method | Path | Description |
@@ -386,6 +398,8 @@ All operational endpoints are prefixed with `/api/v1` and return standard JSON w
 **Portal** -- `/api/v1/portal-accounts`, `/api/v1/portal-messages`, `/api/v1/questionnaires`, `/api/v1/questionnaire-responses`, `/api/v1/patient-checkins`
 
 **CDS** -- `/api/v1/cds-rules`, `/api/v1/cds-alerts`, `/api/v1/drug-interactions`, `/api/v1/order-sets`, `/api/v1/clinical-pathways`, `/api/v1/pathway-enrollments`, `/api/v1/formulary`, `/api/v1/med-reconciliations`
+
+**Subscription** -- `/api/v1/subscriptions`, `/api/v1/subscriptions/:id/notifications`
 
 ---
 
@@ -575,6 +589,10 @@ Patient portal: portal accounts, patient-provider messaging, questionnaires, que
 
 Clinical decision support: CDS rules engine, alerts, drug interaction checking, order sets, clinical pathways with patient enrollment, formulary management, and medication reconciliation.
 
+### subscription
+
+FHIR R4 Subscription management with REST-hook webhook delivery. When resources are created, updated, or deleted, the notification engine evaluates them against active subscription criteria and queues webhook deliveries. Supports criteria filtering (resource type + parameters), exponential retry backoff, subscription expiry, and handshake verification. Admin-only access. Maps to FHIR Subscription.
+
 ---
 
 ## Configuration
@@ -650,6 +668,7 @@ ehr/
 |       |-- research/                # T4: Studies, enrollment, adverse events, deviations
 |       |-- portal/                  # T4: Portal accounts, questionnaires, check-in
 |       |-- cds/                     # T4: Rules, alerts, order sets, pathways, formulary
+|       |-- subscription/              # Subscriptions, webhook notifications, delivery engine
 |-- migrations/
 |   |-- 001_t0_core_tables.sql       # Admin, identity, encounter schemas
 |   |-- 002_t1_clinical_tables.sql   # Clinical domain tables

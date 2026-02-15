@@ -43,6 +43,7 @@ import (
 	"github.com/ehr/ehr/internal/domain/research"
 	"github.com/ehr/ehr/internal/domain/scheduling"
 	"github.com/ehr/ehr/internal/domain/surgery"
+	"github.com/ehr/ehr/internal/domain/subscription"
 	fhirtask "github.com/ehr/ehr/internal/domain/task"
 	"github.com/ehr/ehr/internal/domain/terminology"
 	"github.com/ehr/ehr/internal/platform/auth"
@@ -602,6 +603,14 @@ func runServer() error {
 		{Name: "manufacturer", Type: "string"},
 	})
 
+	// Subscription domain
+	capBuilder.AddResource("Subscription", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "type", Type: "token"},
+		{Name: "criteria", Type: "string"},
+		{Name: "url", Type: "uri"},
+	})
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
@@ -623,6 +632,7 @@ func runServer() error {
 		"CareTeam",
 		"Task",
 		"Device",
+		"Subscription",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -974,6 +984,21 @@ func runServer() error {
 	devHandler := device.NewHandler(devSvc)
 	devHandler.RegisterRoutes(apiV1, fhirGroup)
 
+	// Subscription domain
+	subRepo := subscription.NewSubscriptionRepoPG(pool)
+	subSvc := subscription.NewService(subRepo)
+	subSvc.SetVersionTracker(versionTracker)
+	subHandler := subscription.NewHandler(subSvc)
+	subHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Notification engine — listens for resource events and delivers webhooks
+	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
+	notifyEngine := fhir.NewNotificationEngine(notifyAdapter, logger)
+	versionTracker.AddListener(notifyEngine)
+	notifyCtx, notifyCancel := context.WithCancel(ctx)
+	defer notifyCancel()
+	go notifyEngine.Start(notifyCtx)
+
 	// -- Register resource fetchers for _include/_revinclude resolution --
 	// Each fetcher retrieves a resource by its FHIR ID and returns the FHIR map.
 	includeRegistry.RegisterFetcher("Patient", func(ctx context.Context, id string) (map[string]interface{}, error) {
@@ -1199,6 +1224,13 @@ func runServer() error {
 			return nil, err
 		}
 		return d.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Subscription", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		s, err := subSvc.GetSubscriptionByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return s.ToFHIR(), nil
 	})
 
 	// Reporting framework

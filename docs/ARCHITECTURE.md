@@ -29,7 +29,7 @@ OpenEHR Server is a headless, API-first Electronic Health Record system written 
 
 - **Schema-per-tenant isolation.** Each tenant receives a dedicated PostgreSQL schema. All request-scoped queries run against the tenant schema via `SET search_path`. This provides HIPAA-grade data isolation without the operational overhead of separate database instances.
 
-- **Domain-driven decomposition.** The system is organized into 19 clinical domains, each following an identical 5-file pattern. This makes the codebase predictable, easy to navigate, and straightforward to extend.
+- **Domain-driven decomposition.** The system is organized into 20 domains, each following an identical 5-file pattern. This makes the codebase predictable, easy to navigate, and straightforward to extend.
 
 - **Repository interface pattern.** All database access flows through Go interfaces. Service layers depend on these interfaces rather than concrete PostgreSQL implementations. This enables in-memory mock testing without a database.
 
@@ -86,7 +86,7 @@ OpenEHR Server is a headless, API-first Electronic Health Record system written 
 
 ### Domain Organization
 
-The 19 domains are organized into five tiers based on clinical priority, dependency relationships, and deployment criticality:
+The 20 domains are organized into five tiers (plus cross-cutting infrastructure) based on clinical priority, dependency relationships, and deployment criticality:
 
 **Tier 0 -- Core Infrastructure**
 
@@ -131,6 +131,10 @@ Specialized systems that extend the core EHR:
 - `research` -- Clinical trial protocols, patient enrollment, adverse events, protocol deviations.
 - `portal` -- Patient portal accounts, portal messaging, questionnaires, check-in workflows.
 - `cds` -- Clinical decision support rules, alerts, drug interactions, order sets, clinical pathways, formulary, medication reconciliation.
+
+**Cross-Cutting Infrastructure**
+
+- `subscription` -- FHIR R4 Subscription (rest-hook webhooks). Listens for resource mutations via VersionTracker events, evaluates criteria, delivers webhook notifications with retry. Admin-only.
 
 ### Domain Boundaries
 
@@ -431,6 +435,10 @@ The migration system supports extension tables that add custom fields to existin
 
 Because the FHIR layer uses `map[string]interface{}` for resource representation, plugins can define custom FHIR resource mappings for non-standard resources or extensions.
 
+### Real-Time Event System
+
+The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.
+
 ---
 
 ## Migration Strategy
@@ -471,6 +479,7 @@ Current migration files:
 | `016_t4_portal_tables.sql` | Portal accounts, questionnaires, check-in |
 | `017_t4_cds_tables.sql` | CDS rules, alerts, order sets, pathways |
 | `018_hipaa_row_level_security.sql` | Row-level security policies |
+| `022_subscription_tables.sql` | Subscription and notification tables |
 
 ### Migration Runner
 
