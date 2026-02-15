@@ -39,8 +39,20 @@ type ClaimResponseRepository interface {
 	Create(ctx context.Context, cr *ClaimResponse) error
 	GetByID(ctx context.Context, id uuid.UUID) (*ClaimResponse, error)
 	GetByFHIRID(ctx context.Context, fhirID string) (*ClaimResponse, error)
+	Update(ctx context.Context, cr *ClaimResponse) error
+	Delete(ctx context.Context, id uuid.UUID) error
 	ListByClaim(ctx context.Context, claimID uuid.UUID, limit, offset int) ([]*ClaimResponse, int, error)
 	Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ClaimResponse, int, error)
+}
+
+type ExplanationOfBenefitRepository interface {
+	Create(ctx context.Context, eob *ExplanationOfBenefit) error
+	GetByID(ctx context.Context, id uuid.UUID) (*ExplanationOfBenefit, error)
+	GetByFHIRID(ctx context.Context, fhirID string) (*ExplanationOfBenefit, error)
+	Update(ctx context.Context, eob *ExplanationOfBenefit) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	ListByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*ExplanationOfBenefit, int, error)
+	Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ExplanationOfBenefit, int, error)
 }
 
 type InvoiceRepository interface {

@@ -467,6 +467,10 @@ func runServer() error {
 		{Name: "patient", Type: "reference"},
 		{Name: "status", Type: "token"},
 	})
+	capBuilder.AddResource("MedicationStatement", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
 
 	// Diagnostics domain
 	capBuilder.AddResource("ServiceRequest", fhir.DefaultInteractions(), []fhir.SearchParam{
@@ -513,6 +517,18 @@ func runServer() error {
 		{Name: "status", Type: "token"},
 	})
 	capBuilder.AddResource("Claim", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("ClaimResponse", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("ExplanationOfBenefit", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("Invoice", fhir.DefaultInteractions(), []fhir.SearchParam{
 		{Name: "patient", Type: "reference"},
 		{Name: "status", Type: "token"},
 	})
@@ -949,8 +965,9 @@ func runServer() error {
 	covRepo := billing.NewCoverageRepoPG(pool)
 	claimRepo := billing.NewClaimRepoPG(pool)
 	claimRespRepo := billing.NewClaimResponseRepoPG(pool)
+	eobRepo := billing.NewExplanationOfBenefitRepoPG(pool)
 	invRepo := billing.NewInvoiceRepoPG(pool)
-	billSvc := billing.NewService(covRepo, claimRepo, claimRespRepo, invRepo)
+	billSvc := billing.NewService(covRepo, claimRepo, claimRespRepo, eobRepo, invRepo)
 	billSvc.SetVersionTracker(versionTracker)
 	billHandler := billing.NewHandler(billSvc)
 	billHandler.RegisterRoutes(apiV1, fhirGroup)

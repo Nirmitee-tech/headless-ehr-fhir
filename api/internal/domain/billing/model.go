@@ -379,8 +379,15 @@ type ExplanationOfBenefit struct {
 	TotalPayment               *float64   `db:"total_payment" json:"total_payment,omitempty"`
 	PaymentDate                *time.Time `db:"payment_date" json:"payment_date,omitempty"`
 	Currency                   *string    `db:"currency" json:"currency,omitempty"`
+	VersionID                  int        `db:"version_id" json:"version_id"`
 	CreatedAt                  time.Time  `db:"created_at" json:"created_at"`
 }
+
+// GetVersionID returns the current version.
+func (eob *ExplanationOfBenefit) GetVersionID() int { return eob.VersionID }
+
+// SetVersionID sets the current version.
+func (eob *ExplanationOfBenefit) SetVersionID(v int) { eob.VersionID = v }
 
 func (eob *ExplanationOfBenefit) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
@@ -493,6 +500,56 @@ type InvoiceLineItem struct {
 	TaxAmount      *float64  `db:"tax_amount" json:"tax_amount,omitempty"`
 	GrossAmount    *float64  `db:"gross_amount" json:"gross_amount,omitempty"`
 	Currency       *string   `db:"currency" json:"currency,omitempty"`
+}
+
+func (inv *Invoice) ToFHIR() map[string]interface{} {
+	result := map[string]interface{}{
+		"resourceType": "Invoice",
+		"id":           inv.FHIRID,
+		"status":       inv.Status,
+		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", inv.PatientID.String())},
+		"meta":         fhir.Meta{LastUpdated: inv.CreatedAt},
+	}
+	if inv.TypeCode != nil {
+		result["type"] = fhir.CodeableConcept{
+			Coding: []fhir.Coding{{Code: *inv.TypeCode}},
+		}
+	}
+	if inv.EncounterID != nil {
+		result["encounter"] = fhir.Reference{Reference: fhir.FormatReference("Encounter", inv.EncounterID.String())}
+	}
+	if inv.IssuerOrgID != nil {
+		result["issuer"] = fhir.Reference{Reference: fhir.FormatReference("Organization", inv.IssuerOrgID.String())}
+	}
+	if inv.Date != nil {
+		result["date"] = inv.Date.Format("2006-01-02")
+	}
+	if inv.ParticipantID != nil {
+		result["participant"] = []map[string]interface{}{{
+			"actor": fhir.Reference{Reference: fhir.FormatReference("Practitioner", inv.ParticipantID.String())},
+		}}
+	}
+	if inv.TotalNet != nil {
+		cur := "USD"
+		if inv.Currency != nil {
+			cur = *inv.Currency
+		}
+		result["totalNet"] = map[string]interface{}{"value": *inv.TotalNet, "currency": cur}
+	}
+	if inv.TotalGross != nil {
+		cur := "USD"
+		if inv.Currency != nil {
+			cur = *inv.Currency
+		}
+		result["totalGross"] = map[string]interface{}{"value": *inv.TotalGross, "currency": cur}
+	}
+	if inv.PaymentTerms != nil {
+		result["paymentTerms"] = *inv.PaymentTerms
+	}
+	if inv.Note != nil {
+		result["note"] = []map[string]string{{"text": *inv.Note}}
+	}
+	return result
 }
 
 func strVal(s *string) string {

@@ -509,6 +509,91 @@ type MedicationStatement struct {
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+func (ms *MedicationStatement) ToFHIR() map[string]interface{} {
+	result := map[string]interface{}{
+		"resourceType": "MedicationStatement",
+		"id":           ms.FHIRID,
+		"status":       ms.Status,
+		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", ms.PatientID.String())},
+		"meta":         fhir.Meta{LastUpdated: ms.UpdatedAt},
+	}
+	if ms.MedicationID != nil {
+		result["medicationReference"] = fhir.Reference{
+			Reference: fhir.FormatReference("Medication", ms.MedicationID.String()),
+		}
+	} else if ms.MedicationCode != nil {
+		result["medicationCodeableConcept"] = fhir.CodeableConcept{
+			Coding: []fhir.Coding{{Code: *ms.MedicationCode, Display: strVal(ms.MedicationDisplay)}},
+		}
+	}
+	if ms.CategoryCode != nil {
+		result["category"] = fhir.CodeableConcept{
+			Coding: []fhir.Coding{{Code: *ms.CategoryCode, Display: strVal(ms.CategoryDisplay)}},
+		}
+	}
+	if ms.EncounterID != nil {
+		result["context"] = fhir.Reference{Reference: fhir.FormatReference("Encounter", ms.EncounterID.String())}
+	}
+	if ms.InformationSourceID != nil {
+		result["informationSource"] = fhir.Reference{Reference: fhir.FormatReference("Patient", ms.InformationSourceID.String())}
+	}
+	if ms.EffectiveDatetime != nil {
+		result["effectiveDateTime"] = ms.EffectiveDatetime.Format(time.RFC3339)
+	} else if ms.EffectiveStart != nil {
+		result["effectivePeriod"] = fhir.Period{Start: ms.EffectiveStart, End: ms.EffectiveEnd}
+	}
+	if ms.DateAsserted != nil {
+		result["dateAsserted"] = ms.DateAsserted.Format(time.RFC3339)
+	}
+	if ms.ReasonCode != nil {
+		result["reasonCode"] = []fhir.CodeableConcept{{
+			Coding: []fhir.Coding{{Code: *ms.ReasonCode, Display: strVal(ms.ReasonDisplay)}},
+		}}
+	}
+	if ms.StatusReasonCode != nil {
+		result["statusReason"] = []fhir.CodeableConcept{{
+			Coding: []fhir.Coding{{Code: *ms.StatusReasonCode, Display: strVal(ms.StatusReasonDisplay)}},
+		}}
+	}
+	// dosage
+	dosage := map[string]interface{}{}
+	hasDosage := false
+	if ms.DosageText != nil {
+		dosage["text"] = *ms.DosageText
+		hasDosage = true
+	}
+	if ms.DosageRouteCode != nil {
+		dosage["route"] = fhir.CodeableConcept{
+			Coding: []fhir.Coding{{Code: *ms.DosageRouteCode, Display: strVal(ms.DosageRouteDisplay)}},
+		}
+		hasDosage = true
+	}
+	if ms.DoseQuantity != nil {
+		dosage["doseAndRate"] = []map[string]interface{}{{
+			"doseQuantity": map[string]interface{}{
+				"value": *ms.DoseQuantity,
+				"unit":  strVal(ms.DoseUnit),
+			},
+		}}
+		hasDosage = true
+	}
+	if ms.DosageTimingCode != nil {
+		dosage["timing"] = map[string]interface{}{
+			"code": fhir.CodeableConcept{
+				Coding: []fhir.Coding{{Code: *ms.DosageTimingCode, Display: strVal(ms.DosageTimingDisplay)}},
+			},
+		}
+		hasDosage = true
+	}
+	if hasDosage {
+		result["dosage"] = []interface{}{dosage}
+	}
+	if ms.Note != nil {
+		result["note"] = []map[string]string{{"text": *ms.Note}}
+	}
+	return result
+}
+
 func strVal(s *string) string {
 	if s == nil {
 		return ""

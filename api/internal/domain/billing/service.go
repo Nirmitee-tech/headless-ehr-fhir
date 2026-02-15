@@ -12,6 +12,7 @@ type Service struct {
 	coverages      CoverageRepository
 	claims         ClaimRepository
 	claimResponses ClaimResponseRepository
+	eobs           ExplanationOfBenefitRepository
 	invoices       InvoiceRepository
 	vt             *fhir.VersionTracker
 }
@@ -26,8 +27,8 @@ func (s *Service) VersionTracker() *fhir.VersionTracker {
 	return s.vt
 }
 
-func NewService(cov CoverageRepository, cl ClaimRepository, cr ClaimResponseRepository, inv InvoiceRepository) *Service {
-	return &Service{coverages: cov, claims: cl, claimResponses: cr, invoices: inv}
+func NewService(cov CoverageRepository, cl ClaimRepository, cr ClaimResponseRepository, eob ExplanationOfBenefitRepository, inv InvoiceRepository) *Service {
+	return &Service{coverages: cov, claims: cl, claimResponses: cr, eobs: eob, invoices: inv}
 }
 
 // -- Coverage --
@@ -232,12 +233,97 @@ func (s *Service) GetClaimResponseByFHIRID(ctx context.Context, fhirID string) (
 	return s.claimResponses.GetByFHIRID(ctx, fhirID)
 }
 
+func (s *Service) UpdateClaimResponse(ctx context.Context, cr *ClaimResponse) error {
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "ClaimResponse", cr.FHIRID, cr.VersionID, cr.ToFHIR())
+		if err == nil {
+			cr.VersionID = newVer
+		}
+	}
+	return s.claimResponses.Update(ctx, cr)
+}
+
+func (s *Service) DeleteClaimResponse(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		cr, err := s.claimResponses.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "ClaimResponse", cr.FHIRID, cr.VersionID)
+		}
+	}
+	return s.claimResponses.Delete(ctx, id)
+}
+
 func (s *Service) ListClaimResponsesByClaim(ctx context.Context, claimID uuid.UUID, limit, offset int) ([]*ClaimResponse, int, error) {
 	return s.claimResponses.ListByClaim(ctx, claimID, limit, offset)
 }
 
 func (s *Service) SearchClaimResponses(ctx context.Context, params map[string]string, limit, offset int) ([]*ClaimResponse, int, error) {
 	return s.claimResponses.Search(ctx, params, limit, offset)
+}
+
+// -- ExplanationOfBenefit --
+
+var validEOBStatuses = map[string]bool{
+	"active": true, "cancelled": true, "draft": true, "entered-in-error": true,
+}
+
+func (s *Service) CreateExplanationOfBenefit(ctx context.Context, eob *ExplanationOfBenefit) error {
+	if eob.PatientID == uuid.Nil {
+		return fmt.Errorf("patient_id is required")
+	}
+	if eob.Status == "" {
+		eob.Status = "active"
+	}
+	if !validEOBStatuses[eob.Status] {
+		return fmt.Errorf("invalid explanation_of_benefit status: %s", eob.Status)
+	}
+	if err := s.eobs.Create(ctx, eob); err != nil {
+		return err
+	}
+	eob.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "ExplanationOfBenefit", eob.FHIRID, eob.ToFHIR())
+	}
+	return nil
+}
+
+func (s *Service) GetExplanationOfBenefit(ctx context.Context, id uuid.UUID) (*ExplanationOfBenefit, error) {
+	return s.eobs.GetByID(ctx, id)
+}
+
+func (s *Service) GetExplanationOfBenefitByFHIRID(ctx context.Context, fhirID string) (*ExplanationOfBenefit, error) {
+	return s.eobs.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdateExplanationOfBenefit(ctx context.Context, eob *ExplanationOfBenefit) error {
+	if eob.Status != "" && !validEOBStatuses[eob.Status] {
+		return fmt.Errorf("invalid explanation_of_benefit status: %s", eob.Status)
+	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "ExplanationOfBenefit", eob.FHIRID, eob.VersionID, eob.ToFHIR())
+		if err == nil {
+			eob.VersionID = newVer
+		}
+	}
+	return s.eobs.Update(ctx, eob)
+}
+
+func (s *Service) DeleteExplanationOfBenefit(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		eob, err := s.eobs.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "ExplanationOfBenefit", eob.FHIRID, eob.VersionID)
+		}
+	}
+	return s.eobs.Delete(ctx, id)
+}
+
+func (s *Service) ListExplanationOfBenefitsByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*ExplanationOfBenefit, int, error) {
+	return s.eobs.ListByPatient(ctx, patientID, limit, offset)
+}
+
+func (s *Service) SearchExplanationOfBenefits(ctx context.Context, params map[string]string, limit, offset int) ([]*ExplanationOfBenefit, int, error) {
+	return s.eobs.Search(ctx, params, limit, offset)
 }
 
 // -- Invoice --

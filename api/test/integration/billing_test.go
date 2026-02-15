@@ -1310,3 +1310,243 @@ func TestInvoiceCRUD(t *testing.T) {
 		}
 	})
 }
+
+func TestExplanationOfBenefitCRUD(t *testing.T) {
+	ctx := context.Background()
+	tenantID := uniqueTenantID("eob")
+	createTenantSchema(t, ctx, tenantID)
+	defer dropTenantSchema(t, ctx, tenantID)
+
+	patient := createTestPatient(t, ctx, globalDB.Pool, tenantID, "EOBPatient", "Test", "MRN-EOB-001")
+
+	t.Run("Create", func(t *testing.T) {
+		var created *billing.ExplanationOfBenefit
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob := &billing.ExplanationOfBenefit{
+				Status:         "active",
+				TypeCode:       ptrStr("professional"),
+				UseCode:        ptrStr("claim"),
+				PatientID:      patient.ID,
+				Outcome:        ptrStr("complete"),
+				TotalSubmitted: ptrFloat(500.00),
+				TotalBenefit:   ptrFloat(400.00),
+				TotalPayment:   ptrFloat(400.00),
+				Currency:       ptrStr("USD"),
+			}
+			if err := repo.Create(ctx, eob); err != nil {
+				return err
+			}
+			created = eob
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Create EOB: %v", err)
+		}
+		if created.ID == uuid.Nil {
+			t.Fatal("expected non-nil ID")
+		}
+		if created.FHIRID == "" {
+			t.Fatal("expected non-empty FHIR ID")
+		}
+	})
+
+	t.Run("Create_FK_Violation", func(t *testing.T) {
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob := &billing.ExplanationOfBenefit{
+				Status:    "active",
+				PatientID: uuid.New(),
+			}
+			return repo.Create(ctx, eob)
+		})
+		if err == nil {
+			t.Fatal("expected FK violation for non-existent patient")
+		}
+	})
+
+	t.Run("GetByID", func(t *testing.T) {
+		var eobID uuid.UUID
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob := &billing.ExplanationOfBenefit{
+				Status:         "active",
+				TypeCode:       ptrStr("institutional"),
+				PatientID:      patient.ID,
+				Outcome:        ptrStr("partial"),
+				TotalSubmitted: ptrFloat(1000.00),
+				Currency:       ptrStr("USD"),
+			}
+			if err := repo.Create(ctx, eob); err != nil {
+				return err
+			}
+			eobID = eob.ID
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		var fetched *billing.ExplanationOfBenefit
+		err = withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			var err error
+			fetched, err = repo.GetByID(ctx, eobID)
+			return err
+		})
+		if err != nil {
+			t.Fatalf("GetByID: %v", err)
+		}
+		if fetched.Status != "active" {
+			t.Errorf("expected status=active, got %s", fetched.Status)
+		}
+		if *fetched.TypeCode != "institutional" {
+			t.Errorf("expected type_code=institutional, got %s", *fetched.TypeCode)
+		}
+	})
+
+	t.Run("GetByFHIRID", func(t *testing.T) {
+		var fhirID string
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob := &billing.ExplanationOfBenefit{
+				Status:    "active",
+				PatientID: patient.ID,
+			}
+			if err := repo.Create(ctx, eob); err != nil {
+				return err
+			}
+			fhirID = eob.FHIRID
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		var fetched *billing.ExplanationOfBenefit
+		err = withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			var err error
+			fetched, err = repo.GetByFHIRID(ctx, fhirID)
+			return err
+		})
+		if err != nil {
+			t.Fatalf("GetByFHIRID: %v", err)
+		}
+		if fetched.FHIRID != fhirID {
+			t.Errorf("expected FHIR ID=%s, got %s", fhirID, fetched.FHIRID)
+		}
+	})
+
+	t.Run("Update", func(t *testing.T) {
+		var eobID uuid.UUID
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob := &billing.ExplanationOfBenefit{
+				Status:    "active",
+				PatientID: patient.ID,
+				Outcome:   ptrStr("partial"),
+			}
+			if err := repo.Create(ctx, eob); err != nil {
+				return err
+			}
+			eobID = eob.ID
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		err = withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob, err := repo.GetByID(ctx, eobID)
+			if err != nil {
+				return err
+			}
+			eob.Status = "cancelled"
+			eob.Outcome = ptrStr("complete")
+			eob.Disposition = ptrStr("Claim denied")
+			return repo.Update(ctx, eob)
+		})
+		if err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		var fetched *billing.ExplanationOfBenefit
+		err = withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			var err error
+			fetched, err = repo.GetByID(ctx, eobID)
+			return err
+		})
+		if err != nil {
+			t.Fatalf("GetByID after update: %v", err)
+		}
+		if fetched.Status != "cancelled" {
+			t.Errorf("expected status=cancelled, got %s", fetched.Status)
+		}
+		if *fetched.Outcome != "complete" {
+			t.Errorf("expected outcome=complete, got %s", *fetched.Outcome)
+		}
+	})
+
+	t.Run("Search", func(t *testing.T) {
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			items, total, err := repo.Search(ctx, map[string]string{
+				"patient": patient.ID.String(),
+			}, 100, 0)
+			if err != nil {
+				return err
+			}
+			if total == 0 {
+				t.Error("expected non-zero total")
+			}
+			for _, eob := range items {
+				if eob.PatientID != patient.ID {
+					t.Errorf("expected patient_id=%s, got %s", patient.ID, eob.PatientID)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Search: %v", err)
+		}
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		var eobID uuid.UUID
+		err := withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			eob := &billing.ExplanationOfBenefit{
+				Status:    "active",
+				PatientID: patient.ID,
+			}
+			if err := repo.Create(ctx, eob); err != nil {
+				return err
+			}
+			eobID = eob.ID
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+
+		err = withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			return repo.Delete(ctx, eobID)
+		})
+		if err != nil {
+			t.Fatalf("Delete: %v", err)
+		}
+
+		err = withTenantConn(ctx, globalDB.Pool, tenantID, func(ctx context.Context) error {
+			repo := billing.NewExplanationOfBenefitRepoPG(globalDB.Pool)
+			_, err := repo.GetByID(ctx, eobID)
+			return err
+		})
+		if err == nil {
+			t.Fatal("expected error getting deleted EOB")
+		}
+	})
+}

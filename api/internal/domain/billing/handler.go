@@ -63,6 +63,8 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirRead.GET("/Claim/:id", h.GetClaimFHIR)
 	fhirRead.GET("/ClaimResponse", h.SearchClaimResponsesFHIR)
 	fhirRead.GET("/ClaimResponse/:id", h.GetClaimResponseFHIR)
+	fhirRead.GET("/Invoice", h.SearchInvoicesFHIR)
+	fhirRead.GET("/Invoice/:id", h.GetInvoiceFHIR)
 	fhirRead.GET("/ExplanationOfBenefit", h.SearchEOBsFHIR)
 	fhirRead.GET("/ExplanationOfBenefit/:id", h.GetEOBFHIR)
 
@@ -77,16 +79,36 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirWrite.DELETE("/Claim/:id", h.DeleteClaimFHIR)
 	fhirWrite.PATCH("/Claim/:id", h.PatchClaimFHIR)
 	fhirWrite.POST("/ClaimResponse", h.CreateClaimResponseFHIR)
+	fhirWrite.PUT("/ClaimResponse/:id", h.UpdateClaimResponseFHIR)
+	fhirWrite.DELETE("/ClaimResponse/:id", h.DeleteClaimResponseFHIR)
+	fhirWrite.PATCH("/ClaimResponse/:id", h.PatchClaimResponseFHIR)
+	fhirWrite.POST("/Invoice", h.CreateInvoiceFHIR)
+	fhirWrite.PUT("/Invoice/:id", h.UpdateInvoiceFHIR)
+	fhirWrite.DELETE("/Invoice/:id", h.DeleteInvoiceFHIR)
+	fhirWrite.PATCH("/Invoice/:id", h.PatchInvoiceFHIR)
+	fhirWrite.POST("/ExplanationOfBenefit", h.CreateEOBFHIR)
+	fhirWrite.PUT("/ExplanationOfBenefit/:id", h.UpdateEOBFHIR)
+	fhirWrite.DELETE("/ExplanationOfBenefit/:id", h.DeleteEOBFHIR)
+	fhirWrite.PATCH("/ExplanationOfBenefit/:id", h.PatchEOBFHIR)
 
 	// FHIR POST _search endpoints
 	fhirRead.POST("/Coverage/_search", h.SearchCoveragesFHIR)
 	fhirRead.POST("/Claim/_search", h.SearchClaimsFHIR)
+	fhirRead.POST("/ClaimResponse/_search", h.SearchClaimResponsesFHIR)
+	fhirRead.POST("/Invoice/_search", h.SearchInvoicesFHIR)
+	fhirRead.POST("/ExplanationOfBenefit/_search", h.SearchEOBsFHIR)
 
 	// FHIR vread and history endpoints
 	fhirRead.GET("/Coverage/:id/_history/:vid", h.VreadCoverageFHIR)
 	fhirRead.GET("/Coverage/:id/_history", h.HistoryCoverageFHIR)
 	fhirRead.GET("/Claim/:id/_history/:vid", h.VreadClaimFHIR)
 	fhirRead.GET("/Claim/:id/_history", h.HistoryClaimFHIR)
+	fhirRead.GET("/ClaimResponse/:id/_history/:vid", h.VreadClaimResponseFHIR)
+	fhirRead.GET("/ClaimResponse/:id/_history", h.HistoryClaimResponseFHIR)
+	fhirRead.GET("/Invoice/:id/_history/:vid", h.VreadInvoiceFHIR)
+	fhirRead.GET("/Invoice/:id/_history", h.HistoryInvoiceFHIR)
+	fhirRead.GET("/ExplanationOfBenefit/:id/_history/:vid", h.VreadEOBFHIR)
+	fhirRead.GET("/ExplanationOfBenefit/:id/_history", h.HistoryEOBFHIR)
 }
 
 // -- Coverage Handlers --
@@ -583,23 +605,109 @@ func (h *Handler) CreateClaimResponseFHIR(c echo.Context) error {
 
 func (h *Handler) SearchEOBsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	// EOBs are read from the explanation_of_benefit table; for now, search by patient
 	params := map[string]string{}
 	for _, k := range []string{"patient", "status"} {
 		if v := c.QueryParam(k); v != "" {
 			params[k] = v
 		}
 	}
-	// EOBs share the coverage search path; we query directly
-	_ = pg
-	_ = params
-	// Return empty bundle since EOB has no dedicated service search yet
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(nil, 0, "/fhir/ExplanationOfBenefit"))
+	items, total, err := h.svc.SearchExplanationOfBenefits(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/ExplanationOfBenefit"))
 }
 
 func (h *Handler) GetEOBFHIR(c echo.Context) error {
-	// EOB read by FHIR ID is not yet fully wired; return not found for now
-	return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+	eob, err := h.svc.GetExplanationOfBenefitByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, eob.ToFHIR())
+}
+
+func (h *Handler) CreateEOBFHIR(c echo.Context) error {
+	var eob ExplanationOfBenefit
+	if err := c.Bind(&eob); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateExplanationOfBenefit(c.Request().Context(), &eob); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/ExplanationOfBenefit/"+eob.FHIRID)
+	return c.JSON(http.StatusCreated, eob.ToFHIR())
+}
+
+func (h *Handler) UpdateEOBFHIR(c echo.Context) error {
+	var eob ExplanationOfBenefit
+	if err := c.Bind(&eob); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetExplanationOfBenefitByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+	}
+	eob.ID = existing.ID
+	eob.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateExplanationOfBenefit(c.Request().Context(), &eob); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, eob.ToFHIR())
+}
+
+func (h *Handler) DeleteEOBFHIR(c echo.Context) error {
+	existing, err := h.svc.GetExplanationOfBenefitByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+	}
+	if err := h.svc.DeleteExplanationOfBenefit(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) PatchEOBFHIR(c echo.Context) error {
+	return h.handlePatch(c, "ExplanationOfBenefit", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetExplanationOfBenefitByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateExplanationOfBenefit(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) VreadEOBFHIR(c echo.Context) error {
+	eob, err := h.svc.GetExplanationOfBenefitByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+	}
+	result := eob.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, eob.CreatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryEOBFHIR(c echo.Context) error {
+	eob, err := h.svc.GetExplanationOfBenefitByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
+	}
+	result := eob.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "ExplanationOfBenefit", ResourceID: eob.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: eob.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
 
 // -- FHIR Update Endpoints --
@@ -619,6 +727,23 @@ func (h *Handler) UpdateCoverageFHIR(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
 	return c.JSON(http.StatusOK, cov.ToFHIR())
+}
+
+func (h *Handler) UpdateClaimResponseFHIR(c echo.Context) error {
+	var cr ClaimResponse
+	if err := c.Bind(&cr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetClaimResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ClaimResponse", c.Param("id")))
+	}
+	cr.ID = existing.ID
+	cr.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateClaimResponse(c.Request().Context(), &cr); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, cr.ToFHIR())
 }
 
 func (h *Handler) UpdateClaimFHIR(c echo.Context) error {
@@ -651,6 +776,17 @@ func (h *Handler) DeleteCoverageFHIR(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func (h *Handler) DeleteClaimResponseFHIR(c echo.Context) error {
+	existing, err := h.svc.GetClaimResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ClaimResponse", c.Param("id")))
+	}
+	if err := h.svc.DeleteClaimResponse(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *Handler) DeleteClaimFHIR(c echo.Context) error {
 	existing, err := h.svc.GetClaimByFHIRID(c.Request().Context(), c.Param("id"))
 	if err != nil {
@@ -674,6 +810,22 @@ func (h *Handler) PatchCoverageFHIR(c echo.Context) error {
 			existing.Status = v
 		}
 		if err := h.svc.UpdateCoverage(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) PatchClaimResponseFHIR(c echo.Context) error {
+	return h.handlePatch(c, "ClaimResponse", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetClaimResponseByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ClaimResponse", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateClaimResponse(ctx.Request().Context(), existing); err != nil {
 			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 		}
 		return ctx.JSON(http.StatusOK, existing.ToFHIR())
@@ -715,6 +867,24 @@ func (h *Handler) handlePatch(c echo.Context, resourceType, fhirID string, apply
 		currentResource = existing.ToFHIR()
 	case "Claim":
 		existing, err := h.svc.GetClaimByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "ClaimResponse":
+		existing, err := h.svc.GetClaimResponseByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "Invoice":
+		existing, err := h.svc.GetInvoiceByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "ExplanationOfBenefit":
+		existing, err := h.svc.GetExplanationOfBenefitByFHIRID(c.Request().Context(), fhirID)
 		if err != nil {
 			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
 		}
@@ -799,3 +969,137 @@ func (h *Handler) HistoryClaimFHIR(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
+
+func (h *Handler) VreadClaimResponseFHIR(c echo.Context) error {
+	cr, err := h.svc.GetClaimResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ClaimResponse", c.Param("id")))
+	}
+	result := cr.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, cr.CreatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryClaimResponseFHIR(c echo.Context) error {
+	cr, err := h.svc.GetClaimResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ClaimResponse", c.Param("id")))
+	}
+	result := cr.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "ClaimResponse", ResourceID: cr.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: cr.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+// -- FHIR Invoice Endpoints --
+
+func (h *Handler) SearchInvoicesFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "status"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchInvoices(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Invoice"))
+}
+
+func (h *Handler) GetInvoiceFHIR(c echo.Context) error {
+	inv, err := h.svc.GetInvoiceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, inv.ToFHIR())
+}
+
+func (h *Handler) CreateInvoiceFHIR(c echo.Context) error {
+	var inv Invoice
+	if err := c.Bind(&inv); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateInvoice(c.Request().Context(), &inv); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/Invoice/"+inv.FHIRID)
+	return c.JSON(http.StatusCreated, inv.ToFHIR())
+}
+
+func (h *Handler) UpdateInvoiceFHIR(c echo.Context) error {
+	var inv Invoice
+	if err := c.Bind(&inv); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetInvoiceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", c.Param("id")))
+	}
+	inv.ID = existing.ID
+	inv.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateInvoice(c.Request().Context(), &inv); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, inv.ToFHIR())
+}
+
+func (h *Handler) DeleteInvoiceFHIR(c echo.Context) error {
+	existing, err := h.svc.GetInvoiceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", c.Param("id")))
+	}
+	if err := h.svc.DeleteInvoice(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) PatchInvoiceFHIR(c echo.Context) error {
+	return h.handlePatch(c, "Invoice", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetInvoiceByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", ctx.Param("id")))
+		}
+		if v, ok := resource["status"].(string); ok {
+			existing.Status = v
+		}
+		if err := h.svc.UpdateInvoice(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) VreadInvoiceFHIR(c echo.Context) error {
+	inv, err := h.svc.GetInvoiceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", c.Param("id")))
+	}
+	result := inv.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, inv.CreatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryInvoiceFHIR(c echo.Context) error {
+	inv, err := h.svc.GetInvoiceByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", c.Param("id")))
+	}
+	result := inv.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Invoice", ResourceID: inv.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: inv.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+

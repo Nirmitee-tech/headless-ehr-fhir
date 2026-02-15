@@ -75,6 +75,8 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirRead.GET("/MedicationAdministration/:id", h.GetMedicationAdministrationFHIR)
 	fhirRead.GET("/MedicationDispense", h.SearchMedicationDispensesFHIR)
 	fhirRead.GET("/MedicationDispense/:id", h.GetMedicationDispenseFHIR)
+	fhirRead.GET("/MedicationStatement", h.SearchMedicationStatementsFHIR)
+	fhirRead.GET("/MedicationStatement/:id", h.GetMedicationStatementFHIR)
 
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "pharmacist"))
@@ -94,12 +96,17 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirWrite.PUT("/MedicationDispense/:id", h.UpdateMedicationDispenseFHIR)
 	fhirWrite.DELETE("/MedicationDispense/:id", h.DeleteMedicationDispenseFHIR)
 	fhirWrite.PATCH("/MedicationDispense/:id", h.PatchMedicationDispenseFHIR)
+	fhirWrite.POST("/MedicationStatement", h.CreateMedicationStatementFHIR)
+	fhirWrite.PUT("/MedicationStatement/:id", h.UpdateMedicationStatementFHIR)
+	fhirWrite.DELETE("/MedicationStatement/:id", h.DeleteMedicationStatementFHIR)
+	fhirWrite.PATCH("/MedicationStatement/:id", h.PatchMedicationStatementFHIR)
 
 	// FHIR POST _search endpoints
 	fhirRead.POST("/Medication/_search", h.SearchMedicationsFHIR)
 	fhirRead.POST("/MedicationRequest/_search", h.SearchMedicationRequestsFHIR)
 	fhirRead.POST("/MedicationAdministration/_search", h.SearchMedicationAdministrationsFHIR)
 	fhirRead.POST("/MedicationDispense/_search", h.SearchMedicationDispensesFHIR)
+	fhirRead.POST("/MedicationStatement/_search", h.SearchMedicationStatementsFHIR)
 
 	// FHIR vread and history endpoints
 	fhirRead.GET("/Medication/:id/_history/:vid", h.VreadMedicationFHIR)
@@ -110,6 +117,8 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirRead.GET("/MedicationAdministration/:id/_history", h.HistoryMedicationAdministrationFHIR)
 	fhirRead.GET("/MedicationDispense/:id/_history/:vid", h.VreadMedicationDispenseFHIR)
 	fhirRead.GET("/MedicationDispense/:id/_history", h.HistoryMedicationDispenseFHIR)
+	fhirRead.GET("/MedicationStatement/:id/_history/:vid", h.VreadMedicationStatementFHIR)
+	fhirRead.GET("/MedicationStatement/:id/_history", h.HistoryMedicationStatementFHIR)
 }
 
 // -- Medication Handlers --
@@ -711,6 +720,45 @@ func (h *Handler) CreateMedicationDispenseFHIR(c echo.Context) error {
 	return c.JSON(http.StatusCreated, md.ToFHIR())
 }
 
+func (h *Handler) SearchMedicationStatementsFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "status", "medication"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchMedicationStatements(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/MedicationStatement"))
+}
+
+func (h *Handler) GetMedicationStatementFHIR(c echo.Context) error {
+	ms, err := h.svc.GetMedicationStatementByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, ms.ToFHIR())
+}
+
+func (h *Handler) CreateMedicationStatementFHIR(c echo.Context) error {
+	var ms MedicationStatement
+	if err := c.Bind(&ms); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateMedicationStatement(c.Request().Context(), &ms); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/MedicationStatement/"+ms.FHIRID)
+	return c.JSON(http.StatusCreated, ms.ToFHIR())
+}
+
 // -- FHIR Update Endpoints --
 
 func (h *Handler) UpdateMedicationFHIR(c echo.Context) error {
@@ -781,6 +829,23 @@ func (h *Handler) UpdateMedicationDispenseFHIR(c echo.Context) error {
 	return c.JSON(http.StatusOK, md.ToFHIR())
 }
 
+func (h *Handler) UpdateMedicationStatementFHIR(c echo.Context) error {
+	var ms MedicationStatement
+	if err := c.Bind(&ms); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetMedicationStatementByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
+	}
+	ms.ID = existing.ID
+	ms.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateMedicationStatement(c.Request().Context(), &ms); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, ms.ToFHIR())
+}
+
 // -- FHIR Delete Endpoints --
 
 func (h *Handler) DeleteMedicationFHIR(c echo.Context) error {
@@ -822,6 +887,17 @@ func (h *Handler) DeleteMedicationDispenseFHIR(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
 	}
 	if err := h.svc.DeleteMedicationDispense(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteMedicationStatementFHIR(c echo.Context) error {
+	existing, err := h.svc.GetMedicationStatementByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
+	}
+	if err := h.svc.DeleteMedicationStatement(c.Request().Context(), existing.ID); err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -993,6 +1069,47 @@ func (h *Handler) PatchMedicationDispenseFHIR(c echo.Context) error {
 	return c.JSON(http.StatusOK, existing.ToFHIR())
 }
 
+func (h *Handler) PatchMedicationStatementFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	existing, err := h.svc.GetMedicationStatementByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mp map[string]interface{}
+		if err := json.Unmarshal(body, &mp); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mp)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+	applyMedicationStatementPatch(existing, patched)
+	if err := h.svc.UpdateMedicationStatement(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
 // -- FHIR vread and history endpoints --
 
 func (h *Handler) VreadMedicationFHIR(c echo.Context) error {
@@ -1087,6 +1204,30 @@ func (h *Handler) HistoryMedicationDispenseFHIR(c echo.Context) error {
 	entry := &fhir.HistoryEntry{
 		ResourceType: "MedicationDispense", ResourceID: md.FHIRID, VersionID: 1,
 		Resource: raw, Action: "create", Timestamp: md.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
+func (h *Handler) VreadMedicationStatementFHIR(c echo.Context) error {
+	ms, err := h.svc.GetMedicationStatementByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
+	}
+	result := ms.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, ms.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryMedicationStatementFHIR(c echo.Context) error {
+	ms, err := h.svc.GetMedicationStatementByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
+	}
+	result := ms.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "MedicationStatement", ResourceID: ms.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: ms.CreatedAt,
 	}
 	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }
@@ -1515,6 +1656,105 @@ func applyMedicationDispensePatch(md *MedicationDispense, patched map[string]int
 		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
 			if note, ok := notes[0].(map[string]interface{}); ok {
 				patchStringPtr(note, "text", &md.Note)
+			}
+		}
+	}
+}
+
+func applyMedicationStatementPatch(ms *MedicationStatement, patched map[string]interface{}) {
+	if v, ok := patched["status"].(string); ok {
+		ms.Status = v
+	}
+	// statusReason
+	if v, ok := patched["statusReason"]; ok {
+		if reasons, ok := v.([]interface{}); ok && len(reasons) > 0 {
+			if reason, ok := reasons[0].(map[string]interface{}); ok {
+				if coding, ok := reason["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							ms.StatusReasonCode = &code
+						}
+						if display, ok := c["display"].(string); ok {
+							ms.StatusReasonDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// category
+	if code, display, ok := patchCodeableConcept(patched, "category"); ok {
+		ms.CategoryCode = &code
+		ms.CategoryDisplay = &display
+	}
+	// effectiveDateTime
+	patchTimePtr(patched, "effectiveDateTime", &ms.EffectiveDatetime)
+	// effectivePeriod
+	if v, ok := patched["effectivePeriod"].(map[string]interface{}); ok {
+		patchTimePtr(v, "start", &ms.EffectiveStart)
+		patchTimePtr(v, "end", &ms.EffectiveEnd)
+	}
+	// dateAsserted
+	patchTimePtr(patched, "dateAsserted", &ms.DateAsserted)
+	// reasonCode
+	if v, ok := patched["reasonCode"]; ok {
+		if reasons, ok := v.([]interface{}); ok && len(reasons) > 0 {
+			if reason, ok := reasons[0].(map[string]interface{}); ok {
+				if coding, ok := reason["coding"].([]interface{}); ok && len(coding) > 0 {
+					if c, ok := coding[0].(map[string]interface{}); ok {
+						if code, ok := c["code"].(string); ok {
+							ms.ReasonCode = &code
+						}
+						if display, ok := c["display"].(string); ok {
+							ms.ReasonDisplay = &display
+						}
+					}
+				}
+			}
+		}
+	}
+	// dosage
+	if v, ok := patched["dosage"]; ok {
+		if dosages, ok := v.([]interface{}); ok && len(dosages) > 0 {
+			if dosage, ok := dosages[0].(map[string]interface{}); ok {
+				patchStringPtr(dosage, "text", &ms.DosageText)
+				// route
+				if code, display, ok := patchCodeableConcept(dosage, "route"); ok {
+					ms.DosageRouteCode = &code
+					ms.DosageRouteDisplay = &display
+				}
+				// timing
+				if timing, ok := dosage["timing"].(map[string]interface{}); ok {
+					if timingCode, ok := timing["code"].(map[string]interface{}); ok {
+						if coding, ok := timingCode["coding"].([]interface{}); ok && len(coding) > 0 {
+							if c, ok := coding[0].(map[string]interface{}); ok {
+								if code, ok := c["code"].(string); ok {
+									ms.DosageTimingCode = &code
+								}
+								if display, ok := c["display"].(string); ok {
+									ms.DosageTimingDisplay = &display
+								}
+							}
+						}
+					}
+				}
+				// doseAndRate
+				if dar, ok := dosage["doseAndRate"].([]interface{}); ok && len(dar) > 0 {
+					if d, ok := dar[0].(map[string]interface{}); ok {
+						if dq, ok := d["doseQuantity"].(map[string]interface{}); ok {
+							patchFloat64Ptr(dq, "value", &ms.DoseQuantity)
+							patchStringPtr(dq, "unit", &ms.DoseUnit)
+						}
+					}
+				}
+			}
+		}
+	}
+	// note
+	if v, ok := patched["note"]; ok {
+		if notes, ok := v.([]interface{}); ok && len(notes) > 0 {
+			if note, ok := notes[0].(map[string]interface{}); ok {
+				patchStringPtr(note, "text", &ms.Note)
 			}
 		}
 	}

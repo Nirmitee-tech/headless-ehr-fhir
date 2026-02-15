@@ -240,6 +240,16 @@ func (m *mockClaimResponseRepo) ListByClaim(_ context.Context, claimID uuid.UUID
 	return result, len(result), nil
 }
 
+func (m *mockClaimResponseRepo) Update(_ context.Context, cr *ClaimResponse) error {
+	m.items[cr.ID] = cr
+	return nil
+}
+
+func (m *mockClaimResponseRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.items, id)
+	return nil
+}
+
 func (m *mockClaimResponseRepo) Search(_ context.Context, _ map[string]string, limit, offset int) ([]*ClaimResponse, int, error) {
 	var result []*ClaimResponse
 	for _, cr := range m.items {
@@ -333,8 +343,69 @@ func (m *mockInvoiceRepo) GetLineItems(_ context.Context, invoiceID uuid.UUID) (
 
 // -- Tests --
 
+type mockEOBRepo struct {
+	items map[uuid.UUID]*ExplanationOfBenefit
+}
+
+func newMockEOBRepo() *mockEOBRepo {
+	return &mockEOBRepo{items: make(map[uuid.UUID]*ExplanationOfBenefit)}
+}
+
+func (m *mockEOBRepo) Create(_ context.Context, eob *ExplanationOfBenefit) error {
+	eob.ID = uuid.New()
+	if eob.FHIRID == "" {
+		eob.FHIRID = eob.ID.String()
+	}
+	eob.CreatedAt = time.Now()
+	m.items[eob.ID] = eob
+	return nil
+}
+
+func (m *mockEOBRepo) GetByID(_ context.Context, id uuid.UUID) (*ExplanationOfBenefit, error) {
+	eob, ok := m.items[id]
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	return eob, nil
+}
+
+func (m *mockEOBRepo) GetByFHIRID(_ context.Context, fhirID string) (*ExplanationOfBenefit, error) {
+	for _, eob := range m.items {
+		if eob.FHIRID == fhirID {
+			return eob, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (m *mockEOBRepo) Update(_ context.Context, eob *ExplanationOfBenefit) error {
+	m.items[eob.ID] = eob
+	return nil
+}
+
+func (m *mockEOBRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.items, id)
+	return nil
+}
+
+func (m *mockEOBRepo) ListByPatient(_ context.Context, _ uuid.UUID, _, _ int) ([]*ExplanationOfBenefit, int, error) {
+	var result []*ExplanationOfBenefit
+	for _, eob := range m.items {
+		result = append(result, eob)
+	}
+	return result, len(result), nil
+}
+
+func (m *mockEOBRepo) Search(_ context.Context, _ map[string]string, _, _ int) ([]*ExplanationOfBenefit, int, error) {
+	var result []*ExplanationOfBenefit
+	for _, eob := range m.items {
+		result = append(result, eob)
+	}
+	return result, len(result), nil
+}
+
 func newTestService() *Service {
-	return NewService(newMockCoverageRepo(), newMockClaimRepo(), newMockClaimResponseRepo(), newMockInvoiceRepo())
+	return NewService(newMockCoverageRepo(), newMockClaimRepo(), newMockClaimResponseRepo(), newMockEOBRepo(), newMockInvoiceRepo())
 }
 
 // -- Coverage Tests --

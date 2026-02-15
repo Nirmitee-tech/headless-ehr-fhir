@@ -510,6 +510,21 @@ func (r *claimResponseRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*
 	return r.scanCR(r.conn(ctx).QueryRow(ctx, `SELECT `+crCols+` FROM claim_response WHERE fhir_id = $1`, fhirID))
 }
 
+func (r *claimResponseRepoPG) Update(ctx context.Context, cr *ClaimResponse) error {
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE claim_response SET status=$2, outcome=$3, disposition=$4,
+			payment_amount=$5, total_amount=$6, process_note=$7
+		WHERE id = $1`,
+		cr.ID, cr.Status, cr.Outcome, cr.Disposition,
+		cr.PaymentAmount, cr.TotalAmount, cr.ProcessNote)
+	return err
+}
+
+func (r *claimResponseRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM claim_response WHERE id = $1`, id)
+	return err
+}
+
 func (r *claimResponseRepoPG) ListByClaim(ctx context.Context, claimID uuid.UUID, limit, offset int) ([]*ClaimResponse, int, error) {
 	var total int
 	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM claim_response WHERE claim_id = $1`, claimID).Scan(&total); err != nil {
@@ -576,6 +591,155 @@ func (r *claimResponseRepoPG) Search(ctx context.Context, params map[string]stri
 			return nil, 0, err
 		}
 		items = append(items, cr)
+	}
+	return items, total, nil
+}
+
+// =========== ExplanationOfBenefit Repository ===========
+
+type eobRepoPG struct{ pool *pgxpool.Pool }
+
+func NewExplanationOfBenefitRepoPG(pool *pgxpool.Pool) ExplanationOfBenefitRepository {
+	return &eobRepoPG{pool: pool}
+}
+
+func (r *eobRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+const eobCols = `id, fhir_id, status, type_code, use_code,
+	patient_id, claim_id, claim_response_id, coverage_id,
+	insurer_org_id, provider_id, outcome, disposition,
+	billable_period_start, billable_period_end,
+	total_submitted, total_benefit, total_patient_responsibility,
+	total_payment, payment_date, currency, created_at`
+
+func (r *eobRepoPG) scanEOB(row pgx.Row) (*ExplanationOfBenefit, error) {
+	var eob ExplanationOfBenefit
+	err := row.Scan(&eob.ID, &eob.FHIRID, &eob.Status, &eob.TypeCode, &eob.UseCode,
+		&eob.PatientID, &eob.ClaimID, &eob.ClaimResponseID, &eob.CoverageID,
+		&eob.InsurerOrgID, &eob.ProviderID, &eob.Outcome, &eob.Disposition,
+		&eob.BillablePeriodStart, &eob.BillablePeriodEnd,
+		&eob.TotalSubmitted, &eob.TotalBenefit, &eob.TotalPatientResponsibility,
+		&eob.TotalPayment, &eob.PaymentDate, &eob.Currency, &eob.CreatedAt)
+	return &eob, err
+}
+
+func (r *eobRepoPG) Create(ctx context.Context, eob *ExplanationOfBenefit) error {
+	eob.ID = uuid.New()
+	if eob.FHIRID == "" {
+		eob.FHIRID = eob.ID.String()
+	}
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO explanation_of_benefit (id, fhir_id, status, type_code, use_code,
+			patient_id, claim_id, claim_response_id, coverage_id,
+			insurer_org_id, provider_id, outcome, disposition,
+			billable_period_start, billable_period_end,
+			total_submitted, total_benefit, total_patient_responsibility,
+			total_payment, payment_date, currency)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+		eob.ID, eob.FHIRID, eob.Status, eob.TypeCode, eob.UseCode,
+		eob.PatientID, eob.ClaimID, eob.ClaimResponseID, eob.CoverageID,
+		eob.InsurerOrgID, eob.ProviderID, eob.Outcome, eob.Disposition,
+		eob.BillablePeriodStart, eob.BillablePeriodEnd,
+		eob.TotalSubmitted, eob.TotalBenefit, eob.TotalPatientResponsibility,
+		eob.TotalPayment, eob.PaymentDate, eob.Currency)
+	return err
+}
+
+func (r *eobRepoPG) GetByID(ctx context.Context, id uuid.UUID) (*ExplanationOfBenefit, error) {
+	return r.scanEOB(r.conn(ctx).QueryRow(ctx, `SELECT `+eobCols+` FROM explanation_of_benefit WHERE id = $1`, id))
+}
+
+func (r *eobRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*ExplanationOfBenefit, error) {
+	return r.scanEOB(r.conn(ctx).QueryRow(ctx, `SELECT `+eobCols+` FROM explanation_of_benefit WHERE fhir_id = $1`, fhirID))
+}
+
+func (r *eobRepoPG) Update(ctx context.Context, eob *ExplanationOfBenefit) error {
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE explanation_of_benefit SET status=$2, type_code=$3, use_code=$4,
+			outcome=$5, disposition=$6,
+			total_submitted=$7, total_benefit=$8, total_patient_responsibility=$9,
+			total_payment=$10, payment_date=$11, currency=$12
+		WHERE id = $1`,
+		eob.ID, eob.Status, eob.TypeCode, eob.UseCode,
+		eob.Outcome, eob.Disposition,
+		eob.TotalSubmitted, eob.TotalBenefit, eob.TotalPatientResponsibility,
+		eob.TotalPayment, eob.PaymentDate, eob.Currency)
+	return err
+}
+
+func (r *eobRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM explanation_of_benefit WHERE id = $1`, id)
+	return err
+}
+
+func (r *eobRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*ExplanationOfBenefit, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM explanation_of_benefit WHERE patient_id = $1`, patientID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+eobCols+` FROM explanation_of_benefit WHERE patient_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, patientID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*ExplanationOfBenefit
+	for rows.Next() {
+		eob, err := r.scanEOB(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, eob)
+	}
+	return items, total, nil
+}
+
+func (r *eobRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ExplanationOfBenefit, int, error) {
+	query := `SELECT ` + eobCols + ` FROM explanation_of_benefit WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM explanation_of_benefit WHERE 1=1`
+	var args []interface{}
+	idx := 1
+
+	if p, ok := params["patient"]; ok {
+		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
+		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
+		args = append(args, p)
+		idx++
+	}
+	if p, ok := params["status"]; ok {
+		query += fmt.Sprintf(` AND status = $%d`, idx)
+		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
+		args = append(args, p)
+		idx++
+	}
+
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*ExplanationOfBenefit
+	for rows.Next() {
+		eob, err := r.scanEOB(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, eob)
 	}
 	return items, total, nil
 }
