@@ -40,6 +40,13 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **FHIR Bulk Import/Edit** — batch import via NDJSON, bulk update/delete with criteria matching, and job tracking
 - **FHIR $graphql** — GraphQL query interface for FHIR resources with field selection
 - **CodeSystem/$closure** — transitive closure table management for SNOMED CT hierarchies
+- **API Key Management** — create, revoke, rotate API keys with SHA-256 hashing and per-client scoping
+- **Per-Client Rate Limiting** — tiered rate plans (Free/Starter/Professional/Enterprise) with minute/hour/day limits
+- **SMART Backend Services** — client_credentials grant with RS384 JWT assertion, JTI replay protection
+- **Webhook Management API** — register endpoints, test connectivity, view delivery logs, retry failures, HMAC-SHA256 signatures
+- **API Usage Analytics** — per-endpoint/client/resource metrics, time-series data, P95 latency tracking
+- **Sandbox & Synthetic Data** — generate realistic FHIR patients with encounters, observations, conditions, medications
+- **Detailed CapabilityStatement** — 38 resource types with search params, 12 operations, custom search parameter API
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -665,6 +672,95 @@ Supports: single resource by ID, list queries with search params, field selectio
 | POST | `/fhir/CodeSystem/$closure` | Initialize or process closure table |
 
 Transitive closure computation for SNOMED CT hierarchies. Initialize with `name`, then add concepts to compute subsumption relationships.
+
+### API Key Management
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/api-keys` | Create new API key (returns raw key once) |
+| GET | `/api/v1/api-keys` | List keys for tenant (never exposes hash) |
+| GET | `/api/v1/api-keys/:id` | Get key details |
+| DELETE | `/api/v1/api-keys/:id` | Revoke key |
+| POST | `/api/v1/api-keys/:id/rotate` | Rotate key (revokes old, returns new) |
+
+Key format: `ehr_k1_<32-hex>`. SHA-256 hashed storage. Supports scopes, rate limits, expiration, and metadata.
+
+### Per-Client Rate Limiting
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/admin/rate-limits/plans` | List all rate plans |
+| POST | `/api/v1/admin/rate-limits/plans` | Create/update rate plan |
+| GET | `/api/v1/admin/rate-limits/clients/:id` | Get client usage stats |
+| PUT | `/api/v1/admin/rate-limits/clients/:id/plan` | Assign plan to client |
+| POST | `/api/v1/admin/rate-limits/clients/:id/reset` | Reset client counters |
+
+Default plans: Free (60/min), Starter (300/min), Professional (1K/min), Enterprise (5K/min). Per-minute/hour/day limits with burst and concurrent request tracking.
+
+### SMART Backend Services
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/auth/token` | Token endpoint (grant_type=client_credentials) |
+| POST | `/fhir/auth/register-backend` | Register backend service client |
+| GET | `/fhir/auth/backend-clients` | List registered clients |
+| DELETE | `/fhir/auth/backend-clients/:id` | Remove client |
+
+RS384 JWT assertion verification, JTI replay protection, scope-subset validation.
+
+### Webhook Management
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/webhooks` | Register webhook endpoint |
+| GET | `/api/v1/webhooks` | List endpoints |
+| GET | `/api/v1/webhooks/:id` | Get endpoint details |
+| PUT | `/api/v1/webhooks/:id` | Update endpoint |
+| DELETE | `/api/v1/webhooks/:id` | Delete endpoint |
+| POST | `/api/v1/webhooks/:id/test` | Send test event |
+| GET | `/api/v1/webhooks/:id/deliveries` | Delivery logs |
+| POST | `/api/v1/webhooks/deliveries/:id/retry` | Retry failed delivery |
+| POST | `/api/v1/webhooks/:id/pause` | Pause endpoint |
+| POST | `/api/v1/webhooks/:id/resume` | Resume endpoint |
+
+HMAC-SHA256 payload signing, wildcard event matching, exponential retry backoff.
+
+### API Usage Analytics
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/analytics/overview` | Overall usage stats |
+| GET | `/api/v1/analytics/endpoints` | Top endpoints with latency/error rates |
+| GET | `/api/v1/analytics/clients` | Top clients by usage |
+| GET | `/api/v1/analytics/clients/:id` | Specific client stats |
+| GET | `/api/v1/analytics/resources` | Resource type CRUD breakdown |
+| GET | `/api/v1/analytics/timeseries` | Time-bucketed metrics (interval=1m/5m/1h) |
+
+### Sandbox & Synthetic Data
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/admin/sandbox/seed` | Generate synthetic data (accepts SeedConfig) |
+| GET | `/api/v1/admin/sandbox/resources/:type` | List generated resources |
+| POST | `/api/v1/admin/sandbox/reset` | Clear all synthetic data |
+| GET | `/api/v1/admin/sandbox/export/ndjson/:type` | Export as NDJSON |
+| GET | `/api/v1/admin/sandbox/export/bundle` | Export as FHIR Transaction Bundle |
+
+Generates realistic patients with ICD-10 conditions, LOINC observations, RxNorm medications, CVX immunizations, CPT procedures, and SNOMED allergies. Reproducible with seed parameter.
+
+### Detailed CapabilityStatement
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/fhir/metadata` | Full CapabilityStatement |
+| GET | `/fhir/metadata/resources` | List supported resource types |
+| GET | `/fhir/metadata/resources/:type` | Capability for specific resource |
+| GET | `/fhir/metadata/operations` | List all FHIR operations |
+| POST | `/fhir/metadata/search-params` | Register custom search parameter |
+| GET | `/fhir/metadata/search-params` | List custom search parameters |
+| DELETE | `/fhir/metadata/search-params/:type/:name` | Delete custom search parameter |
+
+38 resource types with detailed search parameters (20+ for Patient), 12 server-level operations, custom search parameter API.
 
 ### Role-Based Access Control
 

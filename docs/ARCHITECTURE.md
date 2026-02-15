@@ -487,6 +487,20 @@ The platform supports FHIR-defined operations as platform-level handlers in `int
 
 - **CodeSystem/$closure** (`POST /fhir/CodeSystem/$closure`) -- Manages transitive closure tables for code system hierarchies. Initialize named closure tables, then incrementally add concepts to compute subsumption relationships. Built-in SNOMED CT hierarchy (25+ relationships across Clinical finding, Disease, Body structure domains). Returns ConceptMap with equivalence relationships (subsumes, specializes, equal). Located in `internal/platform/fhir/closure_op.go`.
 
+- **API Key Management** -- Production-grade API key lifecycle: generate (`ehr_k1_<32-hex>` format), validate (SHA-256 hash lookup), revoke, rotate. Keys are never stored in plaintext — only SHA-256 hashes with 8-char prefix for identification. Supports scopes, per-key rate limits, expiration, and tenant isolation. Echo middleware checks `X-API-Key` header or `Authorization: Bearer ehr_k1_...`. Located in `internal/platform/auth/apikey.go`.
+
+- **Per-Client Rate Limiting** -- Tiered rate plans with per-minute/hour/day limits, burst allowance, and concurrent request tracking. Four default plans: Free (60 RPM), Starter (300 RPM), Professional (1K RPM), Enterprise (5K RPM). Atomic counters with time-window resets. Middleware sets `X-RateLimit-*` headers and returns 429 with `Retry-After`. Client ID extracted from API key, OAuth token, or IP fallback. Located in `internal/platform/middleware/ratelimit_client.go`.
+
+- **SMART Backend Services** -- Machine-to-machine OAuth2 `client_credentials` grant per SMART App Launch v2.0. Clients register with JWKS URL and public keys. Authentication via RS384-signed JWT assertion with full validation (iss==sub==client_id, aud==token endpoint, jti replay protection, expiry). Issues HMAC-SHA256 access tokens with scope subset validation. Located in `internal/platform/auth/backend_services.go`.
+
+- **Webhook Management API** -- Full webhook lifecycle: register endpoints with event subscriptions, HMAC-SHA256 payload signing (`X-Webhook-Signature: sha256=<hex>`), delivery attempt logging with status codes and response bodies, retry with exponential backoff, test endpoint connectivity, pause/resume. Wildcard event matching (`*.delete`, `Patient.*`). Located in `internal/platform/webhook/manager.go`.
+
+- **API Usage Analytics** -- Real-time API metrics aggregation: per-endpoint stats (request count, error rate, avg/P95 latency, status breakdown), per-client stats (requests, bytes, last seen), per-resource-type CRUD counts, time-series bucketing (configurable 1m/5m/1h intervals). Ring buffer for 100K recent metrics. Echo middleware captures timing, status, and client context. Located in `internal/platform/analytics/usage.go`.
+
+- **Sandbox & Synthetic Data** -- Reproducible FHIR data generation with seeded PRNG. Generates realistic patients with demographics (50+ name pools), ICD-10 conditions (21 codes), LOINC observations with physiologic ranges (16 codes), RxNorm medications (16 codes), CVX immunizations (12 codes), SNOMED allergies (11 codes), CPT procedures (12 codes). Proper cross-references between resources. Export as NDJSON or FHIR Transaction Bundle. Located in `internal/platform/sandbox/seeder.go`.
+
+- **Detailed CapabilityStatement** -- 38 FHIR resource types with comprehensive search parameter definitions (Patient has 20 params, Observation 11, Encounter 9, etc.). 12 server-level operations. Custom search parameter registration API. OAuth2/SMART security section. System interactions (transaction, batch, search-system, history-system). Located in `internal/platform/fhir/capability.go`.
+
 ### Real-Time Event System
 
 The VersionTracker (used by all domain services for version history) supports a listener pattern via `ResourceEventListener`. The `NotificationEngine` registers as a listener and evaluates resource mutations against active FHIR Subscription criteria. Matching events produce notification rows in a PostgreSQL queue, which a background delivery loop POSTs to configured webhook endpoints with retry.

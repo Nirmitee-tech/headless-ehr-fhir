@@ -2,8 +2,19 @@ package fhir
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
+
+	"github.com/labstack/echo/v4"
 )
+
+// ===========================================================================
+// Legacy-compatible builder tests (preserved from original)
+// ===========================================================================
 
 func TestCapabilityBuilder_AddResource(t *testing.T) {
 	b := NewCapabilityBuilder("http://localhost:8000/fhir", "0.1.0")
@@ -632,5 +643,977 @@ func TestBuild_SearchIncludeRevIncludeOnly(t *testing.T) {
 	}
 	if sri[0] != "Observation:encounter" || sri[1] != "Condition:encounter" {
 		t.Errorf("unexpected searchRevInclude: %v", sri)
+	}
+}
+
+// ===========================================================================
+// NEW: CapabilityConfig / ResourceCapability / enhanced builder tests
+// ===========================================================================
+
+// 1. TestCapabilityBuilder_Build — returns valid CapabilityStatement
+func TestCapabilityBuilder_Build(t *testing.T) {
+	cfg := CapabilityConfig{
+		ServerName:    "Test Server",
+		ServerVersion: "1.0.0",
+		FHIRVersion:   "4.0.1",
+		Publisher:     "Test Publisher",
+		Description:   "Test Description",
+		BaseURL:       "http://localhost:8000/fhir",
+	}
+	b := NewCapabilityBuilderFromConfig(cfg)
+	b.AddResourceCapability(ResourceCapabilityDef{
+		Type:         "Patient",
+		Profile:      "http://hl7.org/fhir/StructureDefinition/Patient",
+		Interactions: DefaultInteractions(),
+		Versioning:   "versioned",
+	})
+
+	cs := b.Build()
+
+	if cs["resourceType"] != "CapabilityStatement" {
+		t.Errorf("expected resourceType CapabilityStatement, got %v", cs["resourceType"])
+	}
+	if cs["status"] != "active" {
+		t.Errorf("expected status active, got %v", cs["status"])
+	}
+	if cs["kind"] != "instance" {
+		t.Errorf("expected kind instance, got %v", cs["kind"])
+	}
+
+	software := cs["software"].(map[string]string)
+	if software["name"] != "Test Server" {
+		t.Errorf("expected server name 'Test Server', got %s", software["name"])
+	}
+	if software["version"] != "1.0.0" {
+		t.Errorf("expected version 1.0.0, got %s", software["version"])
+	}
+}
+
+// 2. TestCapabilityBuilder_Build_HasResourceType
+func TestCapabilityBuilder_Build_HasResourceType(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	cs := b.Build()
+	if cs["resourceType"] != "CapabilityStatement" {
+		t.Errorf("expected CapabilityStatement, got %v", cs["resourceType"])
+	}
+}
+
+// 3. TestCapabilityBuilder_Build_HasFHIRVersion
+func TestCapabilityBuilder_Build_HasFHIRVersion(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{FHIRVersion: "4.0.1", BaseURL: "http://localhost/fhir"})
+	cs := b.Build()
+	if cs["fhirVersion"] != "4.0.1" {
+		t.Errorf("expected fhirVersion 4.0.1, got %v", cs["fhirVersion"])
+	}
+}
+
+// 4. TestCapabilityBuilder_Build_HasRest
+func TestCapabilityBuilder_Build_HasRest(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	if len(rest) != 1 {
+		t.Fatalf("expected 1 rest entry, got %d", len(rest))
+	}
+	if rest[0]["mode"] != "server" {
+		t.Errorf("expected rest mode server, got %v", rest[0]["mode"])
+	}
+}
+
+// 5. TestCapabilityBuilder_AddResourceCapability
+func TestCapabilityBuilder_AddResourceCapability(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddResourceCapability(ResourceCapabilityDef{
+		Type:         "Observation",
+		Profile:      "http://hl7.org/fhir/StructureDefinition/Observation",
+		Interactions: []string{"read", "search-type"},
+		Versioning:   "versioned",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+	if resources[0]["type"] != "Observation" {
+		t.Errorf("expected Observation, got %v", resources[0]["type"])
+	}
+}
+
+// 6. TestCapabilityBuilder_AddResourceCapability_Interactions
+func TestCapabilityBuilder_AddResourceCapability_Interactions(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddResourceCapability(ResourceCapabilityDef{
+		Type:         "Patient",
+		Interactions: []string{"read", "create", "update", "delete"},
+		Versioning:   "versioned",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	interactions := resources[0]["interaction"].([]map[string]string)
+
+	if len(interactions) != 4 {
+		t.Fatalf("expected 4 interactions, got %d", len(interactions))
+	}
+
+	codes := make(map[string]bool)
+	for _, ia := range interactions {
+		codes[ia["code"]] = true
+	}
+	for _, expected := range []string{"read", "create", "update", "delete"} {
+		if !codes[expected] {
+			t.Errorf("missing interaction: %s", expected)
+		}
+	}
+}
+
+// 7. TestCapabilityBuilder_AddResourceCapability_SearchParams
+func TestCapabilityBuilder_AddResourceCapability_SearchParams(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddResourceCapability(ResourceCapabilityDef{
+		Type:         "Patient",
+		Interactions: []string{"search-type"},
+		SearchParams: []SearchParamCapability{
+			{Name: "name", Type: "string", Documentation: "Patient name"},
+			{Name: "birthdate", Type: "date", Documentation: "Date of birth"},
+			{Name: "identifier", Type: "token", Documentation: "Patient identifier"},
+		},
+		Versioning: "versioned",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+	params := resources[0]["searchParam"].([]map[string]string)
+
+	if len(params) != 3 {
+		t.Fatalf("expected 3 search params, got %d", len(params))
+	}
+
+	paramMap := make(map[string]string)
+	for _, p := range params {
+		paramMap[p["name"]] = p["type"]
+	}
+	if paramMap["name"] != "string" {
+		t.Errorf("expected name type string, got %s", paramMap["name"])
+	}
+	if paramMap["birthdate"] != "date" {
+		t.Errorf("expected birthdate type date, got %s", paramMap["birthdate"])
+	}
+	if paramMap["identifier"] != "token" {
+		t.Errorf("expected identifier type token, got %s", paramMap["identifier"])
+	}
+}
+
+// 8. TestCapabilityBuilder_AddServerOperation
+func TestCapabilityBuilder_AddServerOperation(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddServerOperation(OperationCapability{
+		Name:          "$export",
+		Definition:    "http://hl7.org/fhir/uv/bulkdata/OperationDefinition/export",
+		Documentation: "Bulk data export",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	operations := rest[0]["operation"].([]map[string]interface{})
+
+	if len(operations) != 1 {
+		t.Fatalf("expected 1 operation, got %d", len(operations))
+	}
+	if operations[0]["name"] != "$export" {
+		t.Errorf("expected $export, got %v", operations[0]["name"])
+	}
+	if operations[0]["definition"] != "http://hl7.org/fhir/uv/bulkdata/OperationDefinition/export" {
+		t.Errorf("unexpected definition: %v", operations[0]["definition"])
+	}
+}
+
+// 9. TestCapabilityBuilder_Build_HasSecurity
+func TestCapabilityBuilder_Build_HasSecurity(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.SetOAuthURIs("http://auth/authorize", "http://auth/token")
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	security, ok := rest[0]["security"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected security section")
+	}
+
+	services := security["service"].([]map[string]interface{})
+	codings := services[0]["coding"].([]map[string]string)
+	if codings[0]["code"] != "SMART-on-FHIR" {
+		t.Errorf("expected SMART-on-FHIR, got %s", codings[0]["code"])
+	}
+}
+
+// 10. TestCapabilityBuilder_Build_HasFormats
+func TestCapabilityBuilder_Build_HasFormats(t *testing.T) {
+	cfg := CapabilityConfig{
+		BaseURL:          "http://localhost/fhir",
+		SupportedFormats: []string{"application/fhir+json"},
+	}
+	b := NewCapabilityBuilderFromConfig(cfg)
+	cs := b.Build()
+	formats := cs["format"].([]string)
+	found := false
+	for _, f := range formats {
+		if f == "application/fhir+json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected application/fhir+json in formats, got %v", formats)
+	}
+}
+
+// ===========================================================================
+// Default builder tests
+// ===========================================================================
+
+// 11. TestDefaultCapabilityBuilder_HasPatient
+func TestDefaultCapabilityBuilder_HasPatient(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	var patient map[string]interface{}
+	for _, r := range resources {
+		if r["type"] == "Patient" {
+			patient = r
+			break
+		}
+	}
+	if patient == nil {
+		t.Fatal("Patient resource not found")
+	}
+
+	params := patient["searchParam"].([]map[string]string)
+	if len(params) < 20 {
+		t.Errorf("expected at least 20 Patient search params, got %d", len(params))
+	}
+}
+
+// 12. TestDefaultCapabilityBuilder_HasObservation
+func TestDefaultCapabilityBuilder_HasObservation(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	var obs map[string]interface{}
+	for _, r := range resources {
+		if r["type"] == "Observation" {
+			obs = r
+			break
+		}
+	}
+	if obs == nil {
+		t.Fatal("Observation resource not found")
+	}
+
+	params := obs["searchParam"].([]map[string]string)
+	if len(params) < 5 {
+		t.Errorf("expected at least 5 Observation search params, got %d", len(params))
+	}
+}
+
+// 13. TestDefaultCapabilityBuilder_HasEncounter
+func TestDefaultCapabilityBuilder_HasEncounter(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	var enc map[string]interface{}
+	for _, r := range resources {
+		if r["type"] == "Encounter" {
+			enc = r
+			break
+		}
+	}
+	if enc == nil {
+		t.Fatal("Encounter resource not found")
+	}
+
+	params := enc["searchParam"].([]map[string]string)
+	if len(params) < 5 {
+		t.Errorf("expected at least 5 Encounter search params, got %d", len(params))
+	}
+}
+
+// 14. TestDefaultCapabilityBuilder_Has20PlusResources
+func TestDefaultCapabilityBuilder_Has20PlusResources(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	if len(resources) < 20 {
+		t.Errorf("expected at least 20 resource types, got %d", len(resources))
+	}
+}
+
+// 15. TestDefaultCapabilityBuilder_HasOperations
+func TestDefaultCapabilityBuilder_HasOperations(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	operations := rest[0]["operation"].([]map[string]interface{})
+
+	if len(operations) < 12 {
+		t.Errorf("expected at least 12 server operations, got %d", len(operations))
+	}
+
+	opNames := make(map[string]bool)
+	for _, op := range operations {
+		opNames[op["name"].(string)] = true
+	}
+	for _, expected := range []string{"$export", "$everything", "$validate", "$match", "$graphql"} {
+		if !opNames[expected] {
+			t.Errorf("missing server operation: %s", expected)
+		}
+	}
+}
+
+// 16. TestDefaultCapabilityBuilder_PatientSearchParams
+func TestDefaultCapabilityBuilder_PatientSearchParams(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	var patient map[string]interface{}
+	for _, r := range resources {
+		if r["type"] == "Patient" {
+			patient = r
+			break
+		}
+	}
+	if patient == nil {
+		t.Fatal("Patient resource not found")
+	}
+
+	params := patient["searchParam"].([]map[string]string)
+	paramNames := make(map[string]bool)
+	for _, p := range params {
+		paramNames[p["name"]] = true
+	}
+
+	expected := []string{"name", "family", "given", "birthdate", "gender", "identifier",
+		"address", "phone", "email", "_id", "_lastUpdated", "general-practitioner",
+		"organization", "active", "deceased", "death-date", "language",
+		"address-city", "address-state", "address-postalcode"}
+	for _, e := range expected {
+		if !paramNames[e] {
+			t.Errorf("missing Patient search param: %s", e)
+		}
+	}
+}
+
+// 17. TestDefaultCapabilityBuilder_ObservationSearchParams
+func TestDefaultCapabilityBuilder_ObservationSearchParams(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	var obs map[string]interface{}
+	for _, r := range resources {
+		if r["type"] == "Observation" {
+			obs = r
+			break
+		}
+	}
+	if obs == nil {
+		t.Fatal("Observation resource not found")
+	}
+
+	params := obs["searchParam"].([]map[string]string)
+	paramNames := make(map[string]bool)
+	for _, p := range params {
+		paramNames[p["name"]] = true
+	}
+
+	for _, e := range []string{"category", "code", "date"} {
+		if !paramNames[e] {
+			t.Errorf("missing Observation search param: %s", e)
+		}
+	}
+}
+
+// 18. TestDefaultCapabilityBuilder_SystemInteractions
+func TestDefaultCapabilityBuilder_SystemInteractions(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	interactions := rest[0]["interaction"].([]map[string]string)
+
+	codes := make(map[string]bool)
+	for _, ia := range interactions {
+		codes[ia["code"]] = true
+	}
+	for _, expected := range []string{"transaction", "batch", "search-system", "history-system"} {
+		if !codes[expected] {
+			t.Errorf("missing system interaction: %s", expected)
+		}
+	}
+}
+
+// ===========================================================================
+// Custom search params
+// ===========================================================================
+
+// 19. TestCapabilityBuilder_AddCustomSearchParam
+func TestCapabilityBuilder_AddCustomSearchParam(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddResourceCapability(ResourceCapabilityDef{
+		Type:         "Patient",
+		Interactions: []string{"read", "search-type"},
+		Versioning:   "versioned",
+	})
+
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "my-custom-param",
+		Type:         "string",
+		ResourceType: "Patient",
+		Expression:   "Patient.extension.where(url='http://example.com/custom').value",
+		Description:  "Custom search parameter",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	var patient map[string]interface{}
+	for _, r := range resources {
+		if r["type"] == "Patient" {
+			patient = r
+			break
+		}
+	}
+	if patient == nil {
+		t.Fatal("Patient not found")
+	}
+
+	params := patient["searchParam"].([]map[string]string)
+	found := false
+	for _, p := range params {
+		if p["name"] == "my-custom-param" {
+			found = true
+			if p["type"] != "string" {
+				t.Errorf("expected type string, got %s", p["type"])
+			}
+		}
+	}
+	if !found {
+		t.Error("custom search param not found in build output")
+	}
+}
+
+// 20. TestCapabilityBuilder_ListCustomSearchParams
+func TestCapabilityBuilder_ListCustomSearchParams(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "param-a",
+		Type:         "string",
+		ResourceType: "Patient",
+		Expression:   "Patient.name.text",
+		Description:  "Custom A",
+	})
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "param-b",
+		Type:         "token",
+		ResourceType: "Patient",
+		Expression:   "Patient.identifier",
+		Description:  "Custom B",
+	})
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "param-c",
+		Type:         "reference",
+		ResourceType: "Observation",
+		Expression:   "Observation.subject",
+		Description:  "Custom C",
+	})
+
+	patientParams := b.ListCustomSearchParams("Patient")
+	if len(patientParams) != 2 {
+		t.Fatalf("expected 2 custom params for Patient, got %d", len(patientParams))
+	}
+
+	obsParams := b.ListCustomSearchParams("Observation")
+	if len(obsParams) != 1 {
+		t.Fatalf("expected 1 custom param for Observation, got %d", len(obsParams))
+	}
+}
+
+// 21. TestCapabilityBuilder_DeleteCustomSearchParam
+func TestCapabilityBuilder_DeleteCustomSearchParam(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "deleteme",
+		Type:         "string",
+		ResourceType: "Patient",
+		Expression:   "Patient.name",
+		Description:  "To be deleted",
+	})
+
+	if len(b.ListCustomSearchParams("Patient")) != 1 {
+		t.Fatal("expected 1 custom param before delete")
+	}
+
+	err := b.DeleteCustomSearchParam("Patient", "deleteme")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(b.ListCustomSearchParams("Patient")) != 0 {
+		t.Error("expected 0 custom params after delete")
+	}
+}
+
+// 22. TestCapabilityBuilder_DeleteCustomSearchParam_NotFound
+func TestCapabilityBuilder_DeleteCustomSearchParam_NotFound(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	err := b.DeleteCustomSearchParam("Patient", "nonexistent")
+	if err == nil {
+		t.Error("expected error for deleting nonexistent param")
+	}
+}
+
+// ===========================================================================
+// Handler tests
+// ===========================================================================
+
+// 23. TestCapabilityHandler_Metadata
+func TestCapabilityHandler_Metadata(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/metadata", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var cs map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &cs); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if cs["resourceType"] != "CapabilityStatement" {
+		t.Errorf("expected CapabilityStatement, got %v", cs["resourceType"])
+	}
+}
+
+// 24. TestCapabilityHandler_ListResources
+func TestCapabilityHandler_ListResources(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/metadata/resources", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	resourceTypes, ok := result["resourceTypes"].([]interface{})
+	if !ok {
+		t.Fatal("expected resourceTypes array in response")
+	}
+	if len(resourceTypes) < 20 {
+		t.Errorf("expected at least 20 resource types, got %d", len(resourceTypes))
+	}
+}
+
+// 25. TestCapabilityHandler_GetResourceCapability
+func TestCapabilityHandler_GetResourceCapability(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/metadata/resources/Patient", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if result["type"] != "Patient" {
+		t.Errorf("expected Patient, got %v", result["type"])
+	}
+}
+
+// TestCapabilityHandler_GetResourceCapability_NotFound verifies 404 for unknown type.
+func TestCapabilityHandler_GetResourceCapability_NotFound(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/metadata/resources/NonExistent", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+// 26. TestCapabilityHandler_ListOperations
+func TestCapabilityHandler_ListOperations(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/metadata/operations", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	operations, ok := result["operations"].([]interface{})
+	if !ok {
+		t.Fatal("expected operations array in response")
+	}
+	if len(operations) < 12 {
+		t.Errorf("expected at least 12 operations, got %d", len(operations))
+	}
+}
+
+// 27. TestCapabilityHandler_RegisterCustomParam
+func TestCapabilityHandler_RegisterCustomParam(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	body := `{"name":"custom-mrn","type":"token","resourceType":"Patient","expression":"Patient.identifier.where(system='http://example.com/mrn')","description":"MRN search"}`
+	req := httptest.NewRequest(http.MethodPost, "/fhir/metadata/search-params", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Verify param was registered
+	params := b.ListCustomSearchParams("Patient")
+	found := false
+	for _, p := range params {
+		if p.Name == "custom-mrn" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("custom param not registered after POST")
+	}
+}
+
+// TestCapabilityHandler_ListCustomSearchParams verifies GET /fhir/metadata/search-params.
+func TestCapabilityHandler_ListCustomSearchParams(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "custom-list-test",
+		Type:         "string",
+		ResourceType: "Observation",
+		Expression:   "Observation.code.text",
+		Description:  "list test param",
+	})
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/metadata/search-params", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	customParams, ok := result["customSearchParams"].([]interface{})
+	if !ok {
+		t.Fatal("expected customSearchParams array")
+	}
+	if len(customParams) < 1 {
+		t.Error("expected at least 1 custom search param")
+	}
+}
+
+// TestCapabilityHandler_DeleteCustomParam verifies DELETE /fhir/metadata/search-params/:type/:name.
+func TestCapabilityHandler_DeleteCustomParam(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	b.AddCustomSearchParam(CustomSearchParam{
+		Name:         "to-delete",
+		Type:         "string",
+		ResourceType: "Patient",
+		Expression:   "Patient.name.text",
+		Description:  "delete test",
+	})
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	req := httptest.NewRequest(http.MethodDelete, "/fhir/metadata/search-params/Patient/to-delete", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+
+	params := b.ListCustomSearchParams("Patient")
+	for _, p := range params {
+		if p.Name == "to-delete" {
+			t.Error("param should have been deleted")
+		}
+	}
+}
+
+// 28. TestCapabilityHandler_ConcurrentAccess
+func TestCapabilityHandler_ConcurrentAccess(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	h := NewCapabilityHandler(b)
+
+	e := echo.New()
+	h.RegisterRoutes(e.Group("/fhir"))
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 50)
+
+	// Concurrent metadata reads
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/fhir/metadata", nil)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				errs <- fmt.Errorf("metadata returned %d", rec.Code)
+			}
+		}()
+	}
+
+	// Concurrent custom param registrations
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			body := fmt.Sprintf(`{"name":"concurrent-%d","type":"string","resourceType":"Patient","expression":"Patient.name","description":"concurrent test"}`, idx)
+			req := httptest.NewRequest(http.MethodPost, "/fhir/metadata/search-params", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			if rec.Code != http.StatusCreated {
+				errs <- fmt.Errorf("register param returned %d", rec.Code)
+			}
+		}(i)
+	}
+
+	// Concurrent builds
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = b.Build()
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("concurrent error: %v", err)
+	}
+}
+
+// ===========================================================================
+// Additional structural tests for full coverage
+// ===========================================================================
+
+// TestDefaultCapabilityBuilder_HasCondition verifies Condition resource in defaults.
+func TestDefaultCapabilityBuilder_HasCondition(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	found := false
+	for _, r := range resources {
+		if r["type"] == "Condition" {
+			found = true
+			params := r["searchParam"].([]map[string]string)
+			paramNames := make(map[string]bool)
+			for _, p := range params {
+				paramNames[p["name"]] = true
+			}
+			for _, expected := range []string{"patient", "code", "clinical-status", "category"} {
+				if !paramNames[expected] {
+					t.Errorf("Condition missing search param: %s", expected)
+				}
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("Condition resource not found in default builder")
+	}
+}
+
+// TestDefaultCapabilityBuilder_HasMedicationRequest verifies MedicationRequest in defaults.
+func TestDefaultCapabilityBuilder_HasMedicationRequest(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	found := false
+	for _, r := range resources {
+		if r["type"] == "MedicationRequest" {
+			found = true
+			params := r["searchParam"].([]map[string]string)
+			paramNames := make(map[string]bool)
+			for _, p := range params {
+				paramNames[p["name"]] = true
+			}
+			for _, expected := range []string{"patient", "status", "intent"} {
+				if !paramNames[expected] {
+					t.Errorf("MedicationRequest missing search param: %s", expected)
+				}
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("MedicationRequest resource not found in default builder")
+	}
+}
+
+// TestCapabilityConfig_Defaults verifies default config values are set.
+func TestCapabilityConfig_Defaults(t *testing.T) {
+	cfg := CapabilityConfig{}
+	b := NewCapabilityBuilderFromConfig(cfg)
+	cs := b.Build()
+
+	software := cs["software"].(map[string]string)
+	if software["name"] != "Headless EHR FHIR Server" {
+		t.Errorf("expected default server name, got %s", software["name"])
+	}
+	if cs["fhirVersion"] != "4.0.1" {
+		t.Errorf("expected default FHIR version 4.0.1, got %v", cs["fhirVersion"])
+	}
+}
+
+// TestResourceCapability_WithOperations verifies resource-level operations in build.
+func TestResourceCapability_WithOperations(t *testing.T) {
+	b := NewCapabilityBuilderFromConfig(CapabilityConfig{BaseURL: "http://localhost/fhir"})
+	b.AddResourceCapability(ResourceCapabilityDef{
+		Type:         "Patient",
+		Interactions: []string{"read"},
+		Operations: []OperationCapability{
+			{Name: "$everything", Definition: "http://hl7.org/fhir/OperationDefinition/Patient-everything"},
+		},
+		Versioning: "versioned",
+	})
+
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	ops, ok := resources[0]["operation"].([]map[string]interface{})
+	if !ok {
+		t.Fatal("expected operations on resource")
+	}
+	if len(ops) != 1 {
+		t.Fatalf("expected 1 operation, got %d", len(ops))
+	}
+	if ops[0]["name"] != "$everything" {
+		t.Errorf("expected $everything, got %v", ops[0]["name"])
+	}
+}
+
+// TestDefaultCapabilityBuilder_ResourceProfile verifies profiles are set on default resources.
+func TestDefaultCapabilityBuilder_ResourceProfile(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	for _, r := range resources {
+		if r["type"] == "Patient" {
+			profile, ok := r["profile"].(string)
+			if !ok {
+				t.Fatal("expected profile on Patient resource")
+			}
+			if profile != "http://hl7.org/fhir/StructureDefinition/Patient" {
+				t.Errorf("unexpected profile: %s", profile)
+			}
+			return
+		}
+	}
+	t.Fatal("Patient resource not found")
+}
+
+// TestDefaultCapabilityBuilder_Versioning verifies versioning is set on default resources.
+func TestDefaultCapabilityBuilder_Versioning(t *testing.T) {
+	b := DefaultCapabilityBuilder()
+	cs := b.Build()
+	rest := cs["rest"].([]map[string]interface{})
+	resources := rest[0]["resource"].([]map[string]interface{})
+
+	for _, r := range resources {
+		if r["versioning"] != "versioned" {
+			t.Errorf("expected versioning=versioned on %s, got %v", r["type"], r["versioning"])
+		}
 	}
 }

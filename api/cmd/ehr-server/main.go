@@ -50,18 +50,21 @@ import (
 	"github.com/ehr/ehr/internal/domain/subscription"
 	fhirtask "github.com/ehr/ehr/internal/domain/task"
 	"github.com/ehr/ehr/internal/domain/terminology"
+	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
+	"github.com/ehr/ehr/internal/platform/blobstore"
 	"github.com/ehr/ehr/internal/platform/db"
 	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/ehr/ehr/internal/platform/hipaa"
-	"github.com/ehr/ehr/internal/platform/blobstore"
 	"github.com/ehr/ehr/internal/platform/hl7v2"
 	"github.com/ehr/ehr/internal/platform/middleware"
 	"github.com/ehr/ehr/internal/platform/notification"
-	selfsched "github.com/ehr/ehr/internal/platform/scheduling"
 	"github.com/ehr/ehr/internal/platform/openapi"
-	"github.com/ehr/ehr/internal/platform/websocket"
 	"github.com/ehr/ehr/internal/platform/reporting"
+	"github.com/ehr/ehr/internal/platform/sandbox"
+	selfsched "github.com/ehr/ehr/internal/platform/scheduling"
+	"github.com/ehr/ehr/internal/platform/webhook"
+	"github.com/ehr/ehr/internal/platform/websocket"
 )
 
 // ConsentRepoAdapter adapts a documents.ConsentRepository to the
@@ -2623,11 +2626,51 @@ func runServer() error {
 	closureHandler := fhir.NewClosureHandler(closureMgr)
 	closureHandler.RegisterRoutes(fhirGroup)
 
+	// API Key Management
+	apiKeyStore := auth.NewInMemoryAPIKeyStore()
+	apiKeyMgr := auth.NewAPIKeyManager(apiKeyStore)
+	apiKeyHandler := auth.NewAPIKeyHandler(apiKeyMgr)
+	apiKeyHandler.RegisterRoutes(apiV1)
+
+	// Per-client rate limiting
+	clientRateLimiter := middleware.NewClientRateLimiter()
+	rateLimitAdminHandler := middleware.NewRateLimitHandler(clientRateLimiter)
+	rateLimitAdminHandler.RegisterRoutes(apiV1)
+
+	// SMART Backend Services (client_credentials with JWT assertion)
+	backendSvcStore := auth.NewInMemoryBackendServiceStore()
+	backendSigningKey, _, _ := resolveSmartSigningKey(os.Getenv("SMART_SIGNING_KEY"))
+	backendSvcMgr := auth.NewBackendServiceManager(backendSvcStore, backendSigningKey, cfg.AuthIssuer, cfg.AuthIssuer+"/auth/token")
+	auth.RegisterBackendServiceEndpoints(fhirGroup, backendSvcMgr)
+
+	// Webhook Management API
+	webhookStore := webhook.NewInMemoryWebhookStore()
+	webhookMgr := webhook.NewWebhookManager(webhookStore)
+	webhookHandler := webhook.NewWebhookHandler(webhookMgr)
+	webhookHandler.RegisterRoutes(apiV1)
+
+	// API Usage Analytics
+	usageTracker := analytics.NewUsageTracker(100000)
+	usageHandler := analytics.NewUsageHandler(usageTracker)
+	usageHandler.RegisterRoutes(apiV1)
+
+	// Sandbox / Synthetic Data Seeder
+	sandboxHandler := sandbox.NewSeedHandler()
+	sandboxHandler.RegisterRoutes(apiV1)
+
+	// Detailed CapabilityStatement (extended metadata endpoints)
+	capabilityDetailed := fhir.DefaultCapabilityBuilder()
+	capabilityHandler := fhir.NewCapabilityHandler(capabilityDetailed)
+	capabilityHandler.RegisterRoutes(fhirGroup)
+
 	// Suppress unused variable warnings for optional components
 	_ = wsHub
 	_ = notifMgr
 	_ = blobStore
 	_ = cacheStore
+	_ = apiKeyMgr
+	_ = clientRateLimiter
+	_ = usageTracker
 
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))
