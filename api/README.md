@@ -14,9 +14,14 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 
 ## Features
 
-- **20 domains** covering 200+ database tables (identity, encounter, clinical, medication, diagnostics, scheduling, billing, documents, inbox, surgery, emergency, obstetrics, oncology, nursing, behavioral, research, portal, admin, CDS, subscription)
-- **FHIR R4 REST API** with 22 resource types (Patient, Practitioner, Encounter, Condition, Observation, Subscription, and more)
+- **29 domains** covering 200+ database tables (identity, encounter, clinical, medication, diagnostics, scheduling, billing, documents, inbox, surgery, emergency, obstetrics, oncology, nursing, behavioral, research, portal, admin, CDS, subscription, careplan, careteam, device, immunization, familyhistory, relatedperson, provenance, task, terminology)
+- **FHIR R4 REST API** with 35+ resource types and full CRUD, search, history, patch, transaction bundles
+- **FHIR $validate** operation for resource validation against structure rules, required fields, and business rules
+- **C-CDA 2.1 Generation & Parsing** — produce and consume Continuity of Care Documents (10 clinical sections)
+- **SMART on FHIR App Launch v2.0** — full OAuth2 authorization server with EHR launch, standalone launch, PKCE, dynamic client registration
 - **FHIR R4 Subscriptions** with REST-hook webhook delivery, criteria matching, retry with exponential backoff
+- **Patient/$everything** aggregating 28 resource types from the patient compartment
+- **Bulk Data Export** ($export) with 29 resource type exporters, job limits, expiration, progress tracking
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -357,6 +362,31 @@ All FHIR endpoints are prefixed with `/fhir` and return FHIR R4 JSON.
 | GET | `/fhir/$export-status/:id` | Poll export job status |
 | GET | `/fhir/$export-data/:id/:type` | Download NDJSON export data |
 | DELETE | `/fhir/$export-status/:id` | Cancel/delete export job |
+
+**FHIR $validate** (Resource Validation)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/fhir/$validate` | Validate a FHIR resource (type from body) |
+| POST | `/fhir/:resourceType/$validate` | Validate a resource against type rules |
+
+**C-CDA Generation & Parsing** (Continuity of Care Documents)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/patients/:id/ccd` | Generate CCD XML for a patient |
+| POST | `/api/v1/ccda/parse` | Parse an incoming C-CDA document |
+
+**SMART on FHIR App Launch** (OAuth2 Authorization Server)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/auth/authorize` | OAuth2 authorization endpoint |
+| POST | `/auth/token` | Token endpoint (auth code + refresh grants) |
+| POST | `/auth/register` | Dynamic client registration |
+| POST | `/auth/launch` | Create EHR launch context |
+| POST | `/auth/introspect` | Token introspection |
+| GET | `/.well-known/smart-configuration` | SMART discovery document |
 
 ### Operational REST Endpoints
 

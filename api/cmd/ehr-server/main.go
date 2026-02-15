@@ -18,6 +18,8 @@ import (
 
 	"github.com/ehr/ehr/internal/config"
 	"github.com/ehr/ehr/internal/domain/admin"
+	authpkg "github.com/ehr/ehr/internal/platform/auth"
+	"github.com/ehr/ehr/internal/platform/ccda"
 	"github.com/ehr/ehr/internal/domain/behavioral"
 	"github.com/ehr/ehr/internal/domain/billing"
 	"github.com/ehr/ehr/internal/domain/careplan"
@@ -2480,6 +2482,44 @@ func runServer() error {
 
 	cdsHooksHandler.RegisterRoutes(e)
 
+	// FHIR $validate — resource validation against structure and business rules
+	resourceValidator := fhir.NewResourceValidator()
+	validateHandler := fhir.NewValidateHandler(resourceValidator)
+	validateHandler.RegisterRoutes(fhirGroup)
+
+	// C-CDA Generation & Parsing — Continuity of Care Documents
+	ccdaGenerator := ccda.NewGenerator("EHR System", "2.16.840.1.113883.3.0000")
+	ccdaParser := ccda.NewParser()
+	ccdaFetcher := &ccdaDataFetcher{
+		identitySvc: identitySvc,
+		clinicalSvc: clinicalSvc,
+		medSvc:      medSvc,
+		dxSvc:       dxSvc,
+		immSvc:      immSvc,
+		encSvc:      encSvc,
+		cpSvc:       cpSvc,
+	}
+	ccdaHandler := ccda.NewHandler(ccdaGenerator, ccdaParser, ccdaFetcher)
+	ccdaHandler.RegisterRoutes(apiV1)
+
+	// SMART on FHIR App Launch — OAuth2 authorization server for SMART apps
+	smartSigningKey := []byte("smart-signing-key-change-in-production")
+	if keyHex := os.Getenv("SMART_SIGNING_KEY"); keyHex != "" {
+		if decoded, err := hex.DecodeString(keyHex); err == nil {
+			smartSigningKey = decoded
+		}
+	}
+	smartIssuer := "http://localhost:" + cfg.Port
+	if issuer := os.Getenv("SMART_ISSUER"); issuer != "" {
+		smartIssuer = issuer
+	}
+	smartServer := authpkg.NewSMARTServer(smartIssuer, smartSigningKey)
+	smartCleanupCtx, smartCleanupCancel := context.WithCancel(context.Background())
+	defer smartCleanupCancel()
+	smartServer.StartCleanup(smartCleanupCtx)
+	smartHandler := authpkg.NewSMARTHandler(smartServer)
+	smartHandler.RegisterRoutes(e)
+
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))
 
@@ -2504,4 +2544,106 @@ func runServer() error {
 	}
 	logger.Info().Msg("server stopped")
 	return nil
+}
+
+// ccdaDataFetcher implements ccda.DataFetcher by aggregating data from domain services.
+type ccdaDataFetcher struct {
+	identitySvc *identity.Service
+	clinicalSvc *clinical.Service
+	medSvc      *medication.Service
+	dxSvc       *diagnostics.Service
+	immSvc      *immunization.Service
+	encSvc      *encounter.Service
+	cpSvc       *careplan.Service
+}
+
+func (f *ccdaDataFetcher) FetchPatientData(ctx context.Context, patientID string) (*ccda.PatientData, error) {
+	pid, err := uuid.Parse(patientID)
+	if err != nil {
+		// Try FHIR ID lookup
+		p, lookupErr := f.identitySvc.GetPatientByFHIRID(ctx, patientID)
+		if lookupErr != nil {
+			return nil, fmt.Errorf("patient not found: %s", patientID)
+		}
+		pid = p.ID
+	}
+
+	data := &ccda.PatientData{}
+
+	// Patient demographics
+	patient, err := f.identitySvc.GetPatient(ctx, pid)
+	if err != nil {
+		return nil, err
+	}
+	data.Patient = patient.ToFHIR()
+
+	// Allergies
+	if allergies, _, err := f.clinicalSvc.ListAllergiesByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, a := range allergies {
+			data.Allergies = append(data.Allergies, a.ToFHIR())
+		}
+	}
+
+	// Conditions
+	if conditions, _, err := f.clinicalSvc.ListConditionsByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, c := range conditions {
+			data.Conditions = append(data.Conditions, c.ToFHIR())
+		}
+	}
+
+	// Medications
+	if meds, _, err := f.medSvc.ListMedicationRequestsByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, m := range meds {
+			data.Medications = append(data.Medications, m.ToFHIR())
+		}
+	}
+
+	// Procedures
+	if procs, _, err := f.clinicalSvc.ListProceduresByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, p := range procs {
+			data.Procedures = append(data.Procedures, p.ToFHIR())
+		}
+	}
+
+	// Results (lab observations)
+	if obs, _, err := f.clinicalSvc.ListObservationsByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, o := range obs {
+			fhirObs := o.ToFHIR()
+			// Separate labs from vitals based on category
+			if cats, ok := fhirObs["category"].([]map[string]interface{}); ok && len(cats) > 0 {
+				if codings, ok := cats[0]["coding"].([]map[string]interface{}); ok && len(codings) > 0 {
+					if code, ok := codings[0]["code"].(string); ok {
+						if code == "vital-signs" {
+							data.VitalSigns = append(data.VitalSigns, fhirObs)
+							continue
+						}
+					}
+				}
+			}
+			data.Results = append(data.Results, fhirObs)
+		}
+	}
+
+	// Immunizations
+	if imms, _, err := f.immSvc.ListImmunizationsByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, i := range imms {
+			data.Immunizations = append(data.Immunizations, i.ToFHIR())
+		}
+	}
+
+	// Encounters
+	if encs, _, err := f.encSvc.ListEncountersByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, e := range encs {
+			data.Encounters = append(data.Encounters, e.ToFHIR())
+		}
+	}
+
+	// Care Plans
+	if plans, _, err := f.cpSvc.ListCarePlansByPatient(ctx, pid, 1000, 0); err == nil {
+		for _, p := range plans {
+			data.CarePlans = append(data.CarePlans, p.ToFHIR())
+		}
+	}
+
+	return data, nil
 }
