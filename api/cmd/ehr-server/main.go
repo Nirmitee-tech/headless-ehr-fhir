@@ -53,6 +53,7 @@ import (
 	"github.com/ehr/ehr/internal/platform/db"
 	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/ehr/ehr/internal/platform/hipaa"
+	"github.com/ehr/ehr/internal/platform/hl7v2"
 	"github.com/ehr/ehr/internal/platform/middleware"
 	"github.com/ehr/ehr/internal/platform/openapi"
 	"github.com/ehr/ehr/internal/platform/reporting"
@@ -2522,6 +2523,20 @@ func runServer() error {
 	smartHandler := authpkg.NewSMARTHandler(smartServer)
 	smartHandler.RegisterRoutes(e)
 
+	// HL7v2 Interface Engine — parse and generate ADT, ORM, ORU messages
+	hl7v2Handler := hl7v2.NewHandler()
+	hl7v2Handler.RegisterRoutes(apiV1)
+
+	// FHIR Patient/$match — probabilistic patient matching
+	patientMatcher := fhir.NewPatientMatcher(&patientMatchSearcher{identitySvc: identitySvc})
+	matchHandler := fhir.NewMatchHandler(patientMatcher)
+	matchHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR ConceptMap/$translate — code system translation
+	conceptMapTranslator := fhir.NewConceptMapTranslator()
+	translateHandler := fhir.NewTranslateHandler(conceptMapTranslator)
+	translateHandler.RegisterRoutes(fhirGroup)
+
 	// DB health check endpoint
 	e.GET("/health/db", db.HealthHandler(pool))
 
@@ -2678,4 +2693,54 @@ func resolveSmartSigningKey(envValue string) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("failed to generate random SMART signing key: %w", err)
 	}
 	return key, true, nil
+}
+
+// patientMatchSearcher adapts the identity service to the fhir.PatientSearcher interface.
+type patientMatchSearcher struct {
+	identitySvc *identity.Service
+}
+
+func (s *patientMatchSearcher) SearchByDemographics(ctx context.Context, params map[string]string, limit int) ([]fhir.PatientRecord, error) {
+	patients, _, err := s.identitySvc.SearchPatients(ctx, params, limit, 0)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]fhir.PatientRecord, 0, len(patients))
+	for _, p := range patients {
+		rec := fhir.PatientRecord{
+			ID:           p.ID.String(),
+			FHIRResource: p.ToFHIR(),
+			FirstName:    p.FirstName,
+			LastName:     p.LastName,
+			Gender:       stringVal(p.Gender),
+			MRN:          p.MRN,
+			Email:        stringVal(p.Email),
+		}
+		if p.BirthDate != nil {
+			rec.BirthDate = p.BirthDate.Format("2006-01-02")
+		}
+		if p.PhoneMobile != nil {
+			rec.Phone = *p.PhoneMobile
+		} else if p.PhoneHome != nil {
+			rec.Phone = *p.PhoneHome
+		}
+		if p.AddressLine1 != nil {
+			rec.AddressLine = *p.AddressLine1
+		}
+		if p.City != nil {
+			rec.City = *p.City
+		}
+		if p.PostalCode != nil {
+			rec.PostalCode = *p.PostalCode
+		}
+		records = append(records, rec)
+	}
+	return records, nil
+}
+
+func stringVal(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

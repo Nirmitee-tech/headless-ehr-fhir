@@ -22,6 +22,9 @@ OpenEHR Server provides a complete clinical data platform with dual REST APIs: a
 - **FHIR R4 Subscriptions** with REST-hook webhook delivery, criteria matching, retry with exponential backoff
 - **Patient/$everything** aggregating 28 resource types from the patient compartment
 - **Bulk Data Export** ($export) with 29 resource type exporters, job limits, expiration, progress tracking
+- **HL7v2 Interface Engine** — parse and generate ADT (A01-A08), ORM (O01), ORU (R01) messages with FHIR conversion
+- **Patient/$match** — probabilistic patient matching with Jaro-Winkler similarity scoring and configurable weights
+- **ConceptMap/$translate** — code system translation (SNOMED↔ICD-10, LOINC→SNOMED) with 3 built-in concept maps
 - **Operational REST API** for internal UI consumption with full CRUD, pagination, and search
 - **Schema-per-tenant multi-tenancy** providing HIPAA-grade data isolation via PostgreSQL schemas
 - **OAuth2 / SMART on FHIR authentication** compatible with Keycloak, Auth0, Okta, and Azure AD
@@ -520,6 +523,36 @@ Supported capabilities:
 - `context-standalone-patient`
 - `permission-offline`, `permission-patient`, `permission-user`
 - `sso-openid-connect`
+
+### HL7v2 Interface Engine
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/hl7v2/parse` | Parse HL7v2 message to JSON |
+| POST | `/api/v1/hl7v2/generate/adt` | Generate ADT message from FHIR Patient + Encounter |
+| POST | `/api/v1/hl7v2/generate/orm` | Generate ORM message from FHIR ServiceRequest |
+| POST | `/api/v1/hl7v2/generate/oru` | Generate ORU message from FHIR DiagnosticReport + Observations |
+
+Supported ADT events: A01 (Admit), A02 (Transfer), A03 (Discharge), A04 (Register), A08 (Update).
+
+### Patient $match
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/fhir/Patient/$match` | Probabilistic patient matching |
+
+Accepts a FHIR Parameters resource with a Patient resource and returns a scored Bundle. Matching uses Jaro-Winkler similarity with configurable weights across 9 fields (name, DOB, gender, MRN, phone, email, address, SSN).
+
+### ConceptMap $translate
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/fhir/ConceptMap` | List available concept maps |
+| GET | `/fhir/ConceptMap/$translate` | Translate code (query params) |
+| POST | `/fhir/ConceptMap/$translate` | Translate code (Parameters body) |
+| GET | `/fhir/ConceptMap/:id/$translate` | Translate using specific map |
+
+Built-in maps: SNOMED CT ↔ ICD-10-CM (15 conditions), LOINC → SNOMED CT (10 lab tests).
 
 ### Role-Based Access Control
 
