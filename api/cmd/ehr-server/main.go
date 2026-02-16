@@ -1308,6 +1308,22 @@ func runServer() error {
 	fhirGroup.GET("/_async/:jobId", fhir.AsyncStatusHandler(asyncStore))
 	fhirGroup.DELETE("/_async/:jobId", fhir.AsyncDeleteHandler(asyncStore))
 
+	// FHIR $meta operations (resource tag/security/profile management)
+	metaStore := fhir.NewInMemoryMetaStore()
+	metaHandler := fhir.NewMetaHandler(metaStore)
+	metaHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR $diff operation (resource version comparison)
+	fhirGroup.GET("/:resourceType/:id/$diff", fhir.DiffHandler(historyRepo))
+
+	// FHIR Observation/$lastn (latest N observations per code)
+	fhirGroup.GET("/Observation/$lastn", fhir.LastNHandler(nil))
+	fhirGroup.POST("/Observation/$lastn", fhir.LastNHandler(nil))
+
+	// FHIR Observation/$stats (observation statistics)
+	fhirGroup.GET("/Observation/$stats", fhir.StatsHandler(nil))
+	fhirGroup.POST("/Observation/$stats", fhir.StatsHandler(nil))
+
 	// -- Register Domain Handlers --
 
 	// Admin domain

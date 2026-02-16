@@ -15,6 +15,8 @@ type Meta struct {
 	VersionID   string    `json:"versionId,omitempty"`
 	LastUpdated time.Time `json:"lastUpdated,omitempty"`
 	Profile     []string  `json:"profile,omitempty"`
+	Security    []Coding  `json:"security,omitempty"`
+	Tag         []Coding  `json:"tag,omitempty"`
 }
 
 type Coding struct {
