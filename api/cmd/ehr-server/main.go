@@ -1417,6 +1417,32 @@ func runServer() error {
 	paginationConfig := fhir.DefaultPaginationConfig()
 	fhirGroup.Use(fhir.PaginationMiddleware(paginationConfig))
 
+	// FHIR contained resource search engine
+	_ = fhir.NewContainedSearchEngine()
+
+	// FHIR Schedule/Slot availability operations
+	availStore := fhir.NewInMemoryAvailabilityStore()
+	fhirGroup.GET("/Slot", fhir.SlotSearchHandler(availStore))
+	fhirGroup.GET("/Schedule/:id/$available", fhir.ScheduleAvailableHandler(availStore))
+	fhirGroup.GET("/Slot/$find", fhir.FindAvailabilityHandler(availStore))
+	fhirGroup.POST("/Slot/$check-conflict", fhir.CheckConflictHandler(availStore))
+
+	// FHIR Questionnaire $populate operation
+	populateResolver := fhir.NewInMemoryPopulateResolver()
+	fhirGroup.POST("/Questionnaire/:id/$populate", fhir.PopulateHandler(populateResolver))
+
+	// FHIR async batch/transaction processing
+	asyncBatchProcessor := fhir.NewAsyncBatchProcessor(
+		fhir.NewInMemoryAsyncBatchStore(),
+		fhir.DefaultAsyncBatchConfig(),
+		func(method, url string, resource map[string]interface{}) (*fhir.BundleEntryResponse, error) {
+			return &fhir.BundleEntryResponse{Status: "200 OK", Location: url}, nil
+		},
+	)
+	fhirGroup.POST("/$async-batch", fhir.AsyncBatchHandler(asyncBatchProcessor, nil))
+	fhirGroup.GET("/$async-batch-status/:id", fhir.AsyncBatchStatusHandler(fhir.NewInMemoryAsyncBatchStore()))
+	fhirGroup.DELETE("/$async-batch/:id", fhir.AsyncBatchCancelHandler(asyncBatchProcessor))
+
 	// FHIR TerminologyCapabilities endpoints
 	termCapHandler := fhir.NewTerminologyCapabilitiesHandler()
 	termCapHandler.RegisterRoutes(fhirGroup)
