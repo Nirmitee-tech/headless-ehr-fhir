@@ -432,12 +432,7 @@ func (h *Handler) DeleteWaitlistEntry(c echo.Context) error {
 
 func (h *Handler) SearchSchedulesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"practitioner", "active", "service-type"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchSchedules(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -471,12 +466,7 @@ func (h *Handler) CreateScheduleFHIR(c echo.Context) error {
 
 func (h *Handler) SearchSlotsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"schedule", "status", "start", "service-type"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchAvailableSlots(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -510,12 +500,7 @@ func (h *Handler) CreateSlotFHIR(c echo.Context) error {
 
 func (h *Handler) SearchAppointmentsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "practitioner", "status", "date", "service-type"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchAppointments(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -551,12 +536,7 @@ func (h *Handler) CreateAppointmentFHIR(c echo.Context) error {
 
 func (h *Handler) SearchAppointmentResponsesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"appointment", "actor"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchAppointmentResponses(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))

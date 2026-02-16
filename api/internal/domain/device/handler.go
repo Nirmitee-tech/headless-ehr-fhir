@@ -126,12 +126,7 @@ func (h *Handler) DeleteDevice(c echo.Context) error {
 
 func (h *Handler) SearchDevicesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status", "type", "manufacturer"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchDevices(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))

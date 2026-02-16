@@ -488,12 +488,7 @@ func (h *Handler) GetInvoiceLineItems(c echo.Context) error {
 
 func (h *Handler) SearchCoveragesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status", "type"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchCoverages(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -527,12 +522,7 @@ func (h *Handler) CreateCoverageFHIR(c echo.Context) error {
 
 func (h *Handler) SearchClaimsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status", "use"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchClaims(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -566,12 +556,7 @@ func (h *Handler) CreateClaimFHIR(c echo.Context) error {
 
 func (h *Handler) SearchClaimResponsesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"request", "outcome", "status"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchClaimResponses(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -605,12 +590,7 @@ func (h *Handler) CreateClaimResponseFHIR(c echo.Context) error {
 
 func (h *Handler) SearchEOBsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchExplanationOfBenefits(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -998,12 +978,7 @@ func (h *Handler) HistoryClaimResponseFHIR(c echo.Context) error {
 
 func (h *Handler) SearchInvoicesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchInvoices(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))

@@ -376,16 +376,7 @@ func (h *Handler) RemoveRole(c echo.Context) error {
 
 func (h *Handler) SearchOrganizationsFHIR(c echo.Context) error {
 	p := pagination.FromContext(c)
-	params := map[string]string{}
-	if name := c.QueryParam("name"); name != "" {
-		params["name"] = name
-	}
-	if typeCode := c.QueryParam("type"); typeCode != "" {
-		params["type"] = typeCode
-	}
-	if active := c.QueryParam("active"); active != "" {
-		params["active"] = active
-	}
+	params := fhir.ExtractSearchParams(c)
 
 	orgs, total, err := h.svc.SearchOrganizations(c.Request().Context(), params, p.Limit, p.Offset)
 	if err != nil {

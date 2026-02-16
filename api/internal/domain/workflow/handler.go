@@ -301,12 +301,7 @@ func (h *Handler) DeleteGuidanceResponse(c echo.Context) error {
 
 func (h *Handler) SearchActivityDefinitionsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "name"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchActivityDefinitions(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -398,12 +393,7 @@ func (h *Handler) HistoryActivityDefinitionFHIR(c echo.Context) error {
 
 func (h *Handler) SearchRequestGroupsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchRequestGroups(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -495,12 +485,7 @@ func (h *Handler) HistoryRequestGroupFHIR(c echo.Context) error {
 
 func (h *Handler) SearchGuidanceResponsesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"patient", "status"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchGuidanceResponses(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))

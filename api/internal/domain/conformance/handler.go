@@ -405,12 +405,7 @@ func (h *Handler) DeleteMessageHeader(c echo.Context) error {
 
 func (h *Handler) SearchNamingSystemsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "name", "kind"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchNamingSystems(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -517,12 +512,7 @@ func (h *Handler) HistoryNamingSystemFHIR(c echo.Context) error {
 
 func (h *Handler) SearchOperationDefinitionsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "name", "code"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchOperationDefinitions(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -629,12 +619,7 @@ func (h *Handler) HistoryOperationDefinitionFHIR(c echo.Context) error {
 
 func (h *Handler) SearchMessageDefinitionsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "event"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchMessageDefinitions(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -738,12 +723,7 @@ func (h *Handler) HistoryMessageDefinitionFHIR(c echo.Context) error {
 
 func (h *Handler) SearchMessageHeadersFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"event"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchMessageHeaders(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))

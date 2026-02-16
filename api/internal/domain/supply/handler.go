@@ -91,12 +91,7 @@ func (h *Handler) GetSupplyRequest(c echo.Context) error {
 
 func (h *Handler) ListSupplyRequests(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "category"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchSupplyRequests(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -158,12 +153,7 @@ func (h *Handler) GetSupplyDelivery(c echo.Context) error {
 
 func (h *Handler) ListSupplyDeliveries(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "supplier"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchSupplyDeliveries(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -202,12 +192,7 @@ func (h *Handler) DeleteSupplyDelivery(c echo.Context) error {
 
 func (h *Handler) SearchSupplyRequestsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "category"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchSupplyRequests(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
@@ -345,12 +330,7 @@ func (h *Handler) handlePatchSupplyRequest(c echo.Context, fhirID string) error 
 
 func (h *Handler) SearchSupplyDeliveriesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "supplier"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchSupplyDeliveries(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))

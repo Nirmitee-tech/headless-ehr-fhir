@@ -224,12 +224,7 @@ func (h *Handler) GetStatusHistory(c echo.Context) error {
 
 func (h *Handler) SearchEncountersFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, key := range []string{"patient", "status", "class", "date"} {
-		if v := c.QueryParam(key); v != "" {
-			params[key] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 
 	encs, total, err := h.svc.SearchEncounters(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {

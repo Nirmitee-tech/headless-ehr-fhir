@@ -1,6 +1,11 @@
 package fhir
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/labstack/echo/v4"
+)
 
 // SearchParamType defines the FHIR search parameter type.
 type SearchParamType int
@@ -160,4 +165,50 @@ func (q *SearchQuery) DataArgs(limit, offset int) []interface{} {
 	result[len(q.args)] = limit
 	result[len(q.args)+1] = offset
 	return result
+}
+
+// ApplySort processes the _sort parameter and sets ORDER BY using config column mappings.
+// The _sort value is a comma-separated list of param names, optionally prefixed with - for DESC.
+// Falls back to the provided defaultOrder if _sort is empty.
+func (q *SearchQuery) ApplySort(sortParam, defaultOrder string, configs map[string]SearchParamConfig) {
+	if sortParam == "" {
+		q.orderBy = defaultOrder
+		return
+	}
+	var parts []string
+	for _, field := range strings.Split(sortParam, ",") {
+		field = strings.TrimSpace(field)
+		desc := false
+		if strings.HasPrefix(field, "-") {
+			desc = true
+			field = field[1:]
+		}
+		if config, ok := configs[field]; ok {
+			col := config.Column
+			if desc {
+				parts = append(parts, col+" DESC")
+			} else {
+				parts = append(parts, col+" ASC")
+			}
+		}
+	}
+	if len(parts) > 0 {
+		q.orderBy = strings.Join(parts, ", ")
+	} else {
+		q.orderBy = defaultOrder
+	}
+}
+
+// ExtractSearchParams extracts all FHIR search parameters from the query string,
+// excluding FHIR control parameters (_count, _offset, _sort, _elements, etc.).
+// Unknown params are included — the repo's ApplyParams will ignore ones not in its config.
+func ExtractSearchParams(c echo.Context) map[string]string {
+	params := map[string]string{}
+	for k, v := range c.QueryParams() {
+		if len(v) == 0 || strings.HasPrefix(k, "_") {
+			continue
+		}
+		params[k] = v[0]
+	}
+	return params
 }

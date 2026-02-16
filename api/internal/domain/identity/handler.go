@@ -368,12 +368,7 @@ func (h *Handler) GetPractitionerRoles(c echo.Context) error {
 
 func (h *Handler) SearchPatientsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, key := range []string{"name", "family", "given", "birthdate", "gender", "identifier"} {
-		if v := c.QueryParam(key); v != "" {
-			params[key] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 
 	patients, total, err := h.svc.SearchPatients(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
@@ -439,12 +434,7 @@ func (h *Handler) DeletePatientFHIR(c echo.Context) error {
 
 func (h *Handler) SearchPractitionersFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, key := range []string{"name", "family", "identifier"} {
-		if v := c.QueryParam(key); v != "" {
-			params[key] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 
 	practs, total, err := h.svc.SearchPractitioners(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
@@ -510,12 +500,7 @@ func (h *Handler) DeletePractitionerFHIR(c echo.Context) error {
 
 func (h *Handler) SearchPractitionerRolesFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, key := range []string{"practitioner", "organization", "role", "active"} {
-		if v := c.QueryParam(key); v != "" {
-			params[key] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 
 	roles, total, err := h.svc.SearchPractitionerRoles(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {

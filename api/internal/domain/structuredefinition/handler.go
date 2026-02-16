@@ -114,12 +114,7 @@ func (h *Handler) DeleteStructureDefinition(c echo.Context) error {
 
 func (h *Handler) SearchStructureDefinitionsFHIR(c echo.Context) error {
 	pg := pagination.FromContext(c)
-	params := map[string]string{}
-	for _, k := range []string{"status", "url", "name", "type", "kind", "base"} {
-		if v := c.QueryParam(k); v != "" {
-			params[k] = v
-		}
-	}
+	params := fhir.ExtractSearchParams(c)
 	items, total, err := h.svc.SearchStructureDefinitions(c.Request().Context(), params, pg.Limit, pg.Offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
