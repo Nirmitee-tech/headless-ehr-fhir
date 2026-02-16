@@ -1,0 +1,63 @@
+package examplescenario
+
+import (
+	"time"
+
+	"github.com/ehr/ehr/internal/platform/fhir"
+	"github.com/google/uuid"
+)
+
+// ExampleScenario maps to the example_scenario table (FHIR ExampleScenario resource).
+type ExampleScenario struct {
+	ID          uuid.UUID  `db:"id" json:"id"`
+	FHIRID      string     `db:"fhir_id" json:"fhir_id"`
+	Status      string     `db:"status" json:"status"`
+	URL         *string    `db:"url" json:"url,omitempty"`
+	Name        *string    `db:"name" json:"name,omitempty"`
+	Title       *string    `db:"title" json:"title,omitempty"`
+	Description *string    `db:"description" json:"description,omitempty"`
+	Publisher   *string    `db:"publisher" json:"publisher,omitempty"`
+	Date        *time.Time `db:"date" json:"date,omitempty"`
+	Purpose     *string    `db:"purpose" json:"purpose,omitempty"`
+	Copyright   *string    `db:"copyright" json:"copyright,omitempty"`
+	VersionID   int        `db:"version_id" json:"version_id"`
+	CreatedAt   time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at" json:"updated_at"`
+}
+
+func (e *ExampleScenario) GetVersionID() int  { return e.VersionID }
+func (e *ExampleScenario) SetVersionID(v int) { e.VersionID = v }
+
+func (e *ExampleScenario) ToFHIR() map[string]interface{} {
+	result := map[string]interface{}{
+		"resourceType": "ExampleScenario",
+		"id":           e.FHIRID,
+		"status":       e.Status,
+		"meta":         fhir.Meta{LastUpdated: e.UpdatedAt},
+	}
+	if e.URL != nil {
+		result["url"] = *e.URL
+	}
+	if e.Name != nil {
+		result["name"] = *e.Name
+	}
+	if e.Title != nil {
+		result["title"] = *e.Title
+	}
+	if e.Description != nil {
+		result["description"] = *e.Description
+	}
+	if e.Publisher != nil {
+		result["publisher"] = *e.Publisher
+	}
+	if e.Date != nil {
+		result["date"] = e.Date.Format("2006-01-02")
+	}
+	if e.Purpose != nil {
+		result["purpose"] = *e.Purpose
+	}
+	if e.Copyright != nil {
+		result["copyright"] = *e.Copyright
+	}
+	return result
+}

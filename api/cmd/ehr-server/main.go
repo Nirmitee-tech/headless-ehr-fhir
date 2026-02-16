@@ -94,6 +94,14 @@ import (
 	"github.com/ehr/ehr/internal/domain/terminologycapabilities"
 	"github.com/ehr/ehr/internal/domain/structuremap"
 	"github.com/ehr/ehr/internal/domain/testscript"
+	"github.com/ehr/ehr/internal/domain/testreport"
+	"github.com/ehr/ehr/internal/domain/examplescenario"
+	fhirevidence "github.com/ehr/ehr/internal/domain/evidence"
+	"github.com/ehr/ehr/internal/domain/evidencevariable"
+	"github.com/ehr/ehr/internal/domain/researchdefinition"
+	"github.com/ehr/ehr/internal/domain/researchelementdefinition"
+	"github.com/ehr/ehr/internal/domain/effectevidencesynthesis"
+	"github.com/ehr/ehr/internal/domain/riskevidencesynthesis"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -1014,6 +1022,47 @@ func runServer() error {
 		{Name: "name", Type: "string"},
 	})
 
+	// Research & Evidence resources
+	capBuilder.AddResource("TestReport", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "result", Type: "token"},
+	})
+	capBuilder.AddResource("ExampleScenario", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("Evidence", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("EvidenceVariable", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("ResearchDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("ResearchElementDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("EffectEvidenceSynthesis", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("RiskEvidenceSynthesis", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
@@ -1054,6 +1103,9 @@ func runServer() error {
 		"StructureDefinition", "SearchParameter", "CodeSystem", "ValueSet", "ConceptMap",
 		"ImplementationGuide", "CompartmentDefinition", "TerminologyCapabilities",
 		"StructureMap", "TestScript",
+		"TestReport", "ExampleScenario", "Evidence", "EvidenceVariable",
+		"ResearchDefinition", "ResearchElementDefinition",
+		"EffectEvidenceSynthesis", "RiskEvidenceSynthesis",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -1791,6 +1843,62 @@ func runServer() error {
 	tsSvc.SetVersionTracker(versionTracker)
 	tsHandler := testscript.NewHandler(tsSvc)
 	tsHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// TestReport domain
+	trRepo := testreport.NewTestReportRepoPG(pool)
+	trSvc := testreport.NewService(trRepo)
+	trSvc.SetVersionTracker(versionTracker)
+	trHandler := testreport.NewHandler(trSvc)
+	trHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ExampleScenario domain
+	esRepo := examplescenario.NewExampleScenarioRepoPG(pool)
+	esSvc := examplescenario.NewService(esRepo)
+	esSvc.SetVersionTracker(versionTracker)
+	esHandler := examplescenario.NewHandler(esSvc)
+	esHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Evidence domain
+	evRepo := fhirevidence.NewEvidenceRepoPG(pool)
+	evSvc := fhirevidence.NewService(evRepo)
+	evSvc.SetVersionTracker(versionTracker)
+	evHandler := fhirevidence.NewHandler(evSvc)
+	evHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// EvidenceVariable domain
+	evvRepo := evidencevariable.NewEvidenceVariableRepoPG(pool)
+	evvSvc := evidencevariable.NewService(evvRepo)
+	evvSvc.SetVersionTracker(versionTracker)
+	evvHandler := evidencevariable.NewHandler(evvSvc)
+	evvHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ResearchDefinition domain
+	rdRepo := researchdefinition.NewResearchDefinitionRepoPG(pool)
+	rdSvc := researchdefinition.NewService(rdRepo)
+	rdSvc.SetVersionTracker(versionTracker)
+	rdHandler := researchdefinition.NewHandler(rdSvc)
+	rdHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ResearchElementDefinition domain
+	redRepo := researchelementdefinition.NewResearchElementDefinitionRepoPG(pool)
+	redSvc := researchelementdefinition.NewService(redRepo)
+	redSvc.SetVersionTracker(versionTracker)
+	redHandler := researchelementdefinition.NewHandler(redSvc)
+	redHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// EffectEvidenceSynthesis domain
+	eesRepo := effectevidencesynthesis.NewEffectEvidenceSynthesisRepoPG(pool)
+	eesSvc := effectevidencesynthesis.NewService(eesRepo)
+	eesSvc.SetVersionTracker(versionTracker)
+	eesHandler := effectevidencesynthesis.NewHandler(eesSvc)
+	eesHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// RiskEvidenceSynthesis domain
+	resRepo := riskevidencesynthesis.NewRiskEvidenceSynthesisRepoPG(pool)
+	resSynSvc := riskevidencesynthesis.NewService(resRepo)
+	resSynSvc.SetVersionTracker(versionTracker)
+	resSynHandler := riskevidencesynthesis.NewHandler(resSynSvc)
+	resSynHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
