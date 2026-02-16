@@ -102,6 +102,16 @@ import (
 	"github.com/ehr/ehr/internal/domain/researchelementdefinition"
 	"github.com/ehr/ehr/internal/domain/effectevidencesynthesis"
 	"github.com/ehr/ehr/internal/domain/riskevidencesynthesis"
+	"github.com/ehr/ehr/internal/domain/researchsubject"
+	"github.com/ehr/ehr/internal/domain/documentmanifest"
+	"github.com/ehr/ehr/internal/domain/substancespecification"
+	"github.com/ehr/ehr/internal/domain/medicinalproduct"
+	"github.com/ehr/ehr/internal/domain/medproductingredient"
+	"github.com/ehr/ehr/internal/domain/medproductmanufactured"
+	"github.com/ehr/ehr/internal/domain/medproductpackaged"
+	"github.com/ehr/ehr/internal/domain/medproductauthorization"
+	"github.com/ehr/ehr/internal/domain/medproductcontraindication"
+	"github.com/ehr/ehr/internal/domain/medproductindication"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -1062,6 +1072,48 @@ func runServer() error {
 		{Name: "url", Type: "uri"},
 		{Name: "name", Type: "string"},
 	})
+	capBuilder.AddResource("ResearchSubject", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "study", Type: "reference"},
+		{Name: "individual", Type: "reference"},
+	})
+	capBuilder.AddResource("DocumentManifest", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "subject", Type: "reference"},
+		{Name: "type", Type: "token"},
+	})
+	capBuilder.AddResource("SubstanceSpecification", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "type", Type: "token"},
+		{Name: "domain", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProduct", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "type", Type: "token"},
+		{Name: "domain", Type: "token"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProductIngredient", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "role", Type: "token"},
+		{Name: "substance", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProductManufactured", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "dose-form", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProductPackaged", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "subject", Type: "reference"},
+	})
+	capBuilder.AddResource("MedicinalProductAuthorization", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "subject", Type: "reference"},
+		{Name: "country", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProductContraindication", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "subject", Type: "reference"},
+		{Name: "disease", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProductIndication", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "subject", Type: "reference"},
+		{Name: "disease", Type: "token"},
+	})
 
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
@@ -1106,6 +1158,10 @@ func runServer() error {
 		"TestReport", "ExampleScenario", "Evidence", "EvidenceVariable",
 		"ResearchDefinition", "ResearchElementDefinition",
 		"EffectEvidenceSynthesis", "RiskEvidenceSynthesis",
+		"ResearchSubject", "DocumentManifest", "SubstanceSpecification",
+		"MedicinalProduct", "MedicinalProductIngredient", "MedicinalProductManufactured",
+		"MedicinalProductPackaged", "MedicinalProductAuthorization",
+		"MedicinalProductContraindication", "MedicinalProductIndication",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -1899,6 +1955,76 @@ func runServer() error {
 	resSynSvc.SetVersionTracker(versionTracker)
 	resSynHandler := riskevidencesynthesis.NewHandler(resSynSvc)
 	resSynHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ResearchSubject domain
+	rsRepo := researchsubject.NewResearchSubjectRepoPG(pool)
+	rsSvc := researchsubject.NewService(rsRepo)
+	rsSvc.SetVersionTracker(versionTracker)
+	rsHandler := researchsubject.NewHandler(rsSvc)
+	rsHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// DocumentManifest domain
+	docManRepo := documentmanifest.NewDocumentManifestRepoPG(pool)
+	docManSvc := documentmanifest.NewService(docManRepo)
+	docManSvc.SetVersionTracker(versionTracker)
+	docManHandler := documentmanifest.NewHandler(docManSvc)
+	docManHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SubstanceSpecification domain
+	ssRepo := substancespecification.NewSubstanceSpecificationRepoPG(pool)
+	ssSvc := substancespecification.NewService(ssRepo)
+	ssSvc.SetVersionTracker(versionTracker)
+	ssHandler := substancespecification.NewHandler(ssSvc)
+	ssHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProduct domain
+	mpRepo := medicinalproduct.NewMedicinalProductRepoPG(pool)
+	mpSvc := medicinalproduct.NewService(mpRepo)
+	mpSvc.SetVersionTracker(versionTracker)
+	mpHandler := medicinalproduct.NewHandler(mpSvc)
+	mpHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductIngredient domain
+	mpiRepo := medproductingredient.NewMedicinalProductIngredientRepoPG(pool)
+	mpiSvc := medproductingredient.NewService(mpiRepo)
+	mpiSvc.SetVersionTracker(versionTracker)
+	mpiHandler := medproductingredient.NewHandler(mpiSvc)
+	mpiHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductManufactured domain
+	mpmRepo := medproductmanufactured.NewMedicinalProductManufacturedRepoPG(pool)
+	mpmSvc := medproductmanufactured.NewService(mpmRepo)
+	mpmSvc.SetVersionTracker(versionTracker)
+	mpmHandler := medproductmanufactured.NewHandler(mpmSvc)
+	mpmHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductPackaged domain
+	mppRepo := medproductpackaged.NewMedicinalProductPackagedRepoPG(pool)
+	mppSvc := medproductpackaged.NewService(mppRepo)
+	mppSvc.SetVersionTracker(versionTracker)
+	mppHandler := medproductpackaged.NewHandler(mppSvc)
+	mppHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductAuthorization domain
+	mpaRepo := medproductauthorization.NewMedicinalProductAuthorizationRepoPG(pool)
+	mpaSvc := medproductauthorization.NewService(mpaRepo)
+	mpaSvc.SetVersionTracker(versionTracker)
+	mpaHandler := medproductauthorization.NewHandler(mpaSvc)
+	mpaHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductContraindication domain
+	mpcRepo := medproductcontraindication.NewMedicinalProductContraindicationRepoPG(pool)
+	mpcSvc := medproductcontraindication.NewService(mpcRepo)
+	mpcSvc.SetVersionTracker(versionTracker)
+	mpcHandler := medproductcontraindication.NewHandler(mpcSvc)
+	mpcHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductIndication domain
+	mpindRepo := medproductindication.NewMedicinalProductIndicationRepoPG(pool)
+	mpindSvc := medproductindication.NewService(mpindRepo)
+	mpindSvc.SetVersionTracker(versionTracker)
+	mpindHandler := medproductindication.NewHandler(mpindSvc)
+	mpindHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
