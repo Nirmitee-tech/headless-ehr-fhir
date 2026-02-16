@@ -1278,6 +1278,7 @@ func runServer() error {
 	// Fetchers are registered below after services are initialized; since
 	// the middleware holds a pointer to the registry, late registration works.
 	fhirGroup.Use(fhir.IncludeMiddleware(includeRegistry))
+	fhirGroup.Use(fhir.SearchMiddleware())
 
 	// FHIR metadata (dynamic CapabilityStatement)
 	fhirGroup.GET("/metadata", func(c echo.Context) error {
@@ -3608,6 +3609,28 @@ func runServer() error {
 	})
 	everythingHandler.RegisterRoutes(fhirGroup)
 
+	// FHIR Patient compartment search — /fhir/Patient/:pid/:resourceType
+	compartmentHandler := fhir.NewCompartmentHandler()
+	compartmentHandler.RegisterSearchHandler("Encounter", encHandler.SearchEncountersFHIR)
+	compartmentHandler.RegisterSearchHandler("Condition", clinicalHandler.SearchConditionsFHIR)
+	compartmentHandler.RegisterSearchHandler("Observation", clinicalHandler.SearchObservationsFHIR)
+	compartmentHandler.RegisterSearchHandler("AllergyIntolerance", clinicalHandler.SearchAllergiesFHIR)
+	compartmentHandler.RegisterSearchHandler("Procedure", clinicalHandler.SearchProceduresFHIR)
+	compartmentHandler.RegisterSearchHandler("MedicationRequest", medHandler.SearchMedicationRequestsFHIR)
+	compartmentHandler.RegisterSearchHandler("MedicationAdministration", medHandler.SearchMedicationAdministrationsFHIR)
+	compartmentHandler.RegisterSearchHandler("MedicationDispense", medHandler.SearchMedicationDispensesFHIR)
+	compartmentHandler.RegisterSearchHandler("ServiceRequest", dxHandler.SearchServiceRequestsFHIR)
+	compartmentHandler.RegisterSearchHandler("DiagnosticReport", dxHandler.SearchDiagnosticReportsFHIR)
+	compartmentHandler.RegisterSearchHandler("Immunization", immHandler.SearchImmunizationsFHIR)
+	compartmentHandler.RegisterSearchHandler("CarePlan", cpHandler.SearchCarePlansFHIR)
+	compartmentHandler.RegisterSearchHandler("CareTeam", ctHandler.SearchCareTeamsFHIR)
+	compartmentHandler.RegisterSearchHandler("Goal", cpHandler.SearchGoalsFHIR)
+	compartmentHandler.RegisterSearchHandler("Coverage", billHandler.SearchCoveragesFHIR)
+	compartmentHandler.RegisterSearchHandler("Claim", billHandler.SearchClaimsFHIR)
+	compartmentHandler.RegisterSearchHandler("DocumentReference", docHandler.SearchDocumentReferencesFHIR)
+	compartmentHandler.RegisterSearchHandler("Appointment", schedHandler.SearchAppointmentsFHIR)
+	compartmentHandler.RegisterRoutes(fhirGroup)
+
 	// CDS Hooks (HL7 CDS Hooks 2.0) — external clinical decision support
 	cdsHooksHandler := fhir.NewCDSHooksHandler()
 
@@ -3932,6 +3955,13 @@ func runServer() error {
 	valueSetValidator := fhir.NewValueSetValidator()
 	valueSetValidateHandler := fhir.NewValueSetValidateHandler(valueSetValidator)
 	valueSetValidateHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR terminology service — $expand and $lookup operations
+	terminologySvc := fhir.NewInMemoryTerminologyService()
+	expandHandler := fhir.NewExpandHandler(terminologySvc)
+	expandHandler.RegisterRoutes(fhirGroup)
+	lookupHandler := fhir.NewLookupHandler(terminologySvc)
+	lookupHandler.RegisterRoutes(fhirGroup)
 
 	// FHIR Composition/$document — generate Document Bundles from Compositions
 	documentResolver := &fhirResourceResolver{fhirGroup: fhirGroup}
