@@ -112,6 +112,14 @@ import (
 	"github.com/ehr/ehr/internal/domain/medproductauthorization"
 	"github.com/ehr/ehr/internal/domain/medproductcontraindication"
 	"github.com/ehr/ehr/internal/domain/medproductindication"
+	"github.com/ehr/ehr/internal/domain/medproductinteraction"
+	"github.com/ehr/ehr/internal/domain/medproductundesirableeffect"
+	"github.com/ehr/ehr/internal/domain/medproductpharmaceutical"
+	"github.com/ehr/ehr/internal/domain/substancepolymer"
+	"github.com/ehr/ehr/internal/domain/substanceprotein"
+	"github.com/ehr/ehr/internal/domain/substancenucleicacid"
+	"github.com/ehr/ehr/internal/domain/substancesourcematerial"
+	"github.com/ehr/ehr/internal/domain/substancereferenceinformation"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -1114,6 +1122,23 @@ func runServer() error {
 		{Name: "subject", Type: "reference"},
 		{Name: "disease", Type: "token"},
 	})
+	capBuilder.AddResource("MedicinalProductInteraction", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "subject", Type: "reference"},
+		{Name: "type", Type: "token"},
+	})
+	capBuilder.AddResource("MedicinalProductUndesirableEffect", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "subject", Type: "reference"},
+	})
+	capBuilder.AddResource("MedicinalProductPharmaceutical", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "route", Type: "token"},
+	})
+	capBuilder.AddResource("SubstancePolymer", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "class", Type: "token"},
+	})
+	capBuilder.AddResource("SubstanceProtein", fhir.DefaultInteractions(), nil)
+	capBuilder.AddResource("SubstanceNucleicAcid", fhir.DefaultInteractions(), nil)
+	capBuilder.AddResource("SubstanceSourceMaterial", fhir.DefaultInteractions(), nil)
+	capBuilder.AddResource("SubstanceReferenceInformation", fhir.DefaultInteractions(), nil)
 
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
@@ -1162,6 +1187,10 @@ func runServer() error {
 		"MedicinalProduct", "MedicinalProductIngredient", "MedicinalProductManufactured",
 		"MedicinalProductPackaged", "MedicinalProductAuthorization",
 		"MedicinalProductContraindication", "MedicinalProductIndication",
+		"MedicinalProductInteraction", "MedicinalProductUndesirableEffect",
+		"MedicinalProductPharmaceutical",
+		"SubstancePolymer", "SubstanceProtein", "SubstanceNucleicAcid",
+		"SubstanceSourceMaterial", "SubstanceReferenceInformation",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -2025,6 +2054,62 @@ func runServer() error {
 	mpindSvc.SetVersionTracker(versionTracker)
 	mpindHandler := medproductindication.NewHandler(mpindSvc)
 	mpindHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductInteraction domain
+	mpixRepo := medproductinteraction.NewMedicinalProductInteractionRepoPG(pool)
+	mpixSvc := medproductinteraction.NewService(mpixRepo)
+	mpixSvc.SetVersionTracker(versionTracker)
+	mpixHandler := medproductinteraction.NewHandler(mpixSvc)
+	mpixHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductUndesirableEffect domain
+	mpueRepo := medproductundesirableeffect.NewMedicinalProductUndesirableEffectRepoPG(pool)
+	mpueSvc := medproductundesirableeffect.NewService(mpueRepo)
+	mpueSvc.SetVersionTracker(versionTracker)
+	mpueHandler := medproductundesirableeffect.NewHandler(mpueSvc)
+	mpueHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MedicinalProductPharmaceutical domain
+	mpphRepo := medproductpharmaceutical.NewMedicinalProductPharmaceuticalRepoPG(pool)
+	mpphSvc := medproductpharmaceutical.NewService(mpphRepo)
+	mpphSvc.SetVersionTracker(versionTracker)
+	mpphHandler := medproductpharmaceutical.NewHandler(mpphSvc)
+	mpphHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SubstancePolymer domain
+	subPolyRepo := substancepolymer.NewSubstancePolymerRepoPG(pool)
+	subPolySvc := substancepolymer.NewService(subPolyRepo)
+	subPolySvc.SetVersionTracker(versionTracker)
+	subPolyHandler := substancepolymer.NewHandler(subPolySvc)
+	subPolyHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SubstanceProtein domain
+	sprRepo := substanceprotein.NewSubstanceProteinRepoPG(pool)
+	sprSvc := substanceprotein.NewService(sprRepo)
+	sprSvc.SetVersionTracker(versionTracker)
+	sprHandler := substanceprotein.NewHandler(sprSvc)
+	sprHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SubstanceNucleicAcid domain
+	snaRepo := substancenucleicacid.NewSubstanceNucleicAcidRepoPG(pool)
+	snaSvc := substancenucleicacid.NewService(snaRepo)
+	snaSvc.SetVersionTracker(versionTracker)
+	snaHandler := substancenucleicacid.NewHandler(snaSvc)
+	snaHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SubstanceSourceMaterial domain
+	ssmRepo := substancesourcematerial.NewSubstanceSourceMaterialRepoPG(pool)
+	ssmSvc := substancesourcematerial.NewService(ssmRepo)
+	ssmSvc.SetVersionTracker(versionTracker)
+	ssmHandler := substancesourcematerial.NewHandler(ssmSvc)
+	ssmHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SubstanceReferenceInformation domain
+	sriRepo := substancereferenceinformation.NewSubstanceReferenceInformationRepoPG(pool)
+	sriSvc := substancereferenceinformation.NewService(sriRepo)
+	sriSvc.SetVersionTracker(versionTracker)
+	sriHandler := substancereferenceinformation.NewHandler(sriSvc)
+	sriHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
