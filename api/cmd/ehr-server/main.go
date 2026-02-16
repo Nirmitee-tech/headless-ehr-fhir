@@ -1357,6 +1357,26 @@ func runServer() error {
 	opRegistryHandler := fhir.NewOperationRegistryHandler(opRegistry)
 	opRegistryHandler.RegisterRoutes(fhirGroup)
 
+	// FHIR SearchParameter endpoints
+	searchParamStore := fhir.NewDefaultSearchParameterStore()
+	searchParamHandler := fhir.NewSearchParameterHandler(searchParamStore)
+	searchParamHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR StructureDefinition conformance endpoints (base definitions + snapshots)
+	fhirStructDefHandler := fhir.NewStructureDefinitionHandler()
+	fhirStructDefHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR $import (bulk data import)
+	fhirGroup.POST("/$import", fhir.ImportHandler(asyncStore))
+
+	// FHIR ImplementationGuide conformance endpoints
+	fhirIGHandler := fhir.NewImplementationGuideHandler()
+	fhirIGHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR TerminologyCapabilities endpoints
+	termCapHandler := fhir.NewTerminologyCapabilitiesHandler()
+	termCapHandler.RegisterRoutes(fhirGroup)
+
 	// -- Register Domain Handlers --
 
 	// Admin domain
@@ -1944,11 +1964,11 @@ func runServer() error {
 	catHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// StructureDefinition domain
-	structDefRepo := structuredefinition.NewStructureDefinitionRepoPG(pool)
-	structDefSvc := structuredefinition.NewService(structDefRepo)
-	structDefSvc.SetVersionTracker(versionTracker)
-	structDefHandler := structuredefinition.NewHandler(structDefSvc)
-	structDefHandler.RegisterRoutes(apiV1, fhirGroup)
+	domainStructDefRepo := structuredefinition.NewStructureDefinitionRepoPG(pool)
+	domainStructDefSvc := structuredefinition.NewService(domainStructDefRepo)
+	domainStructDefSvc.SetVersionTracker(versionTracker)
+	domainStructDefHandler := structuredefinition.NewHandler(domainStructDefSvc)
+	domainStructDefHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// SearchParameter domain
 	spRepo := searchparameter.NewSearchParameterRepoPG(pool)
@@ -1979,11 +1999,11 @@ func runServer() error {
 	cmHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// ImplementationGuide domain
-	igRepo := implementationguide.NewImplementationGuideRepoPG(pool)
-	igSvc := implementationguide.NewService(igRepo)
-	igSvc.SetVersionTracker(versionTracker)
-	igHandler := implementationguide.NewHandler(igSvc)
-	igHandler.RegisterRoutes(apiV1, fhirGroup)
+	domainIGRepo := implementationguide.NewImplementationGuideRepoPG(pool)
+	domainIGSvc := implementationguide.NewService(domainIGRepo)
+	domainIGSvc.SetVersionTracker(versionTracker)
+	domainIGHandler := implementationguide.NewHandler(domainIGSvc)
+	domainIGHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// CompartmentDefinition domain
 	cdRepo := compartmentdefinition.NewCompartmentDefinitionRepoPG(pool)
