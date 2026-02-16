@@ -1443,6 +1443,26 @@ func runServer() error {
 	fhirGroup.GET("/$async-batch-status/:id", fhir.AsyncBatchStatusHandler(fhir.NewInMemoryAsyncBatchStore()))
 	fhirGroup.DELETE("/$async-batch/:id", fhir.AsyncBatchCancelHandler(asyncBatchProcessor))
 
+	// FHIR HEAD method middleware (returns headers without body)
+	fhirGroup.Use(fhir.HeadMethodMiddleware(nil))
+
+	// FHIR dynamic search parameter expressions (FHIRPath-based)
+	searchExprRegistry := fhir.NewSearchExpressionRegistry()
+	for _, expr := range fhir.DefaultSearchExpressions() {
+		_ = searchExprRegistry.Register(expr)
+	}
+	fhirGroup.Any("/SearchParameter/$expression", fhir.RegisterSearchParamHandler(searchExprRegistry))
+
+	// FHIR validation profile registry (per-resource validation)
+	validationProfileRegistry := fhir.NewValidationProfileRegistry()
+	for _, p := range fhir.DefaultUSCoreValidationProfiles() {
+		_ = validationProfileRegistry.RegisterValidationProfile(p)
+	}
+	fhirGroup.Use(fhir.ProfileValidationMiddleware(validationProfileRegistry, &fhir.ProfileValidationConfig{
+		ValidateOnCreate: true,
+		ValidateOnUpdate: true,
+	}))
+
 	// FHIR TerminologyCapabilities endpoints
 	termCapHandler := fhir.NewTerminologyCapabilitiesHandler()
 	termCapHandler.RegisterRoutes(fhirGroup)
