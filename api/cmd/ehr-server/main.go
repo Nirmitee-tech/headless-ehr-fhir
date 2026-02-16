@@ -1348,6 +1348,10 @@ func runServer() error {
 	fhirRateLimiter := fhir.NewSlidingWindowLimiter(1000, time.Minute)
 	fhirGroup.Use(fhir.RateLimitMiddleware(fhirRateLimiter))
 
+	// FHIR idempotency key middleware (safe retries for write operations)
+	idempotencyStore := fhir.NewInMemoryIdempotencyStore(24 * time.Hour)
+	fhirGroup.Use(fhir.IdempotencyMiddleware(idempotencyStore))
+
 	// FHIR CompartmentDefinition endpoints
 	compartmentDefHandler := fhir.NewCompartmentDefinitionHandler()
 	compartmentDefHandler.RegisterRoutes(fhirGroup)
