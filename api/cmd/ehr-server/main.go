@@ -84,6 +84,16 @@ import (
 	"github.com/ehr/ehr/internal/domain/molecularsequence"
 	"github.com/ehr/ehr/internal/domain/biologicallyderivedproduct"
 	"github.com/ehr/ehr/internal/domain/catalogentry"
+	"github.com/ehr/ehr/internal/domain/structuredefinition"
+	"github.com/ehr/ehr/internal/domain/searchparameter"
+	"github.com/ehr/ehr/internal/domain/codesystem"
+	"github.com/ehr/ehr/internal/domain/valueset"
+	"github.com/ehr/ehr/internal/domain/conceptmap"
+	"github.com/ehr/ehr/internal/domain/implementationguide"
+	"github.com/ehr/ehr/internal/domain/compartmentdefinition"
+	"github.com/ehr/ehr/internal/domain/terminologycapabilities"
+	"github.com/ehr/ehr/internal/domain/structuremap"
+	"github.com/ehr/ehr/internal/domain/testscript"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -941,6 +951,69 @@ func runServer() error {
 		{Name: "orderable", Type: "token"},
 	})
 
+	// Conformance & Terminology resources
+	capBuilder.AddResource("StructureDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+		{Name: "type", Type: "token"},
+		{Name: "kind", Type: "token"},
+		{Name: "base", Type: "uri"},
+	})
+	capBuilder.AddResource("SearchParameter", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+		{Name: "code", Type: "token"},
+		{Name: "type", Type: "token"},
+		{Name: "base", Type: "token"},
+	})
+	capBuilder.AddResource("CodeSystem", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+		{Name: "content", Type: "token"},
+	})
+	capBuilder.AddResource("ValueSet", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+		{Name: "title", Type: "string"},
+	})
+	capBuilder.AddResource("ConceptMap", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+		{Name: "source", Type: "reference"},
+		{Name: "target", Type: "reference"},
+	})
+	capBuilder.AddResource("ImplementationGuide", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("CompartmentDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+		{Name: "code", Type: "token"},
+	})
+	capBuilder.AddResource("TerminologyCapabilities", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("StructureMap", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("TestScript", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "url", Type: "uri"},
+		{Name: "name", Type: "string"},
+	})
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
@@ -978,6 +1051,9 @@ func runServer() error {
 		"CommunicationRequest", "ObservationDefinition", "Linkage", "Basic",
 		"VerificationResult", "EventDefinition", "GraphDefinition",
 		"MolecularSequence", "BiologicallyDerivedProduct", "CatalogEntry",
+		"StructureDefinition", "SearchParameter", "CodeSystem", "ValueSet", "ConceptMap",
+		"ImplementationGuide", "CompartmentDefinition", "TerminologyCapabilities",
+		"StructureMap", "TestScript",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -1645,6 +1721,76 @@ func runServer() error {
 	catSvc.SetVersionTracker(versionTracker)
 	catHandler := catalogentry.NewHandler(catSvc)
 	catHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// StructureDefinition domain
+	structDefRepo := structuredefinition.NewStructureDefinitionRepoPG(pool)
+	structDefSvc := structuredefinition.NewService(structDefRepo)
+	structDefSvc.SetVersionTracker(versionTracker)
+	structDefHandler := structuredefinition.NewHandler(structDefSvc)
+	structDefHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// SearchParameter domain
+	spRepo := searchparameter.NewSearchParameterRepoPG(pool)
+	spSvc := searchparameter.NewService(spRepo)
+	spSvc.SetVersionTracker(versionTracker)
+	spHandler := searchparameter.NewHandler(spSvc)
+	spHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// CodeSystem domain
+	csRepo := codesystem.NewCodeSystemRepoPG(pool)
+	csSvc := codesystem.NewService(csRepo)
+	csSvc.SetVersionTracker(versionTracker)
+	csHandler := codesystem.NewHandler(csSvc)
+	csHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ValueSet domain
+	vsRepo := valueset.NewValueSetRepoPG(pool)
+	vsSvc := valueset.NewService(vsRepo)
+	vsSvc.SetVersionTracker(versionTracker)
+	vsHandler := valueset.NewHandler(vsSvc)
+	vsHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ConceptMap domain
+	cmRepo := conceptmap.NewConceptMapRepoPG(pool)
+	cmSvc := conceptmap.NewService(cmRepo)
+	cmSvc.SetVersionTracker(versionTracker)
+	cmHandler := conceptmap.NewHandler(cmSvc)
+	cmHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ImplementationGuide domain
+	igRepo := implementationguide.NewImplementationGuideRepoPG(pool)
+	igSvc := implementationguide.NewService(igRepo)
+	igSvc.SetVersionTracker(versionTracker)
+	igHandler := implementationguide.NewHandler(igSvc)
+	igHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// CompartmentDefinition domain
+	cdRepo := compartmentdefinition.NewCompartmentDefinitionRepoPG(pool)
+	cdSvc := compartmentdefinition.NewService(cdRepo)
+	cdSvc.SetVersionTracker(versionTracker)
+	cdHandler := compartmentdefinition.NewHandler(cdSvc)
+	cdHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// TerminologyCapabilities domain
+	tcRepo := terminologycapabilities.NewTerminologyCapabilitiesRepoPG(pool)
+	tcSvc := terminologycapabilities.NewService(tcRepo)
+	tcSvc.SetVersionTracker(versionTracker)
+	tcHandler := terminologycapabilities.NewHandler(tcSvc)
+	tcHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// StructureMap domain
+	smRepo := structuremap.NewStructureMapRepoPG(pool)
+	smSvc := structuremap.NewService(smRepo)
+	smSvc.SetVersionTracker(versionTracker)
+	smHandler := structuremap.NewHandler(smSvc)
+	smHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// TestScript domain
+	tsRepo := testscript.NewTestScriptRepoPG(pool)
+	tsSvc := testscript.NewService(tsRepo)
+	tsSvc.SetVersionTracker(versionTracker)
+	tsHandler := testscript.NewHandler(tsSvc)
+	tsHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
