@@ -1277,6 +1277,8 @@ func runServer() error {
 	// Wire _include/_revinclude middleware into the FHIR search group.
 	// Fetchers are registered below after services are initialized; since
 	// the middleware holds a pointer to the registry, late registration works.
+	fhirGroup.Use(fhir.ContentNegotiationMiddleware())
+	fhirGroup.Use(fhir.ConditionalReadMiddleware())
 	fhirGroup.Use(fhir.IncludeMiddleware(includeRegistry))
 	fhirGroup.Use(fhir.SearchMiddleware())
 	fhirGroup.Use(fhir.PreferMiddleware())
@@ -1296,6 +1298,15 @@ func runServer() error {
 	bundleProcessor := &fhir.DefaultBundleProcessor{}
 	bundleHandler := fhir.NewBundleHandler(bundleProcessor)
 	bundleHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR History handler (system-level and type-level _history)
+	historyHandler := fhir.NewHistoryHandler(historyRepo)
+	historyHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR Async job status handler (Prefer: respond-async support)
+	asyncStore := fhir.NewInMemoryAsyncJobStore()
+	fhirGroup.GET("/_async/:jobId", fhir.AsyncStatusHandler(asyncStore))
+	fhirGroup.DELETE("/_async/:jobId", fhir.AsyncDeleteHandler(asyncStore))
 
 	// -- Register Domain Handlers --
 

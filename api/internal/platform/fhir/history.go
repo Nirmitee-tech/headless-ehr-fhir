@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/platform/db"
 )
@@ -126,6 +128,196 @@ func (r *HistoryRepository) ListVersions(ctx context.Context, resourceType, reso
 		entries = append(entries, &h)
 	}
 	return entries, total, nil
+}
+
+// ListTypeVersions retrieves all history entries for a given resource type,
+// ordered by timestamp descending. It supports optional _since filtering and
+// limit/offset pagination.
+func (r *HistoryRepository) ListTypeVersions(ctx context.Context, resourceType string, since *time.Time, limit, offset int) ([]*HistoryEntry, int, error) {
+	q := r.conn(ctx)
+	if q == nil {
+		return nil, 0, fmt.Errorf("no database connection in context")
+	}
+
+	var total int
+	if since != nil {
+		err := q.QueryRow(ctx, `
+			SELECT COUNT(*) FROM resource_history
+			WHERE resource_type = $1 AND timestamp >= $2`,
+			resourceType, *since).Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("count type history versions: %w", err)
+		}
+	} else {
+		err := q.QueryRow(ctx, `
+			SELECT COUNT(*) FROM resource_history
+			WHERE resource_type = $1`,
+			resourceType).Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("count type history versions: %w", err)
+		}
+	}
+
+	var rows pgx.Rows
+	var err error
+	if since != nil {
+		rows, err = q.Query(ctx, `
+			SELECT resource_type, resource_id, version_id, resource, action, timestamp
+			FROM resource_history
+			WHERE resource_type = $1 AND timestamp >= $2
+			ORDER BY timestamp DESC
+			LIMIT $3 OFFSET $4`,
+			resourceType, *since, limit, offset)
+	} else {
+		rows, err = q.Query(ctx, `
+			SELECT resource_type, resource_id, version_id, resource, action, timestamp
+			FROM resource_history
+			WHERE resource_type = $1
+			ORDER BY timestamp DESC
+			LIMIT $2 OFFSET $3`,
+			resourceType, limit, offset)
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("list type history versions: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*HistoryEntry
+	for rows.Next() {
+		var h HistoryEntry
+		if err := rows.Scan(&h.ResourceType, &h.ResourceID, &h.VersionID, &h.Resource, &h.Action, &h.Timestamp); err != nil {
+			return nil, 0, fmt.Errorf("scan type history entry: %w", err)
+		}
+		entries = append(entries, &h)
+	}
+	return entries, total, nil
+}
+
+// ListAllVersions retrieves all history entries across all resource types,
+// ordered by timestamp descending. It supports optional _since filtering and
+// limit/offset pagination. This implements the system-level _history interaction.
+func (r *HistoryRepository) ListAllVersions(ctx context.Context, since *time.Time, limit, offset int) ([]*HistoryEntry, int, error) {
+	q := r.conn(ctx)
+	if q == nil {
+		return nil, 0, fmt.Errorf("no database connection in context")
+	}
+
+	var total int
+	if since != nil {
+		err := q.QueryRow(ctx, `
+			SELECT COUNT(*) FROM resource_history
+			WHERE timestamp >= $1`,
+			*since).Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("count all history versions: %w", err)
+		}
+	} else {
+		err := q.QueryRow(ctx, `
+			SELECT COUNT(*) FROM resource_history`).Scan(&total)
+		if err != nil {
+			return nil, 0, fmt.Errorf("count all history versions: %w", err)
+		}
+	}
+
+	var rows pgx.Rows
+	var err error
+	if since != nil {
+		rows, err = q.Query(ctx, `
+			SELECT resource_type, resource_id, version_id, resource, action, timestamp
+			FROM resource_history
+			WHERE timestamp >= $1
+			ORDER BY timestamp DESC
+			LIMIT $2 OFFSET $3`,
+			*since, limit, offset)
+	} else {
+		rows, err = q.Query(ctx, `
+			SELECT resource_type, resource_id, version_id, resource, action, timestamp
+			FROM resource_history
+			ORDER BY timestamp DESC
+			LIMIT $1 OFFSET $2`,
+			limit, offset)
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("list all history versions: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*HistoryEntry
+	for rows.Next() {
+		var h HistoryEntry
+		if err := rows.Scan(&h.ResourceType, &h.ResourceID, &h.VersionID, &h.Resource, &h.Action, &h.Timestamp); err != nil {
+			return nil, 0, fmt.Errorf("scan all history entry: %w", err)
+		}
+		entries = append(entries, &h)
+	}
+	return entries, total, nil
+}
+
+// HistoryHandler serves FHIR system-level and type-level _history endpoints.
+type HistoryHandler struct {
+	repo *HistoryRepository
+}
+
+// NewHistoryHandler creates a new HistoryHandler.
+func NewHistoryHandler(repo *HistoryRepository) *HistoryHandler {
+	return &HistoryHandler{repo: repo}
+}
+
+// RegisterRoutes registers the history routes on the given echo group.
+func (h *HistoryHandler) RegisterRoutes(g *echo.Group) {
+	g.GET("/_history", h.SystemHistory)
+	g.GET("/:resourceType/_history", h.TypeHistory)
+}
+
+// SystemHistory handles GET /fhir/_history.
+// It returns a history bundle containing all resource changes across the system.
+func (h *HistoryHandler) SystemHistory(c echo.Context) error {
+	count := ParseCount(c, 20)
+	offset := ParseOffset(c)
+	since := parseSince(c)
+
+	entries, total, err := h.repo.ListAllVersions(c.Request().Context(), since, count, offset)
+	if err != nil {
+		// Return an empty history bundle when the database is unavailable.
+		bundle := NewHistoryBundle(nil, 0, "/fhir")
+		return c.JSON(http.StatusOK, bundle)
+	}
+
+	bundle := NewHistoryBundle(entries, total, "/fhir")
+	return c.JSON(http.StatusOK, bundle)
+}
+
+// TypeHistory handles GET /fhir/:resourceType/_history.
+// It returns a history bundle containing all changes for the specified resource type.
+func (h *HistoryHandler) TypeHistory(c echo.Context) error {
+	resourceType := c.Param("resourceType")
+	count := ParseCount(c, 20)
+	offset := ParseOffset(c)
+	since := parseSince(c)
+
+	entries, total, err := h.repo.ListTypeVersions(c.Request().Context(), resourceType, since, count, offset)
+	if err != nil {
+		// Return an empty history bundle when the database is unavailable.
+		bundle := NewHistoryBundle(nil, 0, "/fhir")
+		return c.JSON(http.StatusOK, bundle)
+	}
+
+	bundle := NewHistoryBundle(entries, total, "/fhir")
+	return c.JSON(http.StatusOK, bundle)
+}
+
+// parseSince parses the _since query parameter as an RFC3339 timestamp.
+// Returns nil if the parameter is not present or cannot be parsed.
+func parseSince(c echo.Context) *time.Time {
+	sinceStr := c.QueryParam("_since")
+	if sinceStr == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, sinceStr)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 // NewHistoryBundle creates a FHIR Bundle of type "history" from history entries.
