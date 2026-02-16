@@ -120,6 +120,8 @@ import (
 	"github.com/ehr/ehr/internal/domain/substancenucleicacid"
 	"github.com/ehr/ehr/internal/domain/substancesourcematerial"
 	"github.com/ehr/ehr/internal/domain/substancereferenceinformation"
+	"github.com/ehr/ehr/internal/domain/auditevent"
+	"github.com/ehr/ehr/internal/domain/immunizationevaluation"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -1139,6 +1141,24 @@ func runServer() error {
 	capBuilder.AddResource("SubstanceNucleicAcid", fhir.DefaultInteractions(), nil)
 	capBuilder.AddResource("SubstanceSourceMaterial", fhir.DefaultInteractions(), nil)
 	capBuilder.AddResource("SubstanceReferenceInformation", fhir.DefaultInteractions(), nil)
+	capBuilder.AddResource("PlanDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "name", Type: "string"},
+	})
+	capBuilder.AddResource("Binary", fhir.DefaultInteractions(), nil)
+	capBuilder.AddResource("AuditEvent", []string{"read", "vread", "search-type", "history-instance"}, []fhir.SearchParam{
+		{Name: "action", Type: "token"},
+		{Name: "type", Type: "token"},
+		{Name: "outcome", Type: "token"},
+		{Name: "agent", Type: "string"},
+		{Name: "entity-type", Type: "token"},
+	})
+	capBuilder.AddResource("ImmunizationEvaluation", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "patient", Type: "reference"},
+		{Name: "target-disease", Type: "token"},
+		{Name: "dose-status", Type: "token"},
+	})
 
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
@@ -1191,6 +1211,7 @@ func runServer() error {
 		"MedicinalProductPharmaceutical",
 		"SubstancePolymer", "SubstanceProtein", "SubstanceNucleicAcid",
 		"SubstanceSourceMaterial", "SubstanceReferenceInformation",
+		"PlanDefinition", "Binary", "AuditEvent", "ImmunizationEvaluation",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -1221,7 +1242,8 @@ func runServer() error {
 	for _, rt := range []string{"Flag", "DetectedIssue", "AdverseEvent", "ClinicalImpression",
 		"RiskAssessment", "EpisodeOfCare", "MeasureReport", "ChargeItem",
 		"RequestGroup", "GuidanceResponse", "VisionPrescription",
-		"BodyStructure", "Media", "DeviceRequest", "DeviceUseStatement"} {
+		"BodyStructure", "Media", "DeviceRequest", "DeviceUseStatement",
+		"ImmunizationEvaluation"} {
 		includeRegistry.RegisterReference(rt, "patient", "Patient")
 		includeRegistry.RegisterReference(rt, "subject", "Patient")
 	}
@@ -2110,6 +2132,19 @@ func runServer() error {
 	sriSvc.SetVersionTracker(versionTracker)
 	sriHandler := substancereferenceinformation.NewHandler(sriSvc)
 	sriHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// AuditEvent domain (read-only FHIR endpoints for existing audit_event table)
+	aeRepo := auditevent.NewAuditEventRepoPG(pool)
+	aeSvc := auditevent.NewService(aeRepo)
+	aeHandler := auditevent.NewHandler(aeSvc)
+	aeHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ImmunizationEvaluation domain
+	ieRepo := immunizationevaluation.NewImmunizationEvaluationRepoPG(pool)
+	ieSvc := immunizationevaluation.NewService(ieRepo)
+	ieSvc.SetVersionTracker(versionTracker)
+	ieHandler := immunizationevaluation.NewHandler(ieSvc)
+	ieHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
