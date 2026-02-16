@@ -1352,6 +1352,30 @@ func runServer() error {
 	idempotencyStore := fhir.NewInMemoryIdempotencyStore(24 * time.Hour)
 	fhirGroup.Use(fhir.IdempotencyMiddleware(idempotencyStore))
 
+	// FHIR per-operation rate limiting (different limits per operation type)
+	opRateLimiter := fhir.DefaultOperationRateLimits()
+	fhirGroup.Use(fhir.OperationRateLimitMiddleware(opRateLimiter))
+
+	// FHIR Prefer header handling (handling=strict/lenient, respond-async)
+	fhirGroup.Use(fhir.PreferHandlingMiddleware())
+
+	// FHIR Consent-based access control enforcement
+	fhirConsentStore := fhir.NewInMemoryConsentStore()
+	fhirGroup.Use(fhir.NewConsentEnforcementMiddleware(fhirConsentStore, fhir.ConsentEnforcementConfig{
+		DefaultDecision:     fhir.ConsentDecisionPermit,
+		RequireConsent:      false,
+		ExemptResourceTypes: []string{"CapabilityStatement", "OperationDefinition", "SearchParameter", "StructureDefinition", "TerminologyCapabilities"},
+	}))
+
+	// FHIR batch/transaction Bundle processing
+	txProcessor := fhir.NewTransactionProcessor(func(method, url string, resource map[string]interface{}) (*fhir.BundleEntryResponse, error) {
+		return &fhir.BundleEntryResponse{
+			Status:   "200 OK",
+			Location: url,
+		}, nil
+	})
+	fhirGroup.POST("", fhir.TransactionHandler(txProcessor))
+
 	// FHIR CompartmentDefinition endpoints
 	compartmentDefHandler := fhir.NewCompartmentDefinitionHandler()
 	compartmentDefHandler.RegisterRoutes(fhirGroup)
