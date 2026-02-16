@@ -4,14 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
+	"github.com/ehr/ehr/internal/platform/auth"
+	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/ehr/ehr/pkg/pagination"
 )
 
@@ -75,23 +81,28 @@ type EnteralFormula struct {
 
 // NutritionOrder is the domain model for a FHIR NutritionOrder resource.
 type NutritionOrder struct {
-	ID                      uuid.UUID        `json:"id"`
-	PatientID               uuid.UUID        `json:"patient_id"`
-	EncounterID             *uuid.UUID       `json:"encounter_id,omitempty"`
-	Orderer                 *uuid.UUID       `json:"orderer,omitempty"`
-	Status                  string           `json:"status"`
-	Intent                  string           `json:"intent"`
-	DateTime                time.Time        `json:"date_time"`
+	ID                      uuid.UUID        `db:"id" json:"id"`
+	FHIRID                  string           `db:"fhir_id" json:"fhir_id"`
+	PatientID               uuid.UUID        `db:"patient_id" json:"patient_id"`
+	EncounterID             *uuid.UUID       `db:"encounter_id" json:"encounter_id,omitempty"`
+	Orderer                 *uuid.UUID       `db:"orderer_id" json:"orderer,omitempty"`
+	Status                  string           `db:"status" json:"status"`
+	Intent                  string           `db:"intent" json:"intent"`
+	DateTime                time.Time        `db:"date_time" json:"date_time"`
 	OralDiet                *OralDiet        `json:"oral_diet,omitempty"`
 	Supplement              []Supplement     `json:"supplement,omitempty"`
 	EnteralFormula          *EnteralFormula  `json:"enteral_formula,omitempty"`
 	AllergyIntolerances     []string         `json:"allergy_intolerances,omitempty"`
 	FoodPreferenceModifiers []string         `json:"food_preference_modifiers,omitempty"`
 	ExcludeFoodModifiers    []string         `json:"exclude_food_modifiers,omitempty"`
-	Note                    string           `json:"note,omitempty"`
-	CreatedAt               time.Time        `json:"created_at"`
-	UpdatedAt               time.Time        `json:"updated_at"`
+	Note                    string           `db:"note" json:"note,omitempty"`
+	VersionID               int              `db:"version_id" json:"version_id"`
+	CreatedAt               time.Time        `db:"created_at" json:"created_at"`
+	UpdatedAt               time.Time        `db:"updated_at" json:"updated_at"`
 }
+
+func (n *NutritionOrder) GetVersionID() int  { return n.VersionID }
+func (n *NutritionOrder) SetVersionID(v int) { n.VersionID = v }
 
 // ---------------------------------------------------------------------------
 // FHIR Mapping — toFHIR
@@ -117,15 +128,20 @@ func codeableConceptToFHIR(cc CodeableConcept) map[string]interface{} {
 }
 
 func (n *NutritionOrder) ToFHIR() map[string]interface{} {
+	fhirID := n.FHIRID
+	if fhirID == "" {
+		fhirID = n.ID.String()
+	}
 	result := map[string]interface{}{
 		"resourceType": "NutritionOrder",
-		"id":           n.ID.String(),
+		"id":           fhirID,
 		"status":       n.Status,
 		"intent":       n.Intent,
 		"dateTime":     n.DateTime.Format(time.RFC3339),
 		"patient":      map[string]string{"reference": "Patient/" + n.PatientID.String()},
 		"meta": map[string]interface{}{
 			"lastUpdated": n.UpdatedAt.Format(time.RFC3339),
+			"versionId":   fmt.Sprintf("%d", n.VersionID),
 		},
 	}
 
@@ -668,10 +684,13 @@ func parseEnteralFormula(data json.RawMessage) *EnteralFormula {
 type NutritionOrderRepository interface {
 	Create(ctx context.Context, order *NutritionOrder) error
 	GetByID(ctx context.Context, id uuid.UUID) (*NutritionOrder, error)
+	GetByFHIRID(ctx context.Context, fhirID string) (*NutritionOrder, error)
 	Update(ctx context.Context, order *NutritionOrder) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context, limit, offset int) ([]*NutritionOrder, int, error)
 	ListByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*NutritionOrder, int, error)
 	ListByEncounter(ctx context.Context, encounterID uuid.UUID, limit, offset int) ([]*NutritionOrder, int, error)
+	Search(ctx context.Context, params map[string]string, limit, offset int) ([]*NutritionOrder, int, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -696,9 +715,13 @@ func (r *inMemoryNutritionOrderRepo) Create(_ context.Context, order *NutritionO
 	defer r.mu.Unlock()
 
 	order.ID = uuid.New()
+	if order.FHIRID == "" {
+		order.FHIRID = order.ID.String()
+	}
 	now := time.Now().UTC()
 	order.CreatedAt = now
 	order.UpdatedAt = now
+	order.VersionID = 1
 
 	// deep copy to avoid external mutation
 	cp := *order
@@ -717,6 +740,66 @@ func (r *inMemoryNutritionOrderRepo) GetByID(_ context.Context, id uuid.UUID) (*
 	}
 	cp := *o
 	return &cp, nil
+}
+
+func (r *inMemoryNutritionOrderRepo) GetByFHIRID(_ context.Context, fhirID string) (*NutritionOrder, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, o := range r.store {
+		if o.FHIRID == fhirID {
+			cp := *o
+			return &cp, nil
+		}
+	}
+	return nil, fmt.Errorf("nutrition order not found: %s", fhirID)
+}
+
+func (r *inMemoryNutritionOrderRepo) List(_ context.Context, limit, offset int) ([]*NutritionOrder, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	total := len(r.order)
+	if offset >= total {
+		return nil, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	var result []*NutritionOrder
+	for _, id := range r.order[offset:end] {
+		cp := *r.store[id]
+		result = append(result, &cp)
+	}
+	return result, total, nil
+}
+
+func (r *inMemoryNutritionOrderRepo) Search(_ context.Context, params map[string]string, limit, offset int) ([]*NutritionOrder, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var all []*NutritionOrder
+	for _, id := range r.order {
+		o := r.store[id]
+		if p, ok := params["patient"]; ok && o.PatientID.String() != p {
+			continue
+		}
+		if s, ok := params["status"]; ok && o.Status != s {
+			continue
+		}
+		cp := *o
+		all = append(all, &cp)
+	}
+	total := len(all)
+	if offset >= total {
+		return nil, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], total, nil
 }
 
 func (r *inMemoryNutritionOrderRepo) Update(_ context.Context, order *NutritionOrder) error {
@@ -936,6 +1019,248 @@ func (s *NutritionOrderService) ListByEncounter(ctx context.Context, encounterID
 	return s.repo.ListByEncounter(ctx, encounterID, limit, offset)
 }
 
+func (s *NutritionOrderService) GetByFHIRID(ctx context.Context, fhirID string) (*NutritionOrder, error) {
+	return s.repo.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *NutritionOrderService) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*NutritionOrder, int, error) {
+	return s.repo.Search(ctx, params, limit, offset)
+}
+
+// ---------------------------------------------------------------------------
+// Postgres Repository
+// ---------------------------------------------------------------------------
+
+type nutritionOrderRepoPG struct{ pool *pgxpool.Pool }
+
+// NewNutritionOrderRepoPG creates a Postgres-backed NutritionOrderRepository.
+func NewNutritionOrderRepoPG(pool *pgxpool.Pool) NutritionOrderRepository {
+	return &nutritionOrderRepoPG{pool: pool}
+}
+
+func (r *nutritionOrderRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+const nutritionOrderCols = `id, fhir_id, status, intent, patient_id, encounter_id,
+	orderer_id, date_time, oral_diet, supplement, enteral_formula,
+	allergy_intolerances, food_preference_modifiers, exclude_food_modifiers,
+	note, version_id, created_at, updated_at`
+
+func (r *nutritionOrderRepoPG) scanOrder(row pgx.Row) (*NutritionOrder, error) {
+	var n NutritionOrder
+	var oralDietJSON, supplementJSON, enteralFormulaJSON []byte
+	err := row.Scan(&n.ID, &n.FHIRID, &n.Status, &n.Intent, &n.PatientID, &n.EncounterID,
+		&n.Orderer, &n.DateTime, &oralDietJSON, &supplementJSON, &enteralFormulaJSON,
+		&n.AllergyIntolerances, &n.FoodPreferenceModifiers, &n.ExcludeFoodModifiers,
+		&n.Note, &n.VersionID, &n.CreatedAt, &n.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if oralDietJSON != nil {
+		var od OralDiet
+		if json.Unmarshal(oralDietJSON, &od) == nil {
+			n.OralDiet = &od
+		}
+	}
+	if supplementJSON != nil {
+		json.Unmarshal(supplementJSON, &n.Supplement)
+	}
+	if enteralFormulaJSON != nil {
+		var ef EnteralFormula
+		if json.Unmarshal(enteralFormulaJSON, &ef) == nil {
+			n.EnteralFormula = &ef
+		}
+	}
+	return &n, nil
+}
+
+func (r *nutritionOrderRepoPG) Create(ctx context.Context, n *NutritionOrder) error {
+	n.ID = uuid.New()
+	if n.FHIRID == "" {
+		n.FHIRID = n.ID.String()
+	}
+	oralDietJSON, _ := json.Marshal(n.OralDiet)
+	supplementJSON, _ := json.Marshal(n.Supplement)
+	enteralFormulaJSON, _ := json.Marshal(n.EnteralFormula)
+	if n.OralDiet == nil {
+		oralDietJSON = nil
+	}
+	if n.EnteralFormula == nil {
+		enteralFormulaJSON = nil
+	}
+	if len(n.Supplement) == 0 {
+		supplementJSON = nil
+	}
+
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO nutrition_order (id, fhir_id, status, intent, patient_id, encounter_id,
+			orderer_id, date_time, oral_diet, supplement, enteral_formula,
+			allergy_intolerances, food_preference_modifiers, exclude_food_modifiers, note)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		n.ID, n.FHIRID, n.Status, n.Intent, n.PatientID, n.EncounterID,
+		n.Orderer, n.DateTime, oralDietJSON, supplementJSON, enteralFormulaJSON,
+		n.AllergyIntolerances, n.FoodPreferenceModifiers, n.ExcludeFoodModifiers, n.Note)
+	if err != nil {
+		return err
+	}
+	n.VersionID = 1
+	n.CreatedAt = time.Now().UTC()
+	n.UpdatedAt = n.CreatedAt
+	return nil
+}
+
+func (r *nutritionOrderRepoPG) GetByID(ctx context.Context, id uuid.UUID) (*NutritionOrder, error) {
+	return r.scanOrder(r.conn(ctx).QueryRow(ctx, `SELECT `+nutritionOrderCols+` FROM nutrition_order WHERE id = $1`, id))
+}
+
+func (r *nutritionOrderRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*NutritionOrder, error) {
+	return r.scanOrder(r.conn(ctx).QueryRow(ctx, `SELECT `+nutritionOrderCols+` FROM nutrition_order WHERE fhir_id = $1`, fhirID))
+}
+
+func (r *nutritionOrderRepoPG) Update(ctx context.Context, n *NutritionOrder) error {
+	oralDietJSON, _ := json.Marshal(n.OralDiet)
+	supplementJSON, _ := json.Marshal(n.Supplement)
+	enteralFormulaJSON, _ := json.Marshal(n.EnteralFormula)
+	if n.OralDiet == nil {
+		oralDietJSON = nil
+	}
+	if n.EnteralFormula == nil {
+		enteralFormulaJSON = nil
+	}
+	if len(n.Supplement) == 0 {
+		supplementJSON = nil
+	}
+
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE nutrition_order SET status=$2, intent=$3, patient_id=$4, encounter_id=$5,
+			orderer_id=$6, date_time=$7, oral_diet=$8, supplement=$9, enteral_formula=$10,
+			allergy_intolerances=$11, food_preference_modifiers=$12, exclude_food_modifiers=$13,
+			note=$14, version_id=version_id+1, updated_at=NOW()
+		WHERE id = $1`,
+		n.ID, n.Status, n.Intent, n.PatientID, n.EncounterID,
+		n.Orderer, n.DateTime, oralDietJSON, supplementJSON, enteralFormulaJSON,
+		n.AllergyIntolerances, n.FoodPreferenceModifiers, n.ExcludeFoodModifiers, n.Note)
+	return err
+}
+
+func (r *nutritionOrderRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM nutrition_order WHERE id = $1`, id)
+	return err
+}
+
+func (r *nutritionOrderRepoPG) List(ctx context.Context, limit, offset int) ([]*NutritionOrder, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM nutrition_order`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+nutritionOrderCols+` FROM nutrition_order ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*NutritionOrder
+	for rows.Next() {
+		n, err := r.scanOrder(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, n)
+	}
+	return items, total, nil
+}
+
+func (r *nutritionOrderRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]*NutritionOrder, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM nutrition_order WHERE patient_id = $1`, patientID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+nutritionOrderCols+` FROM nutrition_order WHERE patient_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, patientID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*NutritionOrder
+	for rows.Next() {
+		n, err := r.scanOrder(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, n)
+	}
+	return items, total, nil
+}
+
+func (r *nutritionOrderRepoPG) ListByEncounter(ctx context.Context, encounterID uuid.UUID, limit, offset int) ([]*NutritionOrder, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM nutrition_order WHERE encounter_id = $1`, encounterID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+nutritionOrderCols+` FROM nutrition_order WHERE encounter_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, encounterID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*NutritionOrder
+	for rows.Next() {
+		n, err := r.scanOrder(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, n)
+	}
+	return items, total, nil
+}
+
+func (r *nutritionOrderRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*NutritionOrder, int, error) {
+	query := `SELECT ` + nutritionOrderCols + ` FROM nutrition_order WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM nutrition_order WHERE 1=1`
+	var args []interface{}
+	idx := 1
+
+	if p, ok := params["patient"]; ok {
+		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
+		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
+		args = append(args, p)
+		idx++
+	}
+	if s, ok := params["status"]; ok {
+		query += fmt.Sprintf(` AND status = $%d`, idx)
+		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
+		args = append(args, s)
+		idx++
+	}
+
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*NutritionOrder
+	for rows.Next() {
+		n, err := r.scanOrder(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, n)
+	}
+	return items, total, nil
+}
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -950,13 +1275,32 @@ func NewNutritionOrderHandler(svc *NutritionOrderService) *NutritionOrderHandler
 	return &NutritionOrderHandler{svc: svc}
 }
 
-// RegisterNutritionOrderRoutes registers the NutritionOrder routes on the given Echo group.
-func (h *NutritionOrderHandler) RegisterNutritionOrderRoutes(api *echo.Group) {
-	api.GET("/nutrition-orders", h.ListNutritionOrders)
-	api.POST("/nutrition-orders", h.CreateNutritionOrder)
-	api.GET("/nutrition-orders/:id", h.GetNutritionOrder)
-	api.PUT("/nutrition-orders/:id", h.UpdateNutritionOrder)
-	api.DELETE("/nutrition-orders/:id", h.DeleteNutritionOrder)
+// RegisterNutritionOrderRoutes registers the NutritionOrder REST and FHIR routes.
+func (h *NutritionOrderHandler) RegisterNutritionOrderRoutes(api *echo.Group, fhirGroup *echo.Group) {
+	// REST endpoints
+	read := api.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	read.GET("/nutrition-orders", h.ListNutritionOrders)
+	read.GET("/nutrition-orders/:id", h.GetNutritionOrder)
+
+	write := api.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	write.POST("/nutrition-orders", h.CreateNutritionOrder)
+	write.PUT("/nutrition-orders/:id", h.UpdateNutritionOrder)
+	write.DELETE("/nutrition-orders/:id", h.DeleteNutritionOrder)
+
+	// FHIR read endpoints
+	fr := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	fr.GET("/NutritionOrder", h.SearchNutritionOrdersFHIR)
+	fr.GET("/NutritionOrder/:id", h.GetNutritionOrderFHIR)
+	fr.POST("/NutritionOrder/_search", h.SearchNutritionOrdersFHIR)
+	fr.GET("/NutritionOrder/:id/_history/:vid", h.VreadNutritionOrderFHIR)
+	fr.GET("/NutritionOrder/:id/_history", h.HistoryNutritionOrderFHIR)
+
+	// FHIR write endpoints
+	fw := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse"))
+	fw.POST("/NutritionOrder", h.CreateNutritionOrderFHIR)
+	fw.PUT("/NutritionOrder/:id", h.UpdateNutritionOrderFHIR)
+	fw.DELETE("/NutritionOrder/:id", h.DeleteNutritionOrderFHIR)
+	fw.PATCH("/NutritionOrder/:id", h.PatchNutritionOrderFHIR)
 }
 
 func (h *NutritionOrderHandler) CreateNutritionOrder(c echo.Context) error {
@@ -1041,4 +1385,155 @@ func (h *NutritionOrderHandler) ListNutritionOrders(c echo.Context) error {
 	}
 
 	return echo.NewHTTPError(http.StatusBadRequest, "patient_id or encounter_id query parameter is required")
+}
+
+// ---------------------------------------------------------------------------
+// FHIR Handlers
+// ---------------------------------------------------------------------------
+
+func (h *NutritionOrderHandler) SearchNutritionOrdersFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"patient", "status"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.Search(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/NutritionOrder"))
+}
+
+func (h *NutritionOrderHandler) GetNutritionOrderFHIR(c echo.Context) error {
+	n, err := h.svc.GetByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NutritionOrder", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, n.ToFHIR())
+}
+
+func (h *NutritionOrderHandler) CreateNutritionOrderFHIR(c echo.Context) error {
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	order, err := NutritionOrderFromFHIR(body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.Create(c.Request().Context(), order); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/NutritionOrder/"+order.FHIRID)
+	return c.JSON(http.StatusCreated, order.ToFHIR())
+}
+
+func (h *NutritionOrderHandler) UpdateNutritionOrderFHIR(c echo.Context) error {
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+	order, err := NutritionOrderFromFHIR(body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NutritionOrder", c.Param("id")))
+	}
+	order.ID = existing.ID
+	order.FHIRID = existing.FHIRID
+	if err := h.svc.Update(c.Request().Context(), order); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, order.ToFHIR())
+}
+
+func (h *NutritionOrderHandler) DeleteNutritionOrderFHIR(c echo.Context) error {
+	existing, err := h.svc.GetByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NutritionOrder", c.Param("id")))
+	}
+	if err := h.svc.Delete(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *NutritionOrderHandler) PatchNutritionOrderFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	existing, err := h.svc.GetByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NutritionOrder", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	// Apply patched fields back to model
+	if v, ok := patched["status"].(string); ok {
+		existing.Status = v
+	}
+	if v, ok := patched["intent"].(string); ok {
+		existing.Intent = v
+	}
+	if err := h.svc.Update(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *NutritionOrderHandler) VreadNutritionOrderFHIR(c echo.Context) error {
+	n, err := h.svc.GetByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NutritionOrder", c.Param("id")))
+	}
+	fhir.SetVersionHeaders(c, 1, n.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, n.ToFHIR())
+}
+
+func (h *NutritionOrderHandler) HistoryNutritionOrderFHIR(c echo.Context) error {
+	n, err := h.svc.GetByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NutritionOrder", c.Param("id")))
+	}
+	raw, _ := json.Marshal(n.ToFHIR())
+	entry := &fhir.HistoryEntry{
+		ResourceType: "NutritionOrder", ResourceID: n.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: n.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

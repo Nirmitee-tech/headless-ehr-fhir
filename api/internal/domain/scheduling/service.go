@@ -9,11 +9,12 @@ import (
 )
 
 type Service struct {
-	schedules    ScheduleRepository
-	slots        SlotRepository
-	appointments AppointmentRepository
-	waitlist     WaitlistRepository
-	vt           *fhir.VersionTracker
+	schedules            ScheduleRepository
+	slots                SlotRepository
+	appointments         AppointmentRepository
+	appointmentResponses AppointmentResponseRepository
+	waitlist             WaitlistRepository
+	vt                   *fhir.VersionTracker
 }
 
 // SetVersionTracker attaches an optional VersionTracker to the service.
@@ -26,8 +27,8 @@ func (s *Service) VersionTracker() *fhir.VersionTracker {
 	return s.vt
 }
 
-func NewService(sched ScheduleRepository, slot SlotRepository, appt AppointmentRepository, wl WaitlistRepository) *Service {
-	return &Service{schedules: sched, slots: slot, appointments: appt, waitlist: wl}
+func NewService(sched ScheduleRepository, slot SlotRepository, appt AppointmentRepository, apptResp AppointmentResponseRepository, wl WaitlistRepository) *Service {
+	return &Service{schedules: sched, slots: slot, appointments: appt, appointmentResponses: apptResp, waitlist: wl}
 }
 
 // -- Schedule --
@@ -254,6 +255,77 @@ func (s *Service) GetAppointmentParticipants(ctx context.Context, appointmentID 
 
 func (s *Service) RemoveAppointmentParticipant(ctx context.Context, id uuid.UUID) error {
 	return s.appointments.RemoveParticipant(ctx, id)
+}
+
+// -- AppointmentResponse --
+
+var validParticipantStatuses = map[string]bool{
+	"accepted": true, "declined": true, "tentative": true, "needs-action": true,
+}
+
+func (s *Service) CreateAppointmentResponse(ctx context.Context, ar *AppointmentResponse) error {
+	if ar.AppointmentID == uuid.Nil {
+		return fmt.Errorf("appointment_id is required")
+	}
+	if ar.ActorType == "" {
+		return fmt.Errorf("actor_type is required")
+	}
+	if ar.ActorID == uuid.Nil {
+		return fmt.Errorf("actor_id is required")
+	}
+	if ar.ParticipantStatus == "" {
+		ar.ParticipantStatus = "needs-action"
+	}
+	if !validParticipantStatuses[ar.ParticipantStatus] {
+		return fmt.Errorf("invalid participant_status: %s", ar.ParticipantStatus)
+	}
+	if err := s.appointmentResponses.Create(ctx, ar); err != nil {
+		return err
+	}
+	ar.VersionID = 1
+	if s.vt != nil {
+		_ = s.vt.RecordCreate(ctx, "AppointmentResponse", ar.FHIRID, ar.ToFHIR())
+	}
+	return nil
+}
+
+func (s *Service) GetAppointmentResponse(ctx context.Context, id uuid.UUID) (*AppointmentResponse, error) {
+	return s.appointmentResponses.GetByID(ctx, id)
+}
+
+func (s *Service) GetAppointmentResponseByFHIRID(ctx context.Context, fhirID string) (*AppointmentResponse, error) {
+	return s.appointmentResponses.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *Service) UpdateAppointmentResponse(ctx context.Context, ar *AppointmentResponse) error {
+	if ar.ParticipantStatus != "" && !validParticipantStatuses[ar.ParticipantStatus] {
+		return fmt.Errorf("invalid participant_status: %s", ar.ParticipantStatus)
+	}
+	if s.vt != nil {
+		newVer, err := s.vt.RecordUpdate(ctx, "AppointmentResponse", ar.FHIRID, ar.VersionID, ar.ToFHIR())
+		if err == nil {
+			ar.VersionID = newVer
+		}
+	}
+	return s.appointmentResponses.Update(ctx, ar)
+}
+
+func (s *Service) DeleteAppointmentResponse(ctx context.Context, id uuid.UUID) error {
+	if s.vt != nil {
+		ar, err := s.appointmentResponses.GetByID(ctx, id)
+		if err == nil {
+			_ = s.vt.RecordDelete(ctx, "AppointmentResponse", ar.FHIRID, ar.VersionID)
+		}
+	}
+	return s.appointmentResponses.Delete(ctx, id)
+}
+
+func (s *Service) ListAppointmentResponses(ctx context.Context, limit, offset int) ([]*AppointmentResponse, int, error) {
+	return s.appointmentResponses.List(ctx, limit, offset)
+}
+
+func (s *Service) SearchAppointmentResponses(ctx context.Context, params map[string]string, limit, offset int) ([]*AppointmentResponse, int, error) {
+	return s.appointmentResponses.Search(ctx, params, limit, offset)
 }
 
 // -- Waitlist --

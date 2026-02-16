@@ -59,6 +59,8 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirRead.GET("/Slot/:id", h.GetSlotFHIR)
 	fhirRead.GET("/Appointment", h.SearchAppointmentsFHIR)
 	fhirRead.GET("/Appointment/:id", h.GetAppointmentFHIR)
+	fhirRead.GET("/AppointmentResponse", h.SearchAppointmentResponsesFHIR)
+	fhirRead.GET("/AppointmentResponse/:id", h.GetAppointmentResponseFHIR)
 
 	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse", "registrar"))
@@ -74,11 +76,16 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirWrite.PUT("/Appointment/:id", h.UpdateAppointmentFHIR)
 	fhirWrite.DELETE("/Appointment/:id", h.DeleteAppointmentFHIR)
 	fhirWrite.PATCH("/Appointment/:id", h.PatchAppointmentFHIR)
+	fhirWrite.POST("/AppointmentResponse", h.CreateAppointmentResponseFHIR)
+	fhirWrite.PUT("/AppointmentResponse/:id", h.UpdateAppointmentResponseFHIR)
+	fhirWrite.DELETE("/AppointmentResponse/:id", h.DeleteAppointmentResponseFHIR)
+	fhirWrite.PATCH("/AppointmentResponse/:id", h.PatchAppointmentResponseFHIR)
 
 	// FHIR POST _search endpoints
 	fhirRead.POST("/Schedule/_search", h.SearchSchedulesFHIR)
 	fhirRead.POST("/Slot/_search", h.SearchSlotsFHIR)
 	fhirRead.POST("/Appointment/_search", h.SearchAppointmentsFHIR)
+	fhirRead.POST("/AppointmentResponse/_search", h.SearchAppointmentResponsesFHIR)
 
 	// FHIR vread and history endpoints
 	fhirRead.GET("/Schedule/:id/_history/:vid", h.VreadScheduleFHIR)
@@ -87,6 +94,8 @@ func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
 	fhirRead.GET("/Slot/:id/_history", h.HistorySlotFHIR)
 	fhirRead.GET("/Appointment/:id/_history/:vid", h.VreadAppointmentFHIR)
 	fhirRead.GET("/Appointment/:id/_history", h.HistoryAppointmentFHIR)
+	fhirRead.GET("/AppointmentResponse/:id/_history/:vid", h.VreadAppointmentResponseFHIR)
+	fhirRead.GET("/AppointmentResponse/:id/_history", h.HistoryAppointmentResponseFHIR)
 }
 
 // -- Schedule Handlers --
@@ -538,6 +547,118 @@ func (h *Handler) CreateAppointmentFHIR(c echo.Context) error {
 	return c.JSON(http.StatusCreated, a.ToFHIR())
 }
 
+// -- FHIR AppointmentResponse Endpoints --
+
+func (h *Handler) SearchAppointmentResponsesFHIR(c echo.Context) error {
+	pg := pagination.FromContext(c)
+	params := map[string]string{}
+	for _, k := range []string{"appointment", "actor"} {
+		if v := c.QueryParam(k); v != "" {
+			params[k] = v
+		}
+	}
+	items, total, err := h.svc.SearchAppointmentResponses(c.Request().Context(), params, pg.Limit, pg.Offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	resources := make([]interface{}, len(items))
+	for i, item := range items {
+		resources[i] = item.ToFHIR()
+	}
+	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/AppointmentResponse"))
+}
+
+func (h *Handler) GetAppointmentResponseFHIR(c echo.Context) error {
+	ar, err := h.svc.GetAppointmentResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", c.Param("id")))
+	}
+	return c.JSON(http.StatusOK, ar.ToFHIR())
+}
+
+func (h *Handler) CreateAppointmentResponseFHIR(c echo.Context) error {
+	var ar AppointmentResponse
+	if err := c.Bind(&ar); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	if err := h.svc.CreateAppointmentResponse(c.Request().Context(), &ar); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	c.Response().Header().Set("Location", "/fhir/AppointmentResponse/"+ar.FHIRID)
+	return c.JSON(http.StatusCreated, ar.ToFHIR())
+}
+
+func (h *Handler) UpdateAppointmentResponseFHIR(c echo.Context) error {
+	var ar AppointmentResponse
+	if err := c.Bind(&ar); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	existing, err := h.svc.GetAppointmentResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", c.Param("id")))
+	}
+	ar.ID = existing.ID
+	ar.FHIRID = existing.FHIRID
+	if err := h.svc.UpdateAppointmentResponse(c.Request().Context(), &ar); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, ar.ToFHIR())
+}
+
+func (h *Handler) DeleteAppointmentResponseFHIR(c echo.Context) error {
+	existing, err := h.svc.GetAppointmentResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", c.Param("id")))
+	}
+	if err := h.svc.DeleteAppointmentResponse(c.Request().Context(), existing.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *Handler) PatchAppointmentResponseFHIR(c echo.Context) error {
+	return h.handlePatch(c, "AppointmentResponse", c.Param("id"), func(ctx echo.Context, resource map[string]interface{}) error {
+		existing, err := h.svc.GetAppointmentResponseByFHIRID(ctx.Request().Context(), ctx.Param("id"))
+		if err != nil {
+			return ctx.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", ctx.Param("id")))
+		}
+		if v, ok := resource["participantStatus"].(string); ok {
+			existing.ParticipantStatus = v
+		}
+		if v, ok := resource["comment"].(string); ok {
+			existing.Comment = &v
+		}
+		if err := h.svc.UpdateAppointmentResponse(ctx.Request().Context(), existing); err != nil {
+			return ctx.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		return ctx.JSON(http.StatusOK, existing.ToFHIR())
+	})
+}
+
+func (h *Handler) VreadAppointmentResponseFHIR(c echo.Context) error {
+	ar, err := h.svc.GetAppointmentResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", c.Param("id")))
+	}
+	result := ar.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, ar.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HistoryAppointmentResponseFHIR(c echo.Context) error {
+	ar, err := h.svc.GetAppointmentResponseByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", c.Param("id")))
+	}
+	result := ar.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "AppointmentResponse", ResourceID: ar.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: ar.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
+}
+
 // -- FHIR Update Endpoints --
 
 func (h *Handler) UpdateScheduleFHIR(c echo.Context) error {
@@ -701,6 +822,12 @@ func (h *Handler) handlePatch(c echo.Context, resourceType, fhirID string, apply
 		currentResource = existing.ToFHIR()
 	case "Appointment":
 		existing, err := h.svc.GetAppointmentByFHIRID(c.Request().Context(), fhirID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
+		}
+		currentResource = existing.ToFHIR()
+	case "AppointmentResponse":
+		existing, err := h.svc.GetAppointmentResponseByFHIRID(c.Request().Context(), fhirID)
 		if err != nil {
 			return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome(resourceType, fhirID))
 		}

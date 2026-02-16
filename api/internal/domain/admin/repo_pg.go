@@ -594,3 +594,278 @@ func (r *userRepoPG) scanUserRow(rows pgx.Rows) (*SystemUser, error) {
 	}
 	return &u, nil
 }
+
+// -- Group Repository --
+
+type groupRepoPG struct {
+	pool *pgxpool.Pool
+}
+
+// NewGroupRepo creates a new Postgres-backed GroupRepository.
+func NewGroupRepo(pool *pgxpool.Pool) GroupRepository {
+	return &groupRepoPG{pool: pool}
+}
+
+func (r *groupRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+const grpColumns = `id, fhir_id, group_type, actual, active, name, code, quantity, managing_entity, version_id, created_at, updated_at`
+
+func (r *groupRepoPG) Create(ctx context.Context, group *Group) error {
+	group.ID = uuid.New()
+	if group.FHIRID == "" {
+		group.FHIRID = group.ID.String()
+	}
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO fhir_group (
+			id, fhir_id, group_type, actual, active, name, code, quantity, managing_entity
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		group.ID, group.FHIRID, string(group.Type), group.Actual, group.Active,
+		group.Name, group.Code, group.Quantity, group.ManagingEntity,
+	)
+	if err != nil {
+		return err
+	}
+	// Insert members
+	for i := range group.Members {
+		m := &group.Members[i]
+		if m.ID == uuid.Nil {
+			m.ID = uuid.New()
+		}
+		_, err := r.conn(ctx).Exec(ctx, `
+			INSERT INTO fhir_group_member (id, group_id, entity_type, entity_id, period_start, period_end, inactive)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			m.ID, group.ID, m.EntityType, m.EntityID, m.PeriodStart, m.PeriodEnd, m.Inactive,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *groupRepoPG) GetByID(ctx context.Context, id uuid.UUID) (*Group, error) {
+	g, err := r.scanGroup(r.conn(ctx).QueryRow(ctx, `SELECT `+grpColumns+` FROM fhir_group WHERE id = $1`, id))
+	if err != nil {
+		return nil, err
+	}
+	members, err := r.ListMembers(ctx, g.ID)
+	if err != nil {
+		return nil, err
+	}
+	g.Members = members
+	return g, nil
+}
+
+func (r *groupRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*Group, error) {
+	g, err := r.scanGroup(r.conn(ctx).QueryRow(ctx, `SELECT `+grpColumns+` FROM fhir_group WHERE fhir_id = $1`, fhirID))
+	if err != nil {
+		return nil, err
+	}
+	members, err := r.ListMembers(ctx, g.ID)
+	if err != nil {
+		return nil, err
+	}
+	g.Members = members
+	return g, nil
+}
+
+func (r *groupRepoPG) Update(ctx context.Context, group *Group) error {
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE fhir_group SET
+			group_type=$2, actual=$3, active=$4, name=$5, code=$6,
+			quantity=$7, managing_entity=$8, version_id=version_id+1, updated_at=NOW()
+		WHERE id = $1`,
+		group.ID, string(group.Type), group.Actual, group.Active, group.Name,
+		group.Code, group.Quantity, group.ManagingEntity,
+	)
+	return err
+}
+
+func (r *groupRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM fhir_group WHERE id = $1`, id)
+	return err
+}
+
+func (r *groupRepoPG) List(ctx context.Context, filterType string, limit, offset int) ([]*Group, int, error) {
+	var total int
+	var args []interface{}
+	countQuery := `SELECT COUNT(*) FROM fhir_group`
+	query := `SELECT ` + grpColumns + ` FROM fhir_group`
+
+	if filterType != "" {
+		countQuery += ` WHERE group_type = $1`
+		query += ` WHERE group_type = $1`
+		args = append(args, filterType)
+	}
+
+	err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	idx := len(args) + 1
+	query += fmt.Sprintf(` ORDER BY name LIMIT $%d OFFSET $%d`, idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var groups []*Group
+	for rows.Next() {
+		g, err := r.scanGroupRow(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, total, nil
+}
+
+func (r *groupRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Group, int, error) {
+	query := `SELECT ` + grpColumns + ` FROM fhir_group WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM fhir_group WHERE 1=1`
+	var args []interface{}
+	idx := 1
+
+	if name, ok := params["name"]; ok {
+		clause := fmt.Sprintf(` AND name ILIKE $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, "%"+name+"%")
+		idx++
+	}
+	if t, ok := params["type"]; ok {
+		clause := fmt.Sprintf(` AND group_type = $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, t)
+		idx++
+	}
+	if active, ok := params["active"]; ok {
+		clause := fmt.Sprintf(` AND active = $%d`, idx)
+		query += clause
+		countQuery += clause
+		args = append(args, active == "true")
+		idx++
+	}
+
+	var total int
+	err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query += fmt.Sprintf(` ORDER BY name LIMIT $%d OFFSET $%d`, idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var groups []*Group
+	for rows.Next() {
+		g, err := r.scanGroupRow(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, total, nil
+}
+
+func (r *groupRepoPG) AddMember(ctx context.Context, groupID uuid.UUID, member *GroupMember) error {
+	if member.ID == uuid.Nil {
+		member.ID = uuid.New()
+	}
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO fhir_group_member (id, group_id, entity_type, entity_id, period_start, period_end, inactive)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		member.ID, groupID, member.EntityType, member.EntityID, member.PeriodStart, member.PeriodEnd, member.Inactive,
+	)
+	if err != nil {
+		return err
+	}
+	// Update quantity
+	_, err = r.conn(ctx).Exec(ctx, `
+		UPDATE fhir_group SET quantity = (SELECT COUNT(*) FROM fhir_group_member WHERE group_id = $1), updated_at = NOW()
+		WHERE id = $1`, groupID)
+	return err
+}
+
+func (r *groupRepoPG) RemoveMember(ctx context.Context, groupID uuid.UUID, memberID uuid.UUID) error {
+	tag, err := r.conn(ctx).Exec(ctx, `DELETE FROM fhir_group_member WHERE id = $1 AND group_id = $2`, memberID, groupID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("member not found")
+	}
+	// Update quantity
+	_, err = r.conn(ctx).Exec(ctx, `
+		UPDATE fhir_group SET quantity = (SELECT COUNT(*) FROM fhir_group_member WHERE group_id = $1), updated_at = NOW()
+		WHERE id = $1`, groupID)
+	return err
+}
+
+func (r *groupRepoPG) ListMembers(ctx context.Context, groupID uuid.UUID) ([]GroupMember, error) {
+	rows, err := r.conn(ctx).Query(ctx, `
+		SELECT id, entity_type, entity_id, period_start, period_end, inactive
+		FROM fhir_group_member WHERE group_id = $1 ORDER BY created_at`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []GroupMember
+	for rows.Next() {
+		var m GroupMember
+		if err := rows.Scan(&m.ID, &m.EntityType, &m.EntityID, &m.PeriodStart, &m.PeriodEnd, &m.Inactive); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, nil
+}
+
+func (r *groupRepoPG) scanGroup(row pgx.Row) (*Group, error) {
+	var g Group
+	var groupType string
+	err := row.Scan(
+		&g.ID, &g.FHIRID, &groupType, &g.Actual, &g.Active,
+		&g.Name, &g.Code, &g.Quantity, &g.ManagingEntity,
+		&g.VersionID, &g.CreatedAt, &g.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	g.Type = GroupType(groupType)
+	return &g, nil
+}
+
+func (r *groupRepoPG) scanGroupRow(rows pgx.Rows) (*Group, error) {
+	var g Group
+	var groupType string
+	err := rows.Scan(
+		&g.ID, &g.FHIRID, &groupType, &g.Actual, &g.Active,
+		&g.Name, &g.Code, &g.Quantity, &g.ManagingEntity,
+		&g.VersionID, &g.CreatedAt, &g.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	g.Type = GroupType(groupType)
+	return &g, nil
+}

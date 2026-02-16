@@ -293,10 +293,74 @@ func (m *mockWaitlistRepo) ListByPractitioner(_ context.Context, practitionerID 
 	return result, len(result), nil
 }
 
+// -- Mock AppointmentResponse Repo --
+
+type mockApptRespRepo struct {
+	resps map[uuid.UUID]*AppointmentResponse
+}
+
+func newMockApptRespRepo() *mockApptRespRepo {
+	return &mockApptRespRepo{resps: make(map[uuid.UUID]*AppointmentResponse)}
+}
+
+func (m *mockApptRespRepo) Create(_ context.Context, ar *AppointmentResponse) error {
+	ar.ID = uuid.New()
+	if ar.FHIRID == "" {
+		ar.FHIRID = ar.ID.String()
+	}
+	ar.CreatedAt = time.Now()
+	ar.UpdatedAt = time.Now()
+	m.resps[ar.ID] = ar
+	return nil
+}
+
+func (m *mockApptRespRepo) GetByID(_ context.Context, id uuid.UUID) (*AppointmentResponse, error) {
+	ar, ok := m.resps[id]
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	return ar, nil
+}
+
+func (m *mockApptRespRepo) GetByFHIRID(_ context.Context, fhirID string) (*AppointmentResponse, error) {
+	for _, ar := range m.resps {
+		if ar.FHIRID == fhirID {
+			return ar, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (m *mockApptRespRepo) Update(_ context.Context, ar *AppointmentResponse) error {
+	m.resps[ar.ID] = ar
+	return nil
+}
+
+func (m *mockApptRespRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.resps, id)
+	return nil
+}
+
+func (m *mockApptRespRepo) List(_ context.Context, limit, offset int) ([]*AppointmentResponse, int, error) {
+	var result []*AppointmentResponse
+	for _, ar := range m.resps {
+		result = append(result, ar)
+	}
+	return result, len(result), nil
+}
+
+func (m *mockApptRespRepo) Search(_ context.Context, _ map[string]string, limit, offset int) ([]*AppointmentResponse, int, error) {
+	var result []*AppointmentResponse
+	for _, ar := range m.resps {
+		result = append(result, ar)
+	}
+	return result, len(result), nil
+}
+
 // -- Tests --
 
 func newTestService() *Service {
-	return NewService(newMockScheduleRepo(), newMockSlotRepo(), newMockApptRepo(), newMockWaitlistRepo())
+	return NewService(newMockScheduleRepo(), newMockSlotRepo(), newMockApptRepo(), newMockApptRespRepo(), newMockWaitlistRepo())
 }
 
 func TestCreateSchedule(t *testing.T) {

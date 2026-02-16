@@ -262,7 +262,7 @@ type AppointmentParticipant struct {
 	PeriodEnd     *time.Time `db:"period_end" json:"period_end,omitempty"`
 }
 
-// AppointmentResponse maps to the appointment_response table.
+// AppointmentResponse maps to the appointment_response table (FHIR AppointmentResponse resource).
 type AppointmentResponse struct {
 	ID                uuid.UUID  `db:"id" json:"id"`
 	FHIRID            string     `db:"fhir_id" json:"fhir_id"`
@@ -273,7 +273,36 @@ type AppointmentResponse struct {
 	Comment           *string    `db:"comment" json:"comment,omitempty"`
 	StartTime         *time.Time `db:"start_time" json:"start_time,omitempty"`
 	EndTime           *time.Time `db:"end_time" json:"end_time,omitempty"`
+	VersionID         int        `db:"version_id" json:"version_id"`
 	CreatedAt         time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt         time.Time  `db:"updated_at" json:"updated_at"`
+}
+
+// GetVersionID returns the current version.
+func (ar *AppointmentResponse) GetVersionID() int { return ar.VersionID }
+
+// SetVersionID sets the current version.
+func (ar *AppointmentResponse) SetVersionID(v int) { ar.VersionID = v }
+
+func (ar *AppointmentResponse) ToFHIR() map[string]interface{} {
+	result := map[string]interface{}{
+		"resourceType":      "AppointmentResponse",
+		"id":                ar.FHIRID,
+		"appointment":       fhir.Reference{Reference: fhir.FormatReference("Appointment", ar.AppointmentID.String())},
+		"actor":             fhir.Reference{Reference: fhir.FormatReference(ar.ActorType, ar.ActorID.String())},
+		"participantStatus": ar.ParticipantStatus,
+		"meta":              fhir.Meta{LastUpdated: ar.UpdatedAt},
+	}
+	if ar.Comment != nil {
+		result["comment"] = *ar.Comment
+	}
+	if ar.StartTime != nil {
+		result["start"] = ar.StartTime.Format(time.RFC3339)
+	}
+	if ar.EndTime != nil {
+		result["end"] = ar.EndTime.Format(time.RFC3339)
+	}
+	return result
 }
 
 // Waitlist maps to the waitlist table.

@@ -633,3 +633,133 @@ func (r *waitlistRepoPG) ListByPractitioner(ctx context.Context, practitionerID 
 	}
 	return items, total, nil
 }
+
+// =========== AppointmentResponse Repository ===========
+
+type appointmentResponseRepoPG struct{ pool *pgxpool.Pool }
+
+func NewAppointmentResponseRepoPG(pool *pgxpool.Pool) AppointmentResponseRepository {
+	return &appointmentResponseRepoPG{pool: pool}
+}
+
+func (r *appointmentResponseRepoPG) conn(ctx context.Context) queryable {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	if c := db.ConnFromContext(ctx); c != nil {
+		return c
+	}
+	return r.pool
+}
+
+const apptRespCols = `id, fhir_id, appointment_id, actor_type, actor_id,
+	participant_status, comment, start_time, end_time,
+	version_id, created_at, updated_at`
+
+func (r *appointmentResponseRepoPG) scanApptResp(row pgx.Row) (*AppointmentResponse, error) {
+	var ar AppointmentResponse
+	err := row.Scan(&ar.ID, &ar.FHIRID, &ar.AppointmentID, &ar.ActorType, &ar.ActorID,
+		&ar.ParticipantStatus, &ar.Comment, &ar.StartTime, &ar.EndTime,
+		&ar.VersionID, &ar.CreatedAt, &ar.UpdatedAt)
+	return &ar, err
+}
+
+func (r *appointmentResponseRepoPG) Create(ctx context.Context, ar *AppointmentResponse) error {
+	ar.ID = uuid.New()
+	if ar.FHIRID == "" {
+		ar.FHIRID = ar.ID.String()
+	}
+	_, err := r.conn(ctx).Exec(ctx, `
+		INSERT INTO appointment_response (id, fhir_id, appointment_id, actor_type, actor_id,
+			participant_status, comment, start_time, end_time)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		ar.ID, ar.FHIRID, ar.AppointmentID, ar.ActorType, ar.ActorID,
+		ar.ParticipantStatus, ar.Comment, ar.StartTime, ar.EndTime)
+	return err
+}
+
+func (r *appointmentResponseRepoPG) GetByID(ctx context.Context, id uuid.UUID) (*AppointmentResponse, error) {
+	return r.scanApptResp(r.conn(ctx).QueryRow(ctx, `SELECT `+apptRespCols+` FROM appointment_response WHERE id = $1`, id))
+}
+
+func (r *appointmentResponseRepoPG) GetByFHIRID(ctx context.Context, fhirID string) (*AppointmentResponse, error) {
+	return r.scanApptResp(r.conn(ctx).QueryRow(ctx, `SELECT `+apptRespCols+` FROM appointment_response WHERE fhir_id = $1`, fhirID))
+}
+
+func (r *appointmentResponseRepoPG) Update(ctx context.Context, ar *AppointmentResponse) error {
+	_, err := r.conn(ctx).Exec(ctx, `
+		UPDATE appointment_response SET participant_status=$2, comment=$3,
+			start_time=$4, end_time=$5, updated_at=NOW()
+		WHERE id = $1`,
+		ar.ID, ar.ParticipantStatus, ar.Comment, ar.StartTime, ar.EndTime)
+	return err
+}
+
+func (r *appointmentResponseRepoPG) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.conn(ctx).Exec(ctx, `DELETE FROM appointment_response WHERE id = $1`, id)
+	return err
+}
+
+func (r *appointmentResponseRepoPG) List(ctx context.Context, limit, offset int) ([]*AppointmentResponse, int, error) {
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, `SELECT COUNT(*) FROM appointment_response`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.conn(ctx).Query(ctx, `SELECT `+apptRespCols+` FROM appointment_response ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*AppointmentResponse
+	for rows.Next() {
+		ar, err := r.scanApptResp(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, ar)
+	}
+	return items, total, nil
+}
+
+func (r *appointmentResponseRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*AppointmentResponse, int, error) {
+	query := `SELECT ` + apptRespCols + ` FROM appointment_response WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM appointment_response WHERE 1=1`
+	var args []interface{}
+	idx := 1
+
+	if p, ok := params["appointment"]; ok {
+		query += fmt.Sprintf(` AND appointment_id = $%d`, idx)
+		countQuery += fmt.Sprintf(` AND appointment_id = $%d`, idx)
+		args = append(args, p)
+		idx++
+	}
+	if p, ok := params["actor"]; ok {
+		query += fmt.Sprintf(` AND actor_id = $%d`, idx)
+		countQuery += fmt.Sprintf(` AND actor_id = $%d`, idx)
+		args = append(args, p)
+		idx++
+	}
+
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*AppointmentResponse
+	for rows.Next() {
+		ar, err := r.scanApptResp(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, ar)
+	}
+	return items, total, nil
+}

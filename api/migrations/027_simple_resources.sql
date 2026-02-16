@@ -1,0 +1,133 @@
+-- 027_simple_resources.sql: Endpoint, BodyStructure, Substance, Media, DeviceRequest, DeviceUseStatement
+
+CREATE TABLE IF NOT EXISTS endpoint (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    connection_type_code VARCHAR(50),
+    connection_type_display VARCHAR(200),
+    name VARCHAR(255),
+    managing_org_id UUID REFERENCES organization(id),
+    contact_phone VARCHAR(50),
+    contact_email VARCHAR(100),
+    period_start TIMESTAMPTZ,
+    period_end TIMESTAMPTZ,
+    payload_type_code VARCHAR(100),
+    payload_type_display VARCHAR(200),
+    payload_mime_type VARCHAR(100),
+    address TEXT NOT NULL,
+    header TEXT,
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS body_structure (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    morphology_code VARCHAR(50),
+    morphology_display VARCHAR(200),
+    morphology_system VARCHAR(200),
+    location_code VARCHAR(50),
+    location_display VARCHAR(200),
+    location_system VARCHAR(200),
+    location_qualifier_code VARCHAR(50),
+    location_qualifier_display VARCHAR(200),
+    description TEXT,
+    patient_id UUID NOT NULL REFERENCES patient(id),
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS substance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    category_code VARCHAR(50),
+    category_display VARCHAR(200),
+    code_code VARCHAR(50) NOT NULL,
+    code_display VARCHAR(200),
+    code_system VARCHAR(200),
+    description TEXT,
+    expiry TIMESTAMPTZ,
+    quantity_value NUMERIC,
+    quantity_unit VARCHAR(50),
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS media (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'completed',
+    type_code VARCHAR(50),
+    type_display VARCHAR(200),
+    modality_code VARCHAR(50),
+    modality_display VARCHAR(200),
+    subject_patient_id UUID REFERENCES patient(id),
+    encounter_id UUID REFERENCES encounter(id),
+    created_date TIMESTAMPTZ,
+    operator_id UUID REFERENCES practitioner(id),
+    reason_code VARCHAR(50),
+    body_site_code VARCHAR(50),
+    body_site_display VARCHAR(200),
+    device_name VARCHAR(200),
+    height INTEGER,
+    width INTEGER,
+    frames INTEGER,
+    duration NUMERIC,
+    content_type VARCHAR(100),
+    content_url TEXT,
+    content_size INTEGER,
+    content_title VARCHAR(255),
+    note TEXT,
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS device_request (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    intent VARCHAR(20) NOT NULL DEFAULT 'order',
+    priority VARCHAR(20),
+    code_code VARCHAR(50),
+    code_display VARCHAR(200),
+    code_system VARCHAR(200),
+    subject_patient_id UUID NOT NULL REFERENCES patient(id),
+    encounter_id UUID REFERENCES encounter(id),
+    authored_on TIMESTAMPTZ,
+    requester_id UUID REFERENCES practitioner(id),
+    performer_id UUID REFERENCES practitioner(id),
+    reason_code VARCHAR(50),
+    reason_display VARCHAR(200),
+    note TEXT,
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS device_use_statement (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    subject_patient_id UUID NOT NULL REFERENCES patient(id),
+    device_id UUID REFERENCES device(id),
+    timing_date TIMESTAMPTZ,
+    timing_period_start TIMESTAMPTZ,
+    timing_period_end TIMESTAMPTZ,
+    recorded_on TIMESTAMPTZ,
+    source_id UUID REFERENCES practitioner(id),
+    reason_code VARCHAR(50),
+    reason_display VARCHAR(200),
+    body_site_code VARCHAR(50),
+    body_site_display VARCHAR(200),
+    note TEXT,
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

@@ -2,7 +2,9 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -54,6 +56,7 @@ type Group struct {
 	ManagingEntity *string       `json:"managing_entity,omitempty"`
 	Members        []GroupMember `json:"members,omitempty"`
 	Active         bool          `json:"active"`
+	VersionID      int           `json:"version_id"`
 	CreatedAt      time.Time     `json:"created_at"`
 	UpdatedAt      time.Time     `json:"updated_at"`
 }
@@ -206,9 +209,11 @@ func GroupFromFHIR(data map[string]interface{}) (*Group, error) {
 type GroupRepository interface {
 	Create(ctx context.Context, group *Group) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Group, error)
+	GetByFHIRID(ctx context.Context, fhirID string) (*Group, error)
 	Update(ctx context.Context, group *Group) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	List(ctx context.Context, filterType string, limit, offset int) ([]*Group, int, error)
+	Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Group, int, error)
 	AddMember(ctx context.Context, groupID uuid.UUID, member *GroupMember) error
 	RemoveMember(ctx context.Context, groupID uuid.UUID, memberID uuid.UUID) error
 	ListMembers(ctx context.Context, groupID uuid.UUID) ([]GroupMember, error)
@@ -259,6 +264,48 @@ func (r *InMemoryGroupRepo) GetByID(_ context.Context, id uuid.UUID) (*Group, er
 	out.Members = make([]GroupMember, len(g.Members))
 	copy(out.Members, g.Members)
 	return &out, nil
+}
+
+func (r *InMemoryGroupRepo) GetByFHIRID(_ context.Context, fhirID string) (*Group, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, g := range r.groups {
+		if g.FHIRID == fhirID {
+			out := *g
+			out.Members = make([]GroupMember, len(g.Members))
+			copy(out.Members, g.Members)
+			return &out, nil
+		}
+	}
+	return nil, fmt.Errorf("group not found")
+}
+
+func (r *InMemoryGroupRepo) Search(_ context.Context, params map[string]string, limit, offset int) ([]*Group, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []*Group
+	for _, g := range r.groups {
+		if name, ok := params["name"]; ok && !strings.Contains(strings.ToLower(g.Name), strings.ToLower(name)) {
+			continue
+		}
+		if t, ok := params["type"]; ok && string(g.Type) != t {
+			continue
+		}
+		out := *g
+		out.Members = make([]GroupMember, len(g.Members))
+		copy(out.Members, g.Members)
+		result = append(result, &out)
+	}
+	total := len(result)
+	if offset >= total {
+		return nil, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return result[offset:end], total, nil
 }
 
 func (r *InMemoryGroupRepo) Update(_ context.Context, group *Group) error {
@@ -386,6 +433,14 @@ func (s *GroupService) GetGroup(ctx context.Context, id uuid.UUID) (*Group, erro
 	return s.repo.GetByID(ctx, id)
 }
 
+func (s *GroupService) GetGroupByFHIRID(ctx context.Context, fhirID string) (*Group, error) {
+	return s.repo.GetByFHIRID(ctx, fhirID)
+}
+
+func (s *GroupService) SearchGroups(ctx context.Context, params map[string]string, limit, offset int) ([]*Group, int, error) {
+	return s.repo.Search(ctx, params, limit, offset)
+}
+
 func (s *GroupService) UpdateGroup(ctx context.Context, group *Group) error {
 	if group.Name == "" {
 		return fmt.Errorf("group name is required")
@@ -455,15 +510,24 @@ func (h *GroupHandler) RegisterGroupRoutes(api *echo.Group, fhirGroup *echo.Grou
 	writeGroup.POST("/groups/:id/members", h.AddMember)
 	writeGroup.DELETE("/groups/:id/members/:member_id", h.RemoveMember)
 
-	// FHIR endpoints
+	// FHIR read endpoints
 	fhirRead := fhirGroup.Group("", auth.RequireRole("admin", "physician", "nurse", "registrar"))
 	fhirRead.GET("/Group", h.SearchGroupsFHIR)
 	fhirRead.GET("/Group/:id", h.GetGroupFHIR)
 
+	// FHIR write endpoints
 	fhirWrite := fhirGroup.Group("", auth.RequireRole("admin"))
 	fhirWrite.POST("/Group", h.CreateGroupFHIR)
 	fhirWrite.PUT("/Group/:id", h.UpdateGroupFHIR)
 	fhirWrite.DELETE("/Group/:id", h.DeleteGroupFHIR)
+	fhirWrite.PATCH("/Group/:id", h.PatchGroupFHIR)
+
+	// FHIR POST _search endpoint
+	fhirRead.POST("/Group/_search", h.SearchGroupsFHIR)
+
+	// FHIR vread and history endpoints
+	fhirRead.GET("/Group/:id/_history/:vid", h.VreadGroupFHIR)
+	fhirRead.GET("/Group/:id/_history", h.HistoryGroupFHIR)
 }
 
 // -- Operational Handlers --
@@ -581,8 +645,18 @@ func (h *GroupHandler) ListMembers(c echo.Context) error {
 
 func (h *GroupHandler) SearchGroupsFHIR(c echo.Context) error {
 	p := pagination.FromContext(c)
-	filterType := c.QueryParam("type")
-	groups, total, err := h.svc.ListGroups(c.Request().Context(), filterType, p.Limit, p.Offset)
+	params := map[string]string{}
+	if name := c.QueryParam("name"); name != "" {
+		params["name"] = name
+	}
+	if typeCode := c.QueryParam("type"); typeCode != "" {
+		params["type"] = typeCode
+	}
+	if active := c.QueryParam("active"); active != "" {
+		params["active"] = active
+	}
+
+	groups, total, err := h.svc.SearchGroups(c.Request().Context(), params, p.Limit, p.Offset)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
 	}
@@ -594,11 +668,7 @@ func (h *GroupHandler) SearchGroupsFHIR(c echo.Context) error {
 }
 
 func (h *GroupHandler) GetGroupFHIR(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
-	}
-	group, err := h.svc.GetGroup(c.Request().Context(), id)
+	group, err := h.svc.GetGroupByFHIRID(c.Request().Context(), c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
 	}
@@ -622,11 +692,7 @@ func (h *GroupHandler) CreateGroupFHIR(c echo.Context) error {
 }
 
 func (h *GroupHandler) UpdateGroupFHIR(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
-	}
-	existing, err := h.svc.GetGroup(c.Request().Context(), id)
+	existing, err := h.svc.GetGroupByFHIRID(c.Request().Context(), c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
 	}
@@ -648,12 +714,91 @@ func (h *GroupHandler) UpdateGroupFHIR(c echo.Context) error {
 }
 
 func (h *GroupHandler) DeleteGroupFHIR(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
+	group, err := h.svc.GetGroupByFHIRID(c.Request().Context(), c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
 	}
-	if err := h.svc.DeleteGroup(c.Request().Context(), id); err != nil {
-		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
+	if err := h.svc.DeleteGroup(c.Request().Context(), group.ID); err != nil {
+		return c.JSON(http.StatusInternalServerError, fhir.ErrorOutcome(err.Error()))
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *GroupHandler) PatchGroupFHIR(c echo.Context) error {
+	contentType := c.Request().Header.Get("Content-Type")
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("failed to read request body"))
+	}
+
+	existing, err := h.svc.GetGroupByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
+	}
+	currentResource := existing.ToFHIR()
+
+	var patched map[string]interface{}
+	if strings.Contains(contentType, "json-patch+json") {
+		ops, err := fhir.ParseJSONPatch(body)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+		}
+		patched, err = fhir.ApplyJSONPatch(currentResource, ops)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else if strings.Contains(contentType, "merge-patch+json") {
+		var mergePatch map[string]interface{}
+		if err := json.Unmarshal(body, &mergePatch); err != nil {
+			return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome("invalid merge patch JSON: "+err.Error()))
+		}
+		patched, err = fhir.ApplyMergePatch(currentResource, mergePatch)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, fhir.ErrorOutcome(err.Error()))
+		}
+	} else {
+		return c.JSON(http.StatusUnsupportedMediaType, fhir.ErrorOutcome(
+			"PATCH requires Content-Type: application/json-patch+json or application/merge-patch+json"))
+	}
+
+	if v, ok := patched["name"].(string); ok {
+		existing.Name = v
+	}
+	if v, ok := patched["active"].(bool); ok {
+		existing.Active = v
+	}
+	if v, ok := patched["type"].(string); ok {
+		existing.Type = GroupType(v)
+	}
+	if v, ok := patched["actual"].(bool); ok {
+		existing.Actual = v
+	}
+	if err := h.svc.UpdateGroup(c.Request().Context(), existing); err != nil {
+		return c.JSON(http.StatusBadRequest, fhir.ErrorOutcome(err.Error()))
+	}
+	return c.JSON(http.StatusOK, existing.ToFHIR())
+}
+
+func (h *GroupHandler) VreadGroupFHIR(c echo.Context) error {
+	group, err := h.svc.GetGroupByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
+	}
+	result := group.ToFHIR()
+	fhir.SetVersionHeaders(c, 1, group.UpdatedAt.Format("2006-01-02T15:04:05Z"))
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *GroupHandler) HistoryGroupFHIR(c echo.Context) error {
+	group, err := h.svc.GetGroupByFHIRID(c.Request().Context(), c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Group", c.Param("id")))
+	}
+	result := group.ToFHIR()
+	raw, _ := json.Marshal(result)
+	entry := &fhir.HistoryEntry{
+		ResourceType: "Group", ResourceID: group.FHIRID, VersionID: 1,
+		Resource: raw, Action: "create", Timestamp: group.CreatedAt,
+	}
+	return c.JSON(http.StatusOK, fhir.NewHistoryBundle([]*fhir.HistoryEntry{entry}, 1, "/fhir"))
 }

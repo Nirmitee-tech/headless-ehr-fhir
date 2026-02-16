@@ -41,6 +41,16 @@ type AppointmentRepository interface {
 	RemoveParticipant(ctx context.Context, id uuid.UUID) error
 }
 
+type AppointmentResponseRepository interface {
+	Create(ctx context.Context, ar *AppointmentResponse) error
+	GetByID(ctx context.Context, id uuid.UUID) (*AppointmentResponse, error)
+	GetByFHIRID(ctx context.Context, fhirID string) (*AppointmentResponse, error)
+	Update(ctx context.Context, ar *AppointmentResponse) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context, limit, offset int) ([]*AppointmentResponse, int, error)
+	Search(ctx context.Context, params map[string]string, limit, offset int) ([]*AppointmentResponse, int, error)
+}
+
 type WaitlistRepository interface {
 	Create(ctx context.Context, w *Waitlist) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Waitlist, error)

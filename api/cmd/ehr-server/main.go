@@ -59,6 +59,12 @@ import (
 	"github.com/ehr/ehr/internal/domain/terminology"
 	"github.com/ehr/ehr/internal/domain/visionprescription"
 	"github.com/ehr/ehr/internal/domain/workflow"
+	fhirendpoint "github.com/ehr/ehr/internal/domain/endpoint"
+	"github.com/ehr/ehr/internal/domain/bodystructure"
+	"github.com/ehr/ehr/internal/domain/substance"
+	fhirmedia "github.com/ehr/ehr/internal/domain/media"
+	"github.com/ehr/ehr/internal/domain/devicerequest"
+	"github.com/ehr/ehr/internal/domain/deviceusestatement"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -419,6 +425,12 @@ func runServer() error {
 		{Name: "status", Type: "token"},
 	})
 
+	capBuilder.AddResource("Group", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "type", Type: "token"},
+		{Name: "name", Type: "string"},
+		{Name: "active", Type: "token"},
+	})
+
 	// Encounter domain
 	capBuilder.AddResource("Encounter", fhir.DefaultInteractions(), []fhir.SearchParam{
 		{Name: "patient", Type: "reference"},
@@ -452,6 +464,10 @@ func runServer() error {
 		{Name: "status", Type: "token"},
 		{Name: "code", Type: "token"},
 		{Name: "date", Type: "date"},
+	})
+	capBuilder.AddResource("NutritionOrder", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
 	})
 
 	// Medication domain
@@ -515,6 +531,10 @@ func runServer() error {
 		{Name: "schedule", Type: "reference"},
 		{Name: "status", Type: "token"},
 		{Name: "start", Type: "date"},
+	})
+	capBuilder.AddResource("AppointmentResponse", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "appointment", Type: "reference"},
+		{Name: "actor", Type: "reference"},
 	})
 
 	// Billing domain
@@ -772,11 +792,39 @@ func runServer() error {
 		{Name: "status", Type: "token"},
 	})
 
+	// Simple resources (Endpoint, BodyStructure, Substance, Media, DeviceRequest, DeviceUseStatement)
+	capBuilder.AddResource("Endpoint", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "name", Type: "string"},
+		{Name: "organization", Type: "reference"},
+	})
+	capBuilder.AddResource("BodyStructure", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+	})
+	capBuilder.AddResource("Substance", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "code", Type: "token"},
+	})
+	capBuilder.AddResource("Media", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+		{Name: "type", Type: "token"},
+	})
+	capBuilder.AddResource("DeviceRequest", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+		{Name: "intent", Type: "token"},
+	})
+	capBuilder.AddResource("DeviceUseStatement", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+	})
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
 		"Patient", "Practitioner", "Organization", "Location", "Encounter",
-		"Condition", "Observation", "AllergyIntolerance", "Procedure",
+		"Condition", "Observation", "AllergyIntolerance", "Procedure", "NutritionOrder",
 		"Medication", "MedicationRequest", "MedicationAdministration", "MedicationDispense",
 		"ServiceRequest", "DiagnosticReport", "ImagingStudy", "Specimen",
 		"Appointment", "Schedule", "Slot",
@@ -802,6 +850,7 @@ func runServer() error {
 		"SupplyRequest", "SupplyDelivery",
 		"NamingSystem", "OperationDefinition", "MessageDefinition", "MessageHeader",
 		"VisionPrescription",
+		"Endpoint", "BodyStructure", "Substance", "Media", "DeviceRequest", "DeviceUseStatement",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -831,12 +880,14 @@ func runServer() error {
 	}
 	for _, rt := range []string{"Flag", "DetectedIssue", "AdverseEvent", "ClinicalImpression",
 		"RiskAssessment", "EpisodeOfCare", "MeasureReport", "ChargeItem",
-		"RequestGroup", "GuidanceResponse", "VisionPrescription"} {
+		"RequestGroup", "GuidanceResponse", "VisionPrescription",
+		"BodyStructure", "Media", "DeviceRequest", "DeviceUseStatement"} {
 		includeRegistry.RegisterReference(rt, "patient", "Patient")
 		includeRegistry.RegisterReference(rt, "subject", "Patient")
 	}
 	includeRegistry.RegisterReference("Provenance", "target", "Patient")
 	includeRegistry.RegisterReference("Provenance", "agent", "Practitioner")
+	includeRegistry.RegisterReference("Endpoint", "organization", "Organization")
 
 	// Wire _include/_revinclude middleware into the FHIR search group.
 	// Fetchers are registered below after services are initialized; since
@@ -872,7 +923,7 @@ func runServer() error {
 	adminHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// FHIR Group resource
-	fhirGroupRepo := admin.NewInMemoryGroupRepo()
+	fhirGroupRepo := admin.NewGroupRepo(pool)
 	fhirGroupSvc := admin.NewGroupService(fhirGroupRepo)
 	fhirGroupHandler := admin.NewGroupHandler(fhirGroupSvc)
 	fhirGroupHandler.RegisterGroupRoutes(apiV1, fhirGroup)
@@ -931,10 +982,10 @@ func runServer() error {
 	clinicalHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// NutritionOrder domain
-	nutritionRepo := clinical.NewInMemoryNutritionOrderRepo()
+	nutritionRepo := clinical.NewNutritionOrderRepoPG(pool)
 	nutritionSvc := clinical.NewNutritionOrderService(nutritionRepo)
 	nutritionHandler := clinical.NewNutritionOrderHandler(nutritionSvc)
-	nutritionHandler.RegisterNutritionOrderRoutes(apiV1)
+	nutritionHandler.RegisterNutritionOrderRoutes(apiV1, fhirGroup)
 
 	// Diagnostics domain
 	srRepo := diagnostics.NewServiceRequestRepoPG(pool)
@@ -962,8 +1013,9 @@ func runServer() error {
 	schedRepo := scheduling.NewScheduleRepoPG(pool)
 	slotRepo := scheduling.NewSlotRepoPG(pool)
 	apptRepo := scheduling.NewAppointmentRepoPG(pool)
+	apptRespRepo := scheduling.NewAppointmentResponseRepoPG(pool)
 	wlRepo := scheduling.NewWaitlistRepoPG(pool)
-	schedSvc := scheduling.NewService(schedRepo, slotRepo, apptRepo, wlRepo)
+	schedSvc := scheduling.NewService(schedRepo, slotRepo, apptRepo, apptRespRepo, wlRepo)
 	schedSvc.SetVersionTracker(versionTracker)
 	schedHandler := scheduling.NewHandler(schedSvc)
 	schedHandler.RegisterRoutes(apiV1, fhirGroup)
@@ -1267,6 +1319,48 @@ func runServer() error {
 	vpSvc.SetVersionTracker(versionTracker)
 	vpHandler := visionprescription.NewHandler(vpSvc)
 	vpHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Endpoint domain
+	endpointRepo := fhirendpoint.NewEndpointRepoPG(pool)
+	endpointSvc := fhirendpoint.NewService(endpointRepo)
+	endpointSvc.SetVersionTracker(versionTracker)
+	endpointHandler := fhirendpoint.NewHandler(endpointSvc)
+	endpointHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// BodyStructure domain
+	bsRepo := bodystructure.NewBodyStructureRepoPG(pool)
+	bsSvc := bodystructure.NewService(bsRepo)
+	bsSvc.SetVersionTracker(versionTracker)
+	bsHandler := bodystructure.NewHandler(bsSvc)
+	bsHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Substance domain
+	substanceRepo := substance.NewSubstanceRepoPG(pool)
+	substanceSvc := substance.NewService(substanceRepo)
+	substanceSvc.SetVersionTracker(versionTracker)
+	substanceHandler := substance.NewHandler(substanceSvc)
+	substanceHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Media domain
+	mediaRepo := fhirmedia.NewMediaRepoPG(pool)
+	mediaSvc := fhirmedia.NewService(mediaRepo)
+	mediaSvc.SetVersionTracker(versionTracker)
+	mediaHandler := fhirmedia.NewHandler(mediaSvc)
+	mediaHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// DeviceRequest domain
+	devReqRepo := devicerequest.NewDeviceRequestRepoPG(pool)
+	devReqSvc := devicerequest.NewService(devReqRepo)
+	devReqSvc.SetVersionTracker(versionTracker)
+	devReqHandler := devicerequest.NewHandler(devReqSvc)
+	devReqHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// DeviceUseStatement domain
+	dusRepo := deviceusestatement.NewDeviceUseStatementRepoPG(pool)
+	dusSvc := deviceusestatement.NewService(dusRepo)
+	dusSvc.SetVersionTracker(versionTracker)
+	dusHandler := deviceusestatement.NewHandler(dusSvc)
+	dusHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
@@ -1655,6 +1749,48 @@ func runServer() error {
 			return nil, err
 		}
 		return vp.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Endpoint", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		ep, err := endpointSvc.GetEndpointByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return ep.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("BodyStructure", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		bs, err := bsSvc.GetBodyStructureByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return bs.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Substance", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		sub, err := substanceSvc.GetSubstanceByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return sub.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Media", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		m, err := mediaSvc.GetMediaByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return m.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("DeviceRequest", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		dr, err := devReqSvc.GetDeviceRequestByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return dr.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("DeviceUseStatement", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		dus, err := dusSvc.GetDeviceUseStatementByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return dus.ToFHIR(), nil
 	})
 
 	// Reporting framework
