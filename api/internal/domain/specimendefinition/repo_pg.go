@@ -2,7 +2,6 @@ package specimendefinition
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -122,28 +122,21 @@ func (r *specimenDefinitionRepoPG) List(ctx context.Context, limit, offset int) 
 	return items, total, nil
 }
 
-func (r *specimenDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SpecimenDefinition, int, error) {
-	query := `SELECT ` + sdCols + ` FROM specimen_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM specimen_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var specimenDefinitionSearchParams = map[string]fhir.SearchParamConfig{
+	"type": {Type: fhir.SearchParamToken, Column: "type_code"},
+}
 
-	if p, ok := params["type"]; ok {
-		query += fmt.Sprintf(` AND type_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND type_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *specimenDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SpecimenDefinition, int, error) {
+	qb := fhir.NewSearchQuery("specimen_definition", sdCols)
+	qb.ApplyParams(params, specimenDefinitionSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

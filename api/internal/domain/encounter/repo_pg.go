@@ -2,7 +2,6 @@ package encounter
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type repoPG struct {
@@ -147,50 +147,24 @@ func (r *repoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, limit, 
 	return collectEncs(rows, total)
 }
 
-func (r *repoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Encounter, int, error) {
-	query := `SELECT ` + encCols + ` FROM encounter WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM encounter WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var encounterSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"class":   {Type: fhir.SearchParamToken, Column: "class_code"},
+	"date":    {Type: fhir.SearchParamDate, Column: "period_start"},
+}
 
-	if patientID, ok := params["patient"]; ok {
-		clause := fmt.Sprintf(` AND patient_id = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, patientID)
-		idx++
-	}
-	if status, ok := params["status"]; ok {
-		clause := fmt.Sprintf(` AND status = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, status)
-		idx++
-	}
-	if classCode, ok := params["class"]; ok {
-		clause := fmt.Sprintf(` AND class_code = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, classCode)
-		idx++
-	}
-	if date, ok := params["date"]; ok {
-		clause := fmt.Sprintf(` AND period_start::date = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, date)
-		idx++
-	}
+func (r *repoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Encounter, int, error) {
+	qb := fhir.NewSearchQuery("encounter", encCols)
+	qb.ApplyParams(params, encounterSearchParams)
+	qb.OrderBy("period_start DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY period_start DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

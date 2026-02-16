@@ -2,7 +2,6 @@ package organizationaffiliation
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -116,46 +116,24 @@ func (r *organizationAffiliationRepoPG) List(ctx context.Context, limit, offset 
 	return items, total, nil
 }
 
-func (r *organizationAffiliationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*OrganizationAffiliation, int, error) {
-	query := `SELECT ` + oaCols + ` FROM organization_affiliation WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM organization_affiliation WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var oaSearchParams = map[string]fhir.SearchParamConfig{
+	"active":                    {Type: fhir.SearchParamToken, Column: "active"},
+	"organization":              {Type: fhir.SearchParamReference, Column: "organization_id"},
+	"participating-organization": {Type: fhir.SearchParamReference, Column: "participating_org_id"},
+	"specialty":                 {Type: fhir.SearchParamToken, Column: "specialty_code"},
+}
 
-	if p, ok := params["active"]; ok {
-		query += fmt.Sprintf(` AND active = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND active = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["organization"]; ok {
-		query += fmt.Sprintf(` AND organization_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND organization_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["participating-organization"]; ok {
-		query += fmt.Sprintf(` AND participating_org_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND participating_org_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["specialty"]; ok {
-		query += fmt.Sprintf(` AND specialty_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND specialty_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *organizationAffiliationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*OrganizationAffiliation, int, error) {
+	qb := fhir.NewSearchQuery("organization_affiliation", oaCols)
+	qb.ApplyParams(params, oaSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package bodystructure
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -116,28 +116,21 @@ func (r *bodyStructureRepoPG) List(ctx context.Context, limit, offset int) ([]*B
 	return items, total, nil
 }
 
-func (r *bodyStructureRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*BodyStructure, int, error) {
-	query := `SELECT ` + bsCols + ` FROM body_structure WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM body_structure WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var bodyStructureSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "patient_id"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *bodyStructureRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*BodyStructure, int, error) {
+	qb := fhir.NewSearchQuery("body_structure", bsCols)
+	qb.ApplyParams(params, bodyStructureSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

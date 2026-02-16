@@ -2,7 +2,6 @@ package immunization
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -141,40 +141,23 @@ func (r *immunizationRepoPG) ListByPatient(ctx context.Context, patientID uuid.U
 	return items, total, nil
 }
 
-func (r *immunizationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Immunization, int, error) {
-	query := `SELECT ` + immCols + ` FROM immunization WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM immunization WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var immunizationSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":      {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":       {Type: fhir.SearchParamToken, Column: "status"},
+	"vaccine-code": {Type: fhir.SearchParamToken, Column: "vaccine_code"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["vaccine-code"]; ok {
-		query += fmt.Sprintf(` AND vaccine_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND vaccine_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *immunizationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Immunization, int, error) {
+	qb := fhir.NewSearchQuery("immunization", immCols)
+	qb.ApplyParams(params, immunizationSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -303,34 +286,22 @@ func (r *recommendationRepoPG) ListByPatient(ctx context.Context, patientID uuid
 	return items, total, nil
 }
 
-func (r *recommendationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ImmunizationRecommendation, int, error) {
-	query := `SELECT ` + recCols + ` FROM immunization_recommendation WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM immunization_recommendation WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var recommendationSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":      {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"vaccine-type": {Type: fhir.SearchParamToken, Column: "vaccine_code"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["vaccine-type"]; ok {
-		query += fmt.Sprintf(` AND vaccine_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND vaccine_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *recommendationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ImmunizationRecommendation, int, error) {
+	qb := fhir.NewSearchQuery("immunization_recommendation", recCols)
+	qb.ApplyParams(params, recommendationSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

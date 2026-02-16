@@ -2,7 +2,6 @@ package documents
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -120,40 +120,23 @@ func (r *consentRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, 
 	return items, total, nil
 }
 
-func (r *consentRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Consent, int, error) {
-	query := `SELECT ` + consentCols + ` FROM consent WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM consent WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var consentSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":  {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["category"]; ok {
-		query += fmt.Sprintf(` AND category_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND category_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *consentRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Consent, int, error) {
+	qb := fhir.NewSearchQuery("consent", consentCols)
+	qb.ApplyParams(params, consentSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -271,46 +254,24 @@ func (r *docRefRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, l
 	return items, total, nil
 }
 
-func (r *docRefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DocumentReference, int, error) {
-	query := `SELECT ` + docRefCols + ` FROM document_reference WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM document_reference WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var docRefSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":  {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"type":     {Type: fhir.SearchParamToken, Column: "type_code"},
+	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["type"]; ok {
-		query += fmt.Sprintf(` AND type_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND type_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["category"]; ok {
-		query += fmt.Sprintf(` AND category_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND category_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *docRefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DocumentReference, int, error) {
+	qb := fhir.NewSearchQuery("document_reference", docRefCols)
+	qb.ApplyParams(params, docRefSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

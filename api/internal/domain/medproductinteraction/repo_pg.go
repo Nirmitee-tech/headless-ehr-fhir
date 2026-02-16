@@ -2,13 +2,13 @@ package medproductinteraction
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -84,16 +84,21 @@ func (r *mpiRepoPG) List(ctx context.Context, limit, offset int) ([]*MedicinalPr
 	return items, total, nil
 }
 
+var mpiSearchParams = map[string]fhir.SearchParamConfig{
+	"subject": {Type: fhir.SearchParamReference, Column: "subject_reference"},
+	"type":    {Type: fhir.SearchParamToken, Column: "type_code"},
+}
+
 func (r *mpiRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MedicinalProductInteraction, int, error) {
-	query := `SELECT ` + mpiCols + ` FROM medicinal_product_interaction WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM medicinal_product_interaction WHERE 1=1`
-	var args []interface{}; idx := 1
-	if p, ok := params["subject"]; ok { query += fmt.Sprintf(` AND subject_reference = $%d`, idx); countQuery += fmt.Sprintf(` AND subject_reference = $%d`, idx); args = append(args, p); idx++ }
-	if p, ok := params["type"]; ok { query += fmt.Sprintf(` AND type_code = $%d`, idx); countQuery += fmt.Sprintf(` AND type_code = $%d`, idx); args = append(args, p); idx++ }
+	qb := fhir.NewSearchQuery("medicinal_product_interaction", mpiCols)
+	qb.ApplyParams(params, mpiSearchParams)
+	qb.OrderBy("created_at DESC")
+
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil { return nil, 0, err }
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1); args = append(args, limit, offset)
-	rows, err := r.conn(ctx).Query(ctx, query, args...); if err != nil { return nil, 0, err }; defer rows.Close()
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil { return nil, 0, err }
+
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
+	if err != nil { return nil, 0, err }; defer rows.Close()
 	var items []*MedicinalProductInteraction
 	for rows.Next() { m, err := r.scanRow(rows); if err != nil { return nil, 0, err }; items = append(items, m) }
 	return items, total, nil

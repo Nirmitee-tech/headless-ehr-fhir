@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 	"github.com/ehr/ehr/internal/platform/hipaa"
 )
 
@@ -186,64 +187,28 @@ func (r *patientRepoPG) List(ctx context.Context, limit, offset int) ([]*Patient
 	return patients, total, nil
 }
 
-func (r *patientRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Patient, int, error) {
-	query := `SELECT ` + patientCols + ` FROM patient WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM patient WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var patientSearchParams = map[string]fhir.SearchParamConfig{
+	"family":     {Type: fhir.SearchParamString, Column: "last_name"},
+	"given":      {Type: fhir.SearchParamString, Column: "first_name"},
+	"birthdate":  {Type: fhir.SearchParamDate, Column: "birth_date"},
+	"gender":     {Type: fhir.SearchParamToken, Column: "gender"},
+	"identifier": {Type: fhir.SearchParamToken, Column: "mrn"},
+}
 
+func (r *patientRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Patient, int, error) {
+	qb := fhir.NewSearchQuery("patient", patientCols)
 	if name, ok := params["name"]; ok {
-		clause := fmt.Sprintf(` AND (first_name ILIKE $%d OR last_name ILIKE $%d)`, idx, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+name+"%")
-		idx++
+		qb.Add(fmt.Sprintf("(first_name ILIKE $%d OR last_name ILIKE $%d)", qb.Idx(), qb.Idx()), "%"+name+"%")
 	}
-	if family, ok := params["family"]; ok {
-		clause := fmt.Sprintf(` AND last_name ILIKE $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+family+"%")
-		idx++
-	}
-	if given, ok := params["given"]; ok {
-		clause := fmt.Sprintf(` AND first_name ILIKE $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+given+"%")
-		idx++
-	}
-	if birthdate, ok := params["birthdate"]; ok {
-		clause := fmt.Sprintf(` AND birth_date = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, birthdate)
-		idx++
-	}
-	if gender, ok := params["gender"]; ok {
-		clause := fmt.Sprintf(` AND gender = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, gender)
-		idx++
-	}
-	if identifier, ok := params["identifier"]; ok {
-		clause := fmt.Sprintf(` AND mrn = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, identifier)
-		idx++
-	}
+	qb.ApplyParams(params, patientSearchParams)
+	qb.OrderBy("last_name, first_name")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY last_name, first_name LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -701,43 +666,25 @@ func (r *practRepoPG) List(ctx context.Context, limit, offset int) ([]*Practitio
 	return practs, total, nil
 }
 
-func (r *practRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Practitioner, int, error) {
-	query := `SELECT ` + practCols + ` FROM practitioner WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM practitioner WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var practitionerSearchParams = map[string]fhir.SearchParamConfig{
+	"family":     {Type: fhir.SearchParamString, Column: "last_name"},
+	"identifier": {Type: fhir.SearchParamToken, Column: "npi_number"},
+}
 
+func (r *practRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Practitioner, int, error) {
+	qb := fhir.NewSearchQuery("practitioner", practCols)
 	if name, ok := params["name"]; ok {
-		clause := fmt.Sprintf(` AND (first_name ILIKE $%d OR last_name ILIKE $%d)`, idx, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+name+"%")
-		idx++
+		qb.Add(fmt.Sprintf("(first_name ILIKE $%d OR last_name ILIKE $%d)", qb.Idx(), qb.Idx()), "%"+name+"%")
 	}
-	if family, ok := params["family"]; ok {
-		clause := fmt.Sprintf(` AND last_name ILIKE $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+family+"%")
-		idx++
-	}
-	if identifier, ok := params["identifier"]; ok {
-		clause := fmt.Sprintf(` AND npi_number = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, identifier)
-		idx++
-	}
+	qb.ApplyParams(params, practitionerSearchParams)
+	qb.OrderBy("last_name, first_name")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY last_name, first_name LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1056,50 +1003,24 @@ func (r *practRoleRepoPG) List(ctx context.Context, limit, offset int) ([]*Pract
 	return roles, total, nil
 }
 
-func (r *practRoleRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PractitionerRole, int, error) {
-	query := `SELECT ` + practRoleCols + ` FROM practitioner_role WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM practitioner_role WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var practitionerRoleSearchParams = map[string]fhir.SearchParamConfig{
+	"practitioner": {Type: fhir.SearchParamReference, Column: "practitioner_id"},
+	"organization": {Type: fhir.SearchParamReference, Column: "organization_id"},
+	"role":         {Type: fhir.SearchParamToken, Column: "role_code"},
+	"active":       {Type: fhir.SearchParamToken, Column: "active"},
+}
 
-	if v, ok := params["practitioner"]; ok {
-		clause := fmt.Sprintf(` AND practitioner_id = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, v)
-		idx++
-	}
-	if v, ok := params["organization"]; ok {
-		clause := fmt.Sprintf(` AND organization_id = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, v)
-		idx++
-	}
-	if v, ok := params["role"]; ok {
-		clause := fmt.Sprintf(` AND role_code = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, v)
-		idx++
-	}
-	if v, ok := params["active"]; ok {
-		clause := fmt.Sprintf(` AND active = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, v == "true")
-		idx++
-	}
+func (r *practRoleRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PractitionerRole, int, error) {
+	qb := fhir.NewSearchQuery("practitioner_role", practRoleCols)
+	qb.ApplyParams(params, practitionerRoleSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package conformance
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -107,40 +107,23 @@ func (r *namingSystemRepoPG) List(ctx context.Context, limit, offset int) ([]*Na
 	return items, total, nil
 }
 
-func (r *namingSystemRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*NamingSystem, int, error) {
-	query := `SELECT ` + nsCols + ` FROM naming_system WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM naming_system WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var nsSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+	"kind":   {Type: fhir.SearchParamToken, Column: "kind"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["kind"]; ok {
-		query += fmt.Sprintf(` AND kind = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND kind = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *namingSystemRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*NamingSystem, int, error) {
+	qb := fhir.NewSearchQuery("naming_system", nsCols)
+	qb.ApplyParams(params, nsSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -277,40 +260,23 @@ func (r *opDefRepoPG) List(ctx context.Context, limit, offset int) ([]*Operation
 	return items, total, nil
 }
 
-func (r *opDefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*OperationDefinition, int, error) {
-	query := `SELECT ` + odCols + ` FROM operation_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM operation_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var odSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+	"code":   {Type: fhir.SearchParamToken, Column: "code"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["code"]; ok {
-		query += fmt.Sprintf(` AND code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *opDefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*OperationDefinition, int, error) {
+	qb := fhir.NewSearchQuery("operation_definition", odCols)
+	qb.ApplyParams(params, odSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -449,34 +415,22 @@ func (r *msgDefRepoPG) List(ctx context.Context, limit, offset int) ([]*MessageD
 	return items, total, nil
 }
 
-func (r *msgDefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MessageDefinition, int, error) {
-	query := `SELECT ` + mdCols + ` FROM message_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM message_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var mdSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"event":  {Type: fhir.SearchParamToken, Column: "event_coding_code"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["event"]; ok {
-		query += fmt.Sprintf(` AND event_coding_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND event_coding_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *msgDefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MessageDefinition, int, error) {
+	qb := fhir.NewSearchQuery("message_definition", mdCols)
+	qb.ApplyParams(params, mdSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -592,28 +546,21 @@ func (r *msgHeaderRepoPG) List(ctx context.Context, limit, offset int) ([]*Messa
 	return items, total, nil
 }
 
-func (r *msgHeaderRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MessageHeader, int, error) {
-	query := `SELECT ` + mhCols + ` FROM message_header WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM message_header WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var mhSearchParams = map[string]fhir.SearchParamConfig{
+	"event": {Type: fhir.SearchParamToken, Column: "event_coding_code"},
+}
 
-	if p, ok := params["event"]; ok {
-		query += fmt.Sprintf(` AND event_coding_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND event_coding_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *msgHeaderRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MessageHeader, int, error) {
+	qb := fhir.NewSearchQuery("message_header", mhCols)
+	qb.ApplyParams(params, mhSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package supply
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -124,34 +124,22 @@ func (r *supplyRequestRepoPG) List(ctx context.Context, limit, offset int) ([]*S
 	return items, total, nil
 }
 
-func (r *supplyRequestRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SupplyRequest, int, error) {
-	query := `SELECT ` + supplyRequestCols + ` FROM supply_request WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM supply_request WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var supplyRequestSearchParams = map[string]fhir.SearchParamConfig{
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["category"]; ok {
-		query += fmt.Sprintf(` AND category_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND category_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *supplyRequestRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SupplyRequest, int, error) {
+	qb := fhir.NewSearchQuery("supply_request", supplyRequestCols)
+	qb.ApplyParams(params, supplyRequestSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -267,34 +255,22 @@ func (r *supplyDeliveryRepoPG) List(ctx context.Context, limit, offset int) ([]*
 	return items, total, nil
 }
 
-func (r *supplyDeliveryRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SupplyDelivery, int, error) {
-	query := `SELECT ` + supplyDeliveryCols + ` FROM supply_delivery WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM supply_delivery WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var supplyDeliverySearchParams = map[string]fhir.SearchParamConfig{
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"supplier": {Type: fhir.SearchParamReference, Column: "supplier_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["supplier"]; ok {
-		query += fmt.Sprintf(` AND supplier_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND supplier_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *supplyDeliveryRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SupplyDelivery, int, error) {
+	qb := fhir.NewSearchQuery("supply_delivery", supplyDeliveryCols)
+	qb.ApplyParams(params, supplyDeliverySearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

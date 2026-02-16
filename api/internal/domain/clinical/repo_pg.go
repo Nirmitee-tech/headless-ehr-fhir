@@ -2,7 +2,6 @@ package clinical
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -139,46 +139,24 @@ func (r *conditionRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID
 	return items, total, nil
 }
 
-func (r *conditionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Condition, int, error) {
-	query := `SELECT ` + condCols + ` FROM condition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM condition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var conditionSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":         {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"clinical-status": {Type: fhir.SearchParamToken, Column: "clinical_status"},
+	"category":        {Type: fhir.SearchParamToken, Column: "category_code"},
+	"code":            {Type: fhir.SearchParamToken, Column: "code_value", SysColumn: "code_system"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["clinical-status"]; ok {
-		query += fmt.Sprintf(` AND clinical_status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND clinical_status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["category"]; ok {
-		query += fmt.Sprintf(` AND category_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND category_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["code"]; ok {
-		query += fmt.Sprintf(` AND code_value = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND code_value = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *conditionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Condition, int, error) {
+	qb := fhir.NewSearchQuery("condition", condCols)
+	qb.ApplyParams(params, conditionSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -321,46 +299,24 @@ func (r *observationRepoPG) ListByPatient(ctx context.Context, patientID uuid.UU
 	return items, total, nil
 }
 
-func (r *observationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Observation, int, error) {
-	query := `SELECT ` + obsCols + ` FROM observation WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM observation WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var observationSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":  {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+	"code":     {Type: fhir.SearchParamToken, Column: "code_value", SysColumn: "code_system"},
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["category"]; ok {
-		query += fmt.Sprintf(` AND category_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND category_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["code"]; ok {
-		query += fmt.Sprintf(` AND code_value = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND code_value = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *observationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Observation, int, error) {
+	qb := fhir.NewSearchQuery("observation", obsCols)
+	qb.ApplyParams(params, observationSearchParams)
+	qb.OrderBy("effective_datetime DESC NULLS LAST")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY effective_datetime DESC NULLS LAST LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

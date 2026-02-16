@@ -2,7 +2,6 @@ package careplan
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -129,40 +129,23 @@ func (r *carePlanRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID,
 	return items, total, nil
 }
 
-func (r *carePlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*CarePlan, int, error) {
-	query := `SELECT ` + cpCols + ` FROM care_plan WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM care_plan WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var carePlanSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":  {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["category"]; ok {
-		query += fmt.Sprintf(` AND category_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND category_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *carePlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*CarePlan, int, error) {
+	qb := fhir.NewSearchQuery("care_plan", cpCols)
+	qb.ApplyParams(params, carePlanSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -325,34 +308,22 @@ func (r *goalRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, lim
 	return items, total, nil
 }
 
-func (r *goalRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Goal, int, error) {
-	query := `SELECT ` + goalCols + ` FROM goal WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM goal WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var goalSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":          {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"lifecycle-status": {Type: fhir.SearchParamToken, Column: "lifecycle_status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["lifecycle-status"]; ok {
-		query += fmt.Sprintf(` AND lifecycle_status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND lifecycle_status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *goalRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Goal, int, error) {
+	qb := fhir.NewSearchQuery("goal", goalCols)
+	qb.ApplyParams(params, goalSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

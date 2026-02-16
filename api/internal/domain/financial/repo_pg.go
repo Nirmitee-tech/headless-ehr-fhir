@@ -2,7 +2,6 @@ package financial
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -108,40 +108,23 @@ func (r *accountRepoPG) List(ctx context.Context, limit, offset int) ([]*Account
 	return items, total, nil
 }
 
-func (r *accountRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Account, int, error) {
-	query := `SELECT ` + acctCols + ` FROM account WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM account WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var accountSearchParams = map[string]fhir.SearchParamConfig{
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"name":    {Type: fhir.SearchParamString, Column: "name"},
+	"patient": {Type: fhir.SearchParamReference, Column: "subject_patient_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name ILIKE $%d`, idx)
-		countQuery += fmt.Sprintf(` AND name ILIKE $%d`, idx)
-		args = append(args, "%"+p+"%")
-		idx++
-	}
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *accountRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Account, int, error) {
+	qb := fhir.NewSearchQuery("account", acctCols)
+	qb.ApplyParams(params, accountSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -249,40 +232,23 @@ func (r *insurancePlanRepoPG) List(ctx context.Context, limit, offset int) ([]*I
 	return items, total, nil
 }
 
-func (r *insurancePlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*InsurancePlan, int, error) {
-	query := `SELECT ` + ipCols + ` FROM insurance_plan WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM insurance_plan WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var insurancePlanSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+	"type":   {Type: fhir.SearchParamToken, Column: "type_code"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name ILIKE $%d`, idx)
-		countQuery += fmt.Sprintf(` AND name ILIKE $%d`, idx)
-		args = append(args, "%"+p+"%")
-		idx++
-	}
-	if p, ok := params["type"]; ok {
-		query += fmt.Sprintf(` AND type_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND type_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *insurancePlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*InsurancePlan, int, error) {
+	qb := fhir.NewSearchQuery("insurance_plan", ipCols)
+	qb.ApplyParams(params, insurancePlanSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -392,34 +358,22 @@ func (r *paymentNoticeRepoPG) List(ctx context.Context, limit, offset int) ([]*P
 	return items, total, nil
 }
 
-func (r *paymentNoticeRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PaymentNotice, int, error) {
-	query := `SELECT ` + pnCols + ` FROM payment_notice WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM payment_notice WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var paymentNoticeSearchParams = map[string]fhir.SearchParamConfig{
+	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"provider": {Type: fhir.SearchParamReference, Column: "provider_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["provider"]; ok {
-		query += fmt.Sprintf(` AND provider_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND provider_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *paymentNoticeRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PaymentNotice, int, error) {
+	qb := fhir.NewSearchQuery("payment_notice", pnCols)
+	qb.ApplyParams(params, paymentNoticeSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -533,34 +487,22 @@ func (r *paymentReconciliationRepoPG) List(ctx context.Context, limit, offset in
 	return items, total, nil
 }
 
-func (r *paymentReconciliationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PaymentReconciliation, int, error) {
-	query := `SELECT ` + prCols + ` FROM payment_reconciliation WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM payment_reconciliation WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var paymentReconciliationSearchParams = map[string]fhir.SearchParamConfig{
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"outcome": {Type: fhir.SearchParamToken, Column: "outcome"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["outcome"]; ok {
-		query += fmt.Sprintf(` AND outcome = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND outcome = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *paymentReconciliationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PaymentReconciliation, int, error) {
+	qb := fhir.NewSearchQuery("payment_reconciliation", prCols)
+	qb.ApplyParams(params, paymentReconciliationSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -680,40 +622,23 @@ func (r *chargeItemRepoPG) List(ctx context.Context, limit, offset int) ([]*Char
 	return items, total, nil
 }
 
-func (r *chargeItemRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ChargeItem, int, error) {
-	query := `SELECT ` + ciCols + ` FROM charge_item WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM charge_item WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var chargeItemSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "subject_patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"code":    {Type: fhir.SearchParamToken, Column: "code_code"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["code"]; ok {
-		query += fmt.Sprintf(` AND code_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND code_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *chargeItemRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ChargeItem, int, error) {
+	qb := fhir.NewSearchQuery("charge_item", ciCols)
+	qb.ApplyParams(params, chargeItemSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -827,40 +752,23 @@ func (r *chargeItemDefinitionRepoPG) List(ctx context.Context, limit, offset int
 	return items, total, nil
 }
 
-func (r *chargeItemDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ChargeItemDefinition, int, error) {
-	query := `SELECT ` + cdCols + ` FROM charge_item_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM charge_item_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var chargeItemDefinitionSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"title":  {Type: fhir.SearchParamString, Column: "title"},
+	"code":   {Type: fhir.SearchParamToken, Column: "code_code"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["title"]; ok {
-		query += fmt.Sprintf(` AND title ILIKE $%d`, idx)
-		countQuery += fmt.Sprintf(` AND title ILIKE $%d`, idx)
-		args = append(args, "%"+p+"%")
-		idx++
-	}
-	if p, ok := params["code"]; ok {
-		query += fmt.Sprintf(` AND code_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND code_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *chargeItemDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ChargeItemDefinition, int, error) {
+	qb := fhir.NewSearchQuery("charge_item_definition", cdCols)
+	qb.ApplyParams(params, chargeItemDefinitionSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -968,34 +876,22 @@ func (r *contractRepoPG) List(ctx context.Context, limit, offset int) ([]*Contra
 	return items, total, nil
 }
 
-func (r *contractRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Contract, int, error) {
-	query := `SELECT ` + ctCols + ` FROM contract WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM contract WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var contractSearchParams = map[string]fhir.SearchParamConfig{
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"patient": {Type: fhir.SearchParamReference, Column: "subject_patient_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *contractRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Contract, int, error) {
+	qb := fhir.NewSearchQuery("contract", ctCols)
+	qb.ApplyParams(params, contractSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1097,34 +993,22 @@ func (r *enrollmentRequestRepoPG) List(ctx context.Context, limit, offset int) (
 	return items, total, nil
 }
 
-func (r *enrollmentRequestRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*EnrollmentRequest, int, error) {
-	query := `SELECT ` + erCols + ` FROM enrollment_request WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM enrollment_request WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var enrollmentRequestSearchParams = map[string]fhir.SearchParamConfig{
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"patient": {Type: fhir.SearchParamReference, Column: "candidate_patient_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND candidate_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND candidate_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *enrollmentRequestRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*EnrollmentRequest, int, error) {
+	qb := fhir.NewSearchQuery("enrollment_request", erCols)
+	qb.ApplyParams(params, enrollmentRequestSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1226,34 +1110,22 @@ func (r *enrollmentResponseRepoPG) List(ctx context.Context, limit, offset int) 
 	return items, total, nil
 }
 
-func (r *enrollmentResponseRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*EnrollmentResponse, int, error) {
-	query := `SELECT ` + erspCols + ` FROM enrollment_response WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM enrollment_response WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var enrollmentResponseSearchParams = map[string]fhir.SearchParamConfig{
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"request": {Type: fhir.SearchParamReference, Column: "request_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["request"]; ok {
-		query += fmt.Sprintf(` AND request_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND request_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *enrollmentResponseRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*EnrollmentResponse, int, error) {
+	qb := fhir.NewSearchQuery("enrollment_response", erspCols)
+	qb.ApplyParams(params, enrollmentResponseSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

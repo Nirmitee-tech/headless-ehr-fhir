@@ -2,7 +2,6 @@ package devicedefinition
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -116,40 +116,23 @@ func (r *deviceDefinitionRepoPG) List(ctx context.Context, limit, offset int) ([
 	return items, total, nil
 }
 
-func (r *deviceDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DeviceDefinition, int, error) {
-	query := `SELECT ` + ddCols + ` FROM device_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM device_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var ddSearchParams = map[string]fhir.SearchParamConfig{
+	"manufacturer": {Type: fhir.SearchParamString, Column: "manufacturer_string"},
+	"model-number": {Type: fhir.SearchParamString, Column: "model_number"},
+	"type":         {Type: fhir.SearchParamToken, Column: "type_code"},
+}
 
-	if p, ok := params["manufacturer"]; ok {
-		query += fmt.Sprintf(` AND manufacturer_string ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND manufacturer_string ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["model-number"]; ok {
-		query += fmt.Sprintf(` AND model_number ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND model_number ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["type"]; ok {
-		query += fmt.Sprintf(` AND type_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND type_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *deviceDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DeviceDefinition, int, error) {
+	qb := fhir.NewSearchQuery("device_definition", ddCols)
+	qb.ApplyParams(params, ddSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

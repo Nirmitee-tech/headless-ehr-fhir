@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 // -- Organization Repository --
@@ -119,44 +120,24 @@ func (r *orgRepoPG) List(ctx context.Context, limit, offset int) ([]*Organizatio
 	return orgs, total, nil
 }
 
-func (r *orgRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Organization, int, error) {
-	query := `SELECT ` + orgColumns + ` FROM organization WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM organization WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var organizationSearchParams = map[string]fhir.SearchParamConfig{
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+	"type":   {Type: fhir.SearchParamToken, Column: "type_code"},
+	"active": {Type: fhir.SearchParamToken, Column: "active"},
+}
 
-	if name, ok := params["name"]; ok {
-		clause := fmt.Sprintf(` AND name ILIKE $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+name+"%")
-		idx++
-	}
-	if typeCode, ok := params["type"]; ok {
-		clause := fmt.Sprintf(` AND type_code = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, typeCode)
-		idx++
-	}
-	if active, ok := params["active"]; ok {
-		clause := fmt.Sprintf(` AND active = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, active == "true")
-		idx++
-	}
+func (r *orgRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Organization, int, error) {
+	qb := fhir.NewSearchQuery("organization", orgColumns)
+	qb.ApplyParams(params, organizationSearchParams)
+	qb.OrderBy("name")
 
 	var total int
-	err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total)
+	err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY name LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -732,44 +713,24 @@ func (r *groupRepoPG) List(ctx context.Context, filterType string, limit, offset
 	return groups, total, nil
 }
 
-func (r *groupRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Group, int, error) {
-	query := `SELECT ` + grpColumns + ` FROM fhir_group WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM fhir_group WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var groupSearchParams = map[string]fhir.SearchParamConfig{
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+	"type":   {Type: fhir.SearchParamToken, Column: "group_type"},
+	"active": {Type: fhir.SearchParamToken, Column: "active"},
+}
 
-	if name, ok := params["name"]; ok {
-		clause := fmt.Sprintf(` AND name ILIKE $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, "%"+name+"%")
-		idx++
-	}
-	if t, ok := params["type"]; ok {
-		clause := fmt.Sprintf(` AND group_type = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, t)
-		idx++
-	}
-	if active, ok := params["active"]; ok {
-		clause := fmt.Sprintf(` AND active = $%d`, idx)
-		query += clause
-		countQuery += clause
-		args = append(args, active == "true")
-		idx++
-	}
+func (r *groupRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Group, int, error) {
+	qb := fhir.NewSearchQuery("fhir_group", grpColumns)
+	qb.ApplyParams(params, groupSearchParams)
+	qb.OrderBy("name")
 
 	var total int
-	err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total)
+	err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY name LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package nursing
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -208,40 +208,23 @@ func (r *flowsheetEntryRepoPG) ListByEncounter(ctx context.Context, encounterID 
 	return items, total, nil
 }
 
-func (r *flowsheetEntryRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*FlowsheetEntry, int, error) {
-	query := `SELECT ` + entryCols + ` FROM flowsheet_entry WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM flowsheet_entry WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var entrySearchParams = map[string]fhir.SearchParamConfig{
+	"patient_id":   {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"encounter_id": {Type: fhir.SearchParamReference, Column: "encounter_id"},
+	"template_id":  {Type: fhir.SearchParamReference, Column: "template_id"},
+}
 
-	if p, ok := params["patient_id"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["encounter_id"]; ok {
-		query += fmt.Sprintf(` AND encounter_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND encounter_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["template_id"]; ok {
-		query += fmt.Sprintf(` AND template_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND template_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *flowsheetEntryRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*FlowsheetEntry, int, error) {
+	qb := fhir.NewSearchQuery("flowsheet_entry", entryCols)
+	qb.ApplyParams(params, entrySearchParams)
+	qb.OrderBy("recorded_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY recorded_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

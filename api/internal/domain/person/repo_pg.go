@@ -2,7 +2,6 @@ package person
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -110,40 +110,23 @@ func (r *personRepoPG) List(ctx context.Context, limit, offset int) ([]*Person, 
 	return items, total, nil
 }
 
-func (r *personRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Person, int, error) {
-	query := `SELECT ` + personCols + ` FROM person WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM person WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var personSearchParams = map[string]fhir.SearchParamConfig{
+	"name":   {Type: fhir.SearchParamString, Column: "name_family"},
+	"gender": {Type: fhir.SearchParamToken, Column: "gender"},
+	"active": {Type: fhir.SearchParamToken, Column: "active"},
+}
 
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name_family ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND name_family ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["gender"]; ok {
-		query += fmt.Sprintf(` AND gender = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND gender = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["active"]; ok {
-		query += fmt.Sprintf(` AND active = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND active = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *personRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Person, int, error) {
+	qb := fhir.NewSearchQuery("person", personCols)
+	qb.ApplyParams(params, personSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

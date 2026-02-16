@@ -2,7 +2,6 @@ package deviceusestatement
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -122,34 +122,22 @@ func (r *deviceUseStatementRepoPG) List(ctx context.Context, limit, offset int) 
 	return items, total, nil
 }
 
-func (r *deviceUseStatementRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DeviceUseStatement, int, error) {
-	query := `SELECT ` + dusCols + ` FROM device_use_statement WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM device_use_statement WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var dusSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "subject_patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *deviceUseStatementRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DeviceUseStatement, int, error) {
+	qb := fhir.NewSearchQuery("device_use_statement", dusCols)
+	qb.ApplyParams(params, dusSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

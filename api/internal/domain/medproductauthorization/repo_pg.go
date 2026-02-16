@@ -2,7 +2,6 @@ package medproductauthorization
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -110,40 +110,33 @@ func (r *mpaRepoPG) List(ctx context.Context, limit, offset int) ([]*MedicinalPr
 	return items, total, nil
 }
 
+var mpaSearchParams = map[string]fhir.SearchParamConfig{
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"subject": {Type: fhir.SearchParamReference, Column: "subject_reference"},
+	"country": {Type: fhir.SearchParamToken, Column: "country_code"},
+}
+
 func (r *mpaRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MedicinalProductAuthorization, int, error) {
-	query := `SELECT ` + mpaCols + ` FROM medicinal_product_authorization WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM medicinal_product_authorization WHERE 1=1`
-	var args []interface{}
-	idx := 1
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["subject"]; ok {
-		query += fmt.Sprintf(` AND subject_reference = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_reference = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["country"]; ok {
-		query += fmt.Sprintf(` AND country_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND country_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+	qb := fhir.NewSearchQuery("medicinal_product_authorization", mpaCols)
+	qb.ApplyParams(params, mpaSearchParams)
+	qb.OrderBy("created_at DESC")
+
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil { return nil, 0, err }
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
-	if err != nil { return nil, 0, err }
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer rows.Close()
 	var items []*MedicinalProductAuthorization
 	for rows.Next() {
 		m, err := r.scanRow(rows)
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		items = append(items, m)
 	}
 	return items, total, nil

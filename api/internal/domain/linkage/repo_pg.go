@@ -2,7 +2,6 @@ package linkage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -104,34 +104,22 @@ func (r *linkageRepoPG) List(ctx context.Context, limit, offset int) ([]*Linkage
 	return items, total, nil
 }
 
-func (r *linkageRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Linkage, int, error) {
-	query := `SELECT ` + lnkCols + ` FROM linkage WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM linkage WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var linkageSearchParams = map[string]fhir.SearchParamConfig{
+	"author": {Type: fhir.SearchParamReference, Column: "author_id"},
+	"source": {Type: fhir.SearchParamReference, Column: "source_reference"},
+}
 
-	if p, ok := params["author"]; ok {
-		query += fmt.Sprintf(` AND author_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND author_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["source"]; ok {
-		query += fmt.Sprintf(` AND source_reference = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND source_reference = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *linkageRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Linkage, int, error) {
+	qb := fhir.NewSearchQuery("linkage", lnkCols)
+	qb.ApplyParams(params, linkageSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package medproductingredient
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -110,32 +110,22 @@ func (r *mpiRepoPG) List(ctx context.Context, limit, offset int) ([]*MedicinalPr
 	return items, total, nil
 }
 
-func (r *mpiRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MedicinalProductIngredient, int, error) {
-	query := `SELECT ` + mpiCols + ` FROM medicinal_product_ingredient WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM medicinal_product_ingredient WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var mpiSearchParams = map[string]fhir.SearchParamConfig{
+	"role":      {Type: fhir.SearchParamToken, Column: "role_code"},
+	"substance": {Type: fhir.SearchParamToken, Column: "substance_code"},
+}
 
-	if p, ok := params["role"]; ok {
-		query += fmt.Sprintf(` AND role_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND role_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["substance"]; ok {
-		query += fmt.Sprintf(` AND substance_code = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND substance_code = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *mpiRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MedicinalProductIngredient, int, error) {
+	qb := fhir.NewSearchQuery("medicinal_product_ingredient", mpiCols)
+	qb.ApplyParams(params, mpiSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

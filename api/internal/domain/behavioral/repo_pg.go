@@ -2,7 +2,6 @@ package behavioral
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -121,34 +121,22 @@ func (r *psychAssessmentRepoPG) ListByPatient(ctx context.Context, patientID uui
 	return items, total, nil
 }
 
-func (r *psychAssessmentRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PsychiatricAssessment, int, error) {
-	query := `SELECT ` + psychAssessCols + ` FROM psychiatric_assessment WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM psychiatric_assessment WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var psychAssessmentSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":   {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"encounter": {Type: fhir.SearchParamReference, Column: "encounter_id"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["encounter"]; ok {
-		query += fmt.Sprintf(` AND encounter_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND encounter_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *psychAssessmentRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*PsychiatricAssessment, int, error) {
+	qb := fhir.NewSearchQuery("psychiatric_assessment", psychAssessCols)
+	qb.ApplyParams(params, psychAssessmentSearchParams)
+	qb.OrderBy("assessment_date DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY assessment_date DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -255,34 +243,22 @@ func (r *safetyPlanRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUI
 	return items, total, nil
 }
 
-func (r *safetyPlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SafetyPlan, int, error) {
-	query := `SELECT ` + safetyPlanCols + ` FROM safety_plan WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM safety_plan WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var safetyPlanSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *safetyPlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SafetyPlan, int, error) {
+	qb := fhir.NewSearchQuery("safety_plan", safetyPlanCols)
+	qb.ApplyParams(params, safetyPlanSearchParams)
+	qb.OrderBy("plan_date DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY plan_date DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -389,34 +365,22 @@ func (r *legalHoldRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID
 	return items, total, nil
 }
 
-func (r *legalHoldRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*LegalHold, int, error) {
-	query := `SELECT ` + legalHoldCols + ` FROM legal_hold WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM legal_hold WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var legalHoldSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *legalHoldRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*LegalHold, int, error) {
+	qb := fhir.NewSearchQuery("legal_hold", legalHoldCols)
+	qb.ApplyParams(params, legalHoldSearchParams)
+	qb.OrderBy("start_datetime DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY start_datetime DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -523,34 +487,22 @@ func (r *seclusionRestraintRepoPG) ListByPatient(ctx context.Context, patientID 
 	return items, total, nil
 }
 
-func (r *seclusionRestraintRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SeclusionRestraintEvent, int, error) {
-	query := `SELECT ` + seclusionCols + ` FROM seclusion_restraint_event WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM seclusion_restraint_event WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var seclusionRestraintSearchParams = map[string]fhir.SearchParamConfig{
+	"patient":    {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"event_type": {Type: fhir.SearchParamToken, Column: "event_type"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["event_type"]; ok {
-		query += fmt.Sprintf(` AND event_type = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND event_type = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *seclusionRestraintRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*SeclusionRestraintEvent, int, error) {
+	qb := fhir.NewSearchQuery("seclusion_restraint_event", seclusionCols)
+	qb.ApplyParams(params, seclusionRestraintSearchParams)
+	qb.OrderBy("start_datetime DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY start_datetime DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -649,34 +601,22 @@ func (r *groupTherapyRepoPG) List(ctx context.Context, limit, offset int) ([]*Gr
 	return items, total, nil
 }
 
-func (r *groupTherapyRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*GroupTherapySession, int, error) {
-	query := `SELECT ` + groupSessionCols + ` FROM group_therapy_session WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM group_therapy_session WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var groupTherapySearchParams = map[string]fhir.SearchParamConfig{
+	"status":      {Type: fhir.SearchParamToken, Column: "status"},
+	"facilitator": {Type: fhir.SearchParamReference, Column: "facilitator_id"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["facilitator"]; ok {
-		query += fmt.Sprintf(` AND facilitator_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND facilitator_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *groupTherapyRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*GroupTherapySession, int, error) {
+	qb := fhir.NewSearchQuery("group_therapy_session", groupSessionCols)
+	qb.ApplyParams(params, groupTherapySearchParams)
+	qb.OrderBy("scheduled_datetime DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY scheduled_datetime DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

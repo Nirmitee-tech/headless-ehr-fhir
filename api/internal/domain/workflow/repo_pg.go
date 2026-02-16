@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -120,34 +120,22 @@ func (r *activityDefinitionRepoPG) List(ctx context.Context, limit, offset int) 
 	return items, total, nil
 }
 
-func (r *activityDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ActivityDefinition, int, error) {
-	query := `SELECT ` + adCols + ` FROM activity_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM activity_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var adSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *activityDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ActivityDefinition, int, error) {
+	qb := fhir.NewSearchQuery("activity_definition", adCols)
+	qb.ApplyParams(params, adSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -256,34 +244,22 @@ func (r *requestGroupRepoPG) List(ctx context.Context, limit, offset int) ([]*Re
 	return items, total, nil
 }
 
-func (r *requestGroupRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*RequestGroup, int, error) {
-	query := `SELECT ` + rgCols + ` FROM request_group WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM request_group WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var rgSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "subject_patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *requestGroupRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*RequestGroup, int, error) {
+	qb := fhir.NewSearchQuery("request_group", rgCols)
+	qb.ApplyParams(params, rgSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -429,34 +405,22 @@ func (r *guidanceResponseRepoPG) List(ctx context.Context, limit, offset int) ([
 	return items, total, nil
 }
 
-func (r *guidanceResponseRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*GuidanceResponse, int, error) {
-	query := `SELECT ` + grCols + ` FROM guidance_response WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM guidance_response WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var grSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "subject_patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+}
 
-	if p, ok := params["patient"]; ok {
-		query += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND subject_patient_id = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *guidanceResponseRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*GuidanceResponse, int, error) {
+	qb := fhir.NewSearchQuery("guidance_response", grCols)
+	qb.ApplyParams(params, grSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,7 +2,6 @@ package graphdefinition
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ehr/ehr/internal/platform/db"
+	"github.com/ehr/ehr/internal/platform/fhir"
 )
 
 type queryable interface {
@@ -104,46 +104,24 @@ func (r *graphDefinitionRepoPG) List(ctx context.Context, limit, offset int) ([]
 	return items, total, nil
 }
 
-func (r *graphDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*GraphDefinition, int, error) {
-	query := `SELECT ` + gdCols + ` FROM graph_definition WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM graph_definition WHERE 1=1`
-	var args []interface{}
-	idx := 1
+var graphDefinitionSearchParams = map[string]fhir.SearchParamConfig{
+	"status": {Type: fhir.SearchParamToken, Column: "status"},
+	"name":   {Type: fhir.SearchParamString, Column: "name"},
+	"url":    {Type: fhir.SearchParamToken, Column: "url"},
+	"start":  {Type: fhir.SearchParamToken, Column: "start_type"},
+}
 
-	if p, ok := params["status"]; ok {
-		query += fmt.Sprintf(` AND status = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND status = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["name"]; ok {
-		query += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		countQuery += fmt.Sprintf(` AND name ILIKE '%%' || $%d || '%%'`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["url"]; ok {
-		query += fmt.Sprintf(` AND url = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND url = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
-	if p, ok := params["start"]; ok {
-		query += fmt.Sprintf(` AND start_type = $%d`, idx)
-		countQuery += fmt.Sprintf(` AND start_type = $%d`, idx)
-		args = append(args, p)
-		idx++
-	}
+func (r *graphDefinitionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*GraphDefinition, int, error) {
+	qb := fhir.NewSearchQuery("graph_definition", gdCols)
+	qb.ApplyParams(params, graphDefinitionSearchParams)
+	qb.OrderBy("created_at DESC")
 
 	var total int
-	if err := r.conn(ctx).QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	query += fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
-	args = append(args, limit, offset)
-
-	rows, err := r.conn(ctx).Query(ctx, query, args...)
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
