@@ -1341,6 +1341,22 @@ func runServer() error {
 	// FHIR security label enforcement middleware
 	fhirGroup.Use(fhir.SecurityLabelMiddleware())
 
+	// FHIR CORS middleware (FHIR-specific headers)
+	fhirGroup.Use(fhir.FHIRCORSMiddleware())
+
+	// FHIR rate limiting with standard headers
+	fhirRateLimiter := fhir.NewSlidingWindowLimiter(1000, time.Minute)
+	fhirGroup.Use(fhir.RateLimitMiddleware(fhirRateLimiter))
+
+	// FHIR CompartmentDefinition endpoints
+	compartmentDefHandler := fhir.NewCompartmentDefinitionHandler()
+	compartmentDefHandler.RegisterRoutes(fhirGroup)
+
+	// FHIR OperationDefinition endpoints
+	opRegistry := fhir.DefaultOperationRegistry()
+	opRegistryHandler := fhir.NewOperationRegistryHandler(opRegistry)
+	opRegistryHandler.RegisterRoutes(fhirGroup)
+
 	// -- Register Domain Handlers --
 
 	// Admin domain
