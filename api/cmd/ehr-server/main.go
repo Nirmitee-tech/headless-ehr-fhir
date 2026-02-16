@@ -74,6 +74,16 @@ import (
 	"github.com/ehr/ehr/internal/domain/devicedefinition"
 	"github.com/ehr/ehr/internal/domain/devicemetric"
 	"github.com/ehr/ehr/internal/domain/specimendefinition"
+	"github.com/ehr/ehr/internal/domain/communicationrequest"
+	"github.com/ehr/ehr/internal/domain/observationdefinition"
+	"github.com/ehr/ehr/internal/domain/linkage"
+	fhirbasic "github.com/ehr/ehr/internal/domain/basic"
+	"github.com/ehr/ehr/internal/domain/verificationresult"
+	"github.com/ehr/ehr/internal/domain/eventdefinition"
+	"github.com/ehr/ehr/internal/domain/graphdefinition"
+	"github.com/ehr/ehr/internal/domain/molecularsequence"
+	"github.com/ehr/ehr/internal/domain/biologicallyderivedproduct"
+	"github.com/ehr/ehr/internal/domain/catalogentry"
 	"github.com/ehr/ehr/internal/platform/analytics"
 	"github.com/ehr/ehr/internal/platform/auth"
 	"github.com/ehr/ehr/internal/platform/blobstore"
@@ -882,6 +892,54 @@ func runServer() error {
 	capBuilder.AddResource("SpecimenDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
 		{Name: "type", Type: "token"},
 	})
+	capBuilder.AddResource("CommunicationRequest", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "patient", Type: "reference"},
+		{Name: "status", Type: "token"},
+		{Name: "priority", Type: "token"},
+		{Name: "category", Type: "token"},
+	})
+	capBuilder.AddResource("ObservationDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "code", Type: "token"},
+		{Name: "category", Type: "token"},
+	})
+	capBuilder.AddResource("Linkage", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "author", Type: "reference"},
+		{Name: "source", Type: "reference"},
+	})
+	capBuilder.AddResource("Basic", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "code", Type: "token"},
+		{Name: "subject", Type: "reference"},
+		{Name: "author", Type: "reference"},
+	})
+	capBuilder.AddResource("VerificationResult", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "target", Type: "reference"},
+	})
+	capBuilder.AddResource("EventDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "name", Type: "string"},
+		{Name: "url", Type: "uri"},
+	})
+	capBuilder.AddResource("GraphDefinition", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "name", Type: "string"},
+		{Name: "url", Type: "uri"},
+		{Name: "start", Type: "token"},
+	})
+	capBuilder.AddResource("MolecularSequence", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "type", Type: "token"},
+		{Name: "patient", Type: "reference"},
+	})
+	capBuilder.AddResource("BiologicallyDerivedProduct", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "product-category", Type: "token"},
+		{Name: "status", Type: "token"},
+	})
+	capBuilder.AddResource("CatalogEntry", fhir.DefaultInteractions(), []fhir.SearchParam{
+		{Name: "status", Type: "token"},
+		{Name: "type", Type: "token"},
+		{Name: "orderable", Type: "token"},
+	})
 
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
@@ -917,6 +975,9 @@ func runServer() error {
 		"CoverageEligibilityRequest", "CoverageEligibilityResponse",
 		"MedicationKnowledge", "OrganizationAffiliation", "Person",
 		"Measure", "Library", "DeviceDefinition", "DeviceMetric", "SpecimenDefinition",
+		"CommunicationRequest", "ObservationDefinition", "Linkage", "Basic",
+		"VerificationResult", "EventDefinition", "GraphDefinition",
+		"MolecularSequence", "BiologicallyDerivedProduct", "CatalogEntry",
 	} {
 		capBuilder.SetResourceCapabilities(rt, defaultCaps)
 	}
@@ -966,6 +1027,14 @@ func runServer() error {
 	includeRegistry.RegisterReference("DeviceDefinition", "owner", "Organization")
 	includeRegistry.RegisterReference("DeviceMetric", "source", "Device")
 	includeRegistry.RegisterReference("DeviceMetric", "parent", "Device")
+	includeRegistry.RegisterReference("CommunicationRequest", "patient", "Patient")
+	includeRegistry.RegisterReference("CommunicationRequest", "encounter", "Encounter")
+	includeRegistry.RegisterReference("CommunicationRequest", "requester", "Practitioner")
+	includeRegistry.RegisterReference("CommunicationRequest", "recipient", "Practitioner")
+	includeRegistry.RegisterReference("CommunicationRequest", "sender", "Practitioner")
+	includeRegistry.RegisterReference("MolecularSequence", "patient", "Patient")
+	includeRegistry.RegisterReference("Linkage", "author", "Practitioner")
+	includeRegistry.RegisterReference("Basic", "author", "Practitioner")
 	includeRegistry.RegisterReference("Provenance", "target", "Patient")
 	includeRegistry.RegisterReference("Provenance", "agent", "Practitioner")
 	includeRegistry.RegisterReference("Endpoint", "organization", "Organization")
@@ -1506,6 +1575,76 @@ func runServer() error {
 	sdSvc.SetVersionTracker(versionTracker)
 	sdHandler := specimendefinition.NewHandler(sdSvc)
 	sdHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// CommunicationRequest domain
+	commReqRepo := communicationrequest.NewCommunicationRequestRepoPG(pool)
+	commReqSvc := communicationrequest.NewService(commReqRepo)
+	commReqSvc.SetVersionTracker(versionTracker)
+	commReqHandler := communicationrequest.NewHandler(commReqSvc)
+	commReqHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// ObservationDefinition domain
+	obsDefRepo := observationdefinition.NewObservationDefinitionRepoPG(pool)
+	obsDefSvc := observationdefinition.NewService(obsDefRepo)
+	obsDefSvc.SetVersionTracker(versionTracker)
+	obsDefHandler := observationdefinition.NewHandler(obsDefSvc)
+	obsDefHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Linkage domain
+	linkageRepo := linkage.NewLinkageRepoPG(pool)
+	linkageSvc := linkage.NewService(linkageRepo)
+	linkageSvc.SetVersionTracker(versionTracker)
+	linkageHandler := linkage.NewHandler(linkageSvc)
+	linkageHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// Basic domain
+	basicRepo := fhirbasic.NewBasicRepoPG(pool)
+	basicSvc := fhirbasic.NewService(basicRepo)
+	basicSvc.SetVersionTracker(versionTracker)
+	basicHandler := fhirbasic.NewHandler(basicSvc)
+	basicHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// VerificationResult domain
+	vrRepo := verificationresult.NewVerificationResultRepoPG(pool)
+	vrSvc := verificationresult.NewService(vrRepo)
+	vrSvc.SetVersionTracker(versionTracker)
+	vrHandler := verificationresult.NewHandler(vrSvc)
+	vrHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// EventDefinition domain
+	edRepo := eventdefinition.NewEventDefinitionRepoPG(pool)
+	edDefSvc := eventdefinition.NewService(edRepo)
+	edDefSvc.SetVersionTracker(versionTracker)
+	edDefHandler := eventdefinition.NewHandler(edDefSvc)
+	edDefHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// GraphDefinition domain
+	gdRepo := graphdefinition.NewGraphDefinitionRepoPG(pool)
+	gdSvc := graphdefinition.NewService(gdRepo)
+	gdSvc.SetVersionTracker(versionTracker)
+	gdHandler := graphdefinition.NewHandler(gdSvc)
+	gdHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// MolecularSequence domain
+	msRepo := molecularsequence.NewMolecularSequenceRepoPG(pool)
+	msSvc := molecularsequence.NewService(msRepo)
+	msSvc.SetVersionTracker(versionTracker)
+	msHandler := molecularsequence.NewHandler(msSvc)
+	msHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// BiologicallyDerivedProduct domain
+	bdpRepo := biologicallyderivedproduct.NewBiologicallyDerivedProductRepoPG(pool)
+	bdpSvc := biologicallyderivedproduct.NewService(bdpRepo)
+	bdpSvc.SetVersionTracker(versionTracker)
+	bdpHandler := biologicallyderivedproduct.NewHandler(bdpSvc)
+	bdpHandler.RegisterRoutes(apiV1, fhirGroup)
+
+	// CatalogEntry domain
+	catRepo := catalogentry.NewCatalogEntryRepoPG(pool)
+	catSvc := catalogentry.NewService(catRepo)
+	catSvc.SetVersionTracker(versionTracker)
+	catHandler := catalogentry.NewHandler(catSvc)
+	catHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Notification engine — listens for resource events and delivers webhooks
 	notifyAdapter := subscription.NewNotifyRepoAdapter(subRepo)
