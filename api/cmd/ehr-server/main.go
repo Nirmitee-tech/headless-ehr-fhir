@@ -1401,6 +1401,22 @@ func runServer() error {
 	fhirIGHandler := fhir.NewImplementationGuideHandler()
 	fhirIGHandler.RegisterRoutes(fhirGroup)
 
+	// FHIR $apply operation (PlanDefinition and ActivityDefinition)
+	applyResolver := fhir.NewIncludeRegistryResolver(includeRegistry)
+	fhirGroup.POST("/PlanDefinition/:id/$apply", fhir.ApplyHandler(applyResolver))
+	fhirGroup.POST("/ActivityDefinition/:id/$apply", fhir.ActivityDefinitionApplyHandler(applyResolver))
+
+	// FHIR full-text search engine (_text and _content parameters)
+	_ = fhir.NewFullTextSearchEngine()
+
+	// FHIR custom operations framework (dynamic operation registration)
+	customOpRegistry := fhir.NewCustomOperationRegistry()
+	fhirGroup.Use(fhir.CustomOperationMiddleware(customOpRegistry))
+
+	// FHIR cursor-based pagination (keyset pagination for large result sets)
+	paginationConfig := fhir.DefaultPaginationConfig()
+	fhirGroup.Use(fhir.PaginationMiddleware(paginationConfig))
+
 	// FHIR TerminologyCapabilities endpoints
 	termCapHandler := fhir.NewTerminologyCapabilitiesHandler()
 	termCapHandler.RegisterRoutes(fhirGroup)

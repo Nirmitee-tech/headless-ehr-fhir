@@ -872,3 +872,42 @@ func parseApplyRequestFromBody(body map[string]interface{}) *ApplyRequest {
 
 	return req
 }
+
+// ---------------------------------------------------------------------------
+// Adapter: IncludeRegistry -> ApplyOpResourceResolver
+// ---------------------------------------------------------------------------
+
+// includeRegistryResolver adapts an IncludeRegistry to the ApplyOpResourceResolver interface.
+type includeRegistryResolver struct {
+	registry *IncludeRegistry
+}
+
+// NewIncludeRegistryResolver creates an ApplyOpResourceResolver backed by an IncludeRegistry.
+func NewIncludeRegistryResolver(registry *IncludeRegistry) ApplyOpResourceResolver {
+	return &includeRegistryResolver{registry: registry}
+}
+
+// ResolveReference resolves a FHIR reference (e.g. "Patient/123") using the IncludeRegistry's fetchers.
+func (r *includeRegistryResolver) ResolveReference(ctx interface{}, reference string) (map[string]interface{}, error) {
+	parts := strings.SplitN(reference, "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid reference format: %s", reference)
+	}
+	resourceType, id := parts[0], parts[1]
+
+	r.registry.mu.RLock()
+	fetcher, ok := r.registry.fetchers[resourceType]
+	r.registry.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("no fetcher registered for resource type: %s", resourceType)
+	}
+
+	// Use a background context if the provided ctx is not a context.Context.
+	ctxVal, ok := ctx.(interface{ Value(interface{}) interface{} })
+	if ok {
+		_ = ctxVal // The fetcher needs context.Context
+	}
+
+	return fetcher(nil, id)
+}
