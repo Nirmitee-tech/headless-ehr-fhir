@@ -1279,6 +1279,7 @@ func runServer() error {
 	// the middleware holds a pointer to the registry, late registration works.
 	fhirGroup.Use(fhir.IncludeMiddleware(includeRegistry))
 	fhirGroup.Use(fhir.SearchMiddleware())
+	fhirGroup.Use(fhir.PreferMiddleware())
 
 	// FHIR metadata (dynamic CapabilityStatement)
 	fhirGroup.GET("/metadata", func(c echo.Context) error {
