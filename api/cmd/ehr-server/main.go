@@ -1324,6 +1324,23 @@ func runServer() error {
 	fhirGroup.GET("/Observation/$stats", fhir.StatsHandler(nil))
 	fhirGroup.POST("/Observation/$stats", fhir.StatsHandler(nil))
 
+	// FHIR $convert operation (format normalization)
+	fhirGroup.POST("/$convert", fhir.ConvertHandler())
+
+	// FHIR $graph operation (GraphDefinition traversal)
+	fhirGroup.POST("/$graph", fhir.GraphApplyHandler(includeRegistry))
+
+	// FHIR $batch-validate (batch resource validation)
+	batchValidator := fhir.NewBatchValidateHandler(nil)
+	batchValidator.RegisterRoutes(fhirGroup)
+
+	// FHIR request logging middleware
+	fhirLogSink := fhir.NewChannelLogSink(10000)
+	fhirGroup.Use(fhir.FHIRRequestLoggerMiddleware(fhirLogSink))
+
+	// FHIR security label enforcement middleware
+	fhirGroup.Use(fhir.SecurityLabelMiddleware())
+
 	// -- Register Domain Handlers --
 
 	// Admin domain
