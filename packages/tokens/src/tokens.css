@@ -1,0 +1,209 @@
+/* @ehr/tokens — CSS Custom Properties */
+/* Import once: import '@ehr/tokens/css' */
+
+:root,
+[data-ehr-theme] {
+  /* ── Colors: Gray ── */
+  --ehr-gray-50: #F9FAFB;
+  --ehr-gray-100: #F3F4F6;
+  --ehr-gray-200: #E5E7EB;
+  --ehr-gray-300: #D1D5DB;
+  --ehr-gray-400: #9CA3AF;
+  --ehr-gray-500: #6B7280;
+  --ehr-gray-600: #4B5563;
+  --ehr-gray-700: #374151;
+  --ehr-gray-800: #1F2937;
+  --ehr-gray-900: #111827;
+  --ehr-gray-950: #030712;
+
+  /* ── Colors: Blue (Primary) ── */
+  --ehr-blue-50: #EFF6FF;
+  --ehr-blue-100: #DBEAFE;
+  --ehr-blue-200: #BFDBFE;
+  --ehr-blue-300: #93C5FD;
+  --ehr-blue-400: #60A5FA;
+  --ehr-blue-500: #3B82F6;
+  --ehr-blue-600: #2563EB;
+  --ehr-blue-700: #1D4ED8;
+  --ehr-blue-800: #1E40AF;
+  --ehr-blue-900: #1E3A8A;
+
+  /* ── Colors: Red (Danger) ── */
+  --ehr-red-50: #FEF2F2;
+  --ehr-red-100: #FEE2E2;
+  --ehr-red-200: #FECACA;
+  --ehr-red-500: #EF4444;
+  --ehr-red-600: #DC2626;
+  --ehr-red-700: #B91C1C;
+  --ehr-red-800: #991B1B;
+
+  /* ── Colors: Green (Success) ── */
+  --ehr-green-50: #F0FDF4;
+  --ehr-green-100: #DCFCE7;
+  --ehr-green-200: #BBF7D0;
+  --ehr-green-500: #22C55E;
+  --ehr-green-600: #16A34A;
+  --ehr-green-700: #15803D;
+
+  /* ── Colors: Orange (Warning) ── */
+  --ehr-orange-50: #FFF7ED;
+  --ehr-orange-200: #FED7AA;
+  --ehr-orange-500: #F97316;
+  --ehr-orange-600: #EA580C;
+  --ehr-orange-700: #C2410C;
+
+  /* ── Colors: Yellow (Caution) ── */
+  --ehr-yellow-50: #FFFBEB;
+  --ehr-yellow-200: #FDE68A;
+  --ehr-yellow-500: #F59E0B;
+  --ehr-yellow-700: #B45309;
+
+  /* ── Colors: Teal (Clinical Info) ── */
+  --ehr-teal-50: #F0FDFA;
+  --ehr-teal-500: #14B8A6;
+  --ehr-teal-600: #0D9488;
+
+  /* ── Colors: Purple (Specialty) ── */
+  --ehr-purple-50: #FAF5FF;
+  --ehr-purple-500: #A855F7;
+  --ehr-purple-600: #9333EA;
+
+  /* ── Semantic: Surfaces ── */
+  --ehr-bg-primary: #FFFFFF;
+  --ehr-bg-secondary: var(--ehr-gray-50);
+  --ehr-bg-tertiary: var(--ehr-gray-100);
+  --ehr-bg-inverse: var(--ehr-gray-900);
+  --ehr-fg-primary: var(--ehr-gray-900);
+  --ehr-fg-secondary: var(--ehr-gray-600);
+  --ehr-fg-tertiary: var(--ehr-gray-400);
+  --ehr-fg-inverse: #FFFFFF;
+  --ehr-fg-link: var(--ehr-blue-600);
+  --ehr-border-default: var(--ehr-gray-200);
+  --ehr-border-strong: var(--ehr-gray-300);
+  --ehr-border-focus: var(--ehr-blue-500);
+
+  /* ── Semantic: Interactive ── */
+  --ehr-interactive: var(--ehr-blue-600);
+  --ehr-interactive-hover: var(--ehr-blue-700);
+  --ehr-interactive-active: var(--ehr-blue-800);
+
+  /* ── Semantic: Feedback ── */
+  --ehr-success-fg: var(--ehr-green-700);
+  --ehr-success-bg: var(--ehr-green-50);
+  --ehr-success-border: var(--ehr-green-200);
+  --ehr-warning-fg: var(--ehr-orange-700);
+  --ehr-warning-bg: var(--ehr-orange-50);
+  --ehr-warning-border: var(--ehr-orange-200);
+  --ehr-danger-fg: var(--ehr-red-700);
+  --ehr-danger-bg: var(--ehr-red-50);
+  --ehr-danger-border: var(--ehr-red-200);
+  --ehr-info-fg: var(--ehr-blue-700);
+  --ehr-info-bg: var(--ehr-blue-50);
+  --ehr-info-border: var(--ehr-blue-200);
+
+  /* ── Spacing ── */
+  --ehr-space-0: 0;
+  --ehr-space-1: 0.25rem;
+  --ehr-space-2: 0.5rem;
+  --ehr-space-3: 0.75rem;
+  --ehr-space-4: 1rem;
+  --ehr-space-5: 1.25rem;
+  --ehr-space-6: 1.5rem;
+  --ehr-space-8: 2rem;
+  --ehr-space-10: 2.5rem;
+  --ehr-space-12: 3rem;
+  --ehr-space-16: 4rem;
+
+  /* ── Typography ── */
+  --ehr-font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --ehr-font-mono: "JetBrains Mono", "Fira Code", Menlo, Monaco, "Courier New", monospace;
+  --ehr-text-xs: 0.75rem;
+  --ehr-text-sm: 0.875rem;
+  --ehr-text-base: 1rem;
+  --ehr-text-lg: 1.125rem;
+  --ehr-text-xl: 1.25rem;
+  --ehr-text-2xl: 1.5rem;
+  --ehr-text-3xl: 1.875rem;
+  --ehr-weight-normal: 400;
+  --ehr-weight-medium: 500;
+  --ehr-weight-semibold: 600;
+  --ehr-weight-bold: 700;
+
+  /* ── Radius ── */
+  --ehr-radius-none: 0;
+  --ehr-radius-sm: 0.125rem;
+  --ehr-radius-md: 0.375rem;
+  --ehr-radius-lg: 0.5rem;
+  --ehr-radius-xl: 0.75rem;
+  --ehr-radius-2xl: 1rem;
+  --ehr-radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --ehr-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --ehr-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --ehr-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --ehr-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
+  /* ── Motion ── */
+  --ehr-duration-fast: 100ms;
+  --ehr-duration-normal: 200ms;
+  --ehr-duration-slow: 300ms;
+  --ehr-easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ehr-easing-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* ── Controls ── */
+  --ehr-control-sm: 2rem;
+  --ehr-control-md: 2.5rem;
+  --ehr-control-lg: 3rem;
+  --ehr-control-radius: var(--ehr-radius-md);
+  --ehr-focus-ring: 0 0 0 2px #FFFFFF, 0 0 0 4px var(--ehr-blue-500);
+
+  /* ── Clinical: Severity ── */
+  --ehr-severity-critical-fg: #FFFFFF;
+  --ehr-severity-critical-bg: #B91C1C;
+  --ehr-severity-high-fg: #B91C1C;
+  --ehr-severity-high-bg: #FEF2F2;
+  --ehr-severity-moderate-fg: #C2410C;
+  --ehr-severity-moderate-bg: #FFF7ED;
+  --ehr-severity-low-fg: #B45309;
+  --ehr-severity-low-bg: #FFFBEB;
+  --ehr-severity-info-fg: #1D4ED8;
+  --ehr-severity-info-bg: #EFF6FF;
+
+  /* ── Clinical: Lab Flags ── */
+  --ehr-lab-normal-fg: inherit;
+  --ehr-lab-normal-bg: transparent;
+  --ehr-lab-high-fg: #B91C1C;
+  --ehr-lab-high-bg: #FEF2F2;
+  --ehr-lab-low-fg: #1D4ED8;
+  --ehr-lab-low-bg: #EFF6FF;
+  --ehr-lab-critical-high-fg: #FFFFFF;
+  --ehr-lab-critical-high-bg: #B91C1C;
+  --ehr-lab-critical-low-fg: #FFFFFF;
+  --ehr-lab-critical-low-bg: #1E40AF;
+
+  /* ── Clinical: Status ── */
+  --ehr-status-active: #22C55E;
+  --ehr-status-inactive: #9CA3AF;
+  --ehr-status-draft: #F59E0B;
+  --ehr-status-completed: #3B82F6;
+  --ehr-status-error: #EF4444;
+}
+
+/* ── Dark Mode ── */
+[data-ehr-theme="dark"] {
+  --ehr-bg-primary: var(--ehr-gray-950);
+  --ehr-bg-secondary: var(--ehr-gray-900);
+  --ehr-bg-tertiary: var(--ehr-gray-800);
+  --ehr-bg-inverse: #FFFFFF;
+  --ehr-fg-primary: var(--ehr-gray-50);
+  --ehr-fg-secondary: var(--ehr-gray-400);
+  --ehr-fg-tertiary: var(--ehr-gray-500);
+  --ehr-fg-inverse: var(--ehr-gray-900);
+  --ehr-border-default: var(--ehr-gray-700);
+  --ehr-border-strong: var(--ehr-gray-600);
+  --ehr-shadow-xs: none;
+  --ehr-shadow-sm: none;
+  --ehr-shadow-md: none;
+  --ehr-shadow-lg: none;
+}

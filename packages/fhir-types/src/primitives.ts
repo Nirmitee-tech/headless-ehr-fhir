@@ -1,0 +1,20 @@
+/** FHIR R4 primitive types */
+export type FHIRString = string
+export type FHIRBoolean = boolean
+export type FHIRInteger = number
+export type FHIRDecimal = number
+export type FHIRUri = string
+export type FHIRUrl = string
+export type FHIRCanonical = string
+export type FHIRBase64Binary = string
+export type FHIRInstant = string
+export type FHIRDate = string
+export type FHIRDateTime = string
+export type FHIRTime = string
+export type FHIRCode = string
+export type FHIROid = string
+export type FHIRId = string
+export type FHIRMarkdown = string
+export type FHIRUnsignedInt = number
+export type FHIRPositiveInt = number
+export type FHIRUuid = string

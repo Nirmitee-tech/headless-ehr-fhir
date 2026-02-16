@@ -1,0 +1,32 @@
+{
+  "name": "@ehr/primitives",
+  "version": "0.1.0",
+  "description": "Core UI primitives for the EHR healthcare component library",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./css": "./src/styles/primitives.css"
+  },
+  "files": ["dist", "src/styles"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@ehr/tokens": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "sideEffects": false,
+  "license": "Apache-2.0"
+}
