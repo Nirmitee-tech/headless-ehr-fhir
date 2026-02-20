@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -74,9 +76,51 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
+	if cfg.IsDev() {
+		log.Println("WARNING: ============================================================")
+		log.Println("WARNING: Server is running in DEVELOPMENT mode (ENV=development).")
+		log.Println("WARNING: DevAuthMiddleware is active — all requests get admin access.")
+		log.Println("WARNING: Do NOT use this configuration in production.")
+		log.Println("WARNING: Set ENV=production and configure AUTH_ISSUER for production.")
+		log.Println("WARNING: ============================================================")
+	}
+
 	return cfg, nil
 }
 
 func (c *Config) IsDev() bool {
 	return c.Env == "development"
+}
+
+// IsProduction returns true when the server is configured for production mode.
+func (c *Config) IsProduction() bool {
+	return c.Env == "production"
+}
+
+// Validate checks that the configuration is safe to run. In non-development
+// modes AUTH_ISSUER must be set so that real JWT authentication is enforced.
+// In production, HIPAA_ENCRYPTION_KEY is required and must be a valid
+// 64-character hex string (32 bytes when decoded).
+func (c *Config) Validate() error {
+	if !c.IsDev() && c.AuthIssuer == "" {
+		return fmt.Errorf(
+			"AUTH_ISSUER must be set when ENV is not \"development\" (current ENV=%q). "+
+				"Refusing to start without authentication configuration", c.Env)
+	}
+
+	// HIPAA encryption key validation
+	if c.IsProduction() && c.HIPAAEncryptionKey == "" {
+		return fmt.Errorf("HIPAA_ENCRYPTION_KEY is required in production")
+	}
+	if c.HIPAAEncryptionKey != "" {
+		keyBytes, err := hex.DecodeString(c.HIPAAEncryptionKey)
+		if err != nil {
+			return fmt.Errorf("HIPAA_ENCRYPTION_KEY is not valid hex: %w", err)
+		}
+		if len(keyBytes) != 32 {
+			return fmt.Errorf("HIPAA_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes", len(keyBytes))
+		}
+	}
+
+	return nil
 }

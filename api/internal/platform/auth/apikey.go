@@ -577,22 +577,8 @@ func enforceAPIKeyScopes(c echo.Context, scopes []string) error {
 		fmt.Sprintf("insufficient scope: requires %s.%s", resourceType, operation))
 }
 
-// extractFHIRResourceType extracts a FHIR resource type from URL paths like
-// /fhir/Patient/123 or /fhir/Observation.
-func extractFHIRResourceType(path string) string {
-	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
-	if len(parts) >= 2 && parts[0] == "fhir" {
-		return parts[1]
-	}
-	// Also support paths like /Patient, /Patient/123 for non-prefixed routes.
-	if len(parts) >= 1 {
-		candidate := parts[0]
-		if len(candidate) > 0 && candidate[0] >= 'A' && candidate[0] <= 'Z' {
-			return candidate
-		}
-	}
-	return ""
-}
+// extractFHIRResourceType is defined in smart_scope_middleware.go and shared
+// across the auth package.
 
 // httpMethodToScopeOperation maps HTTP methods to SMART scope operations.
 func httpMethodToScopeOperation(method string) string {

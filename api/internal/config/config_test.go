@@ -1,9 +1,14 @@
 package config
 
 import (
+	"encoding/hex"
 	"os"
 	"testing"
 )
+
+// validHIPAAKey is a 32-byte key encoded as 64 hex characters, used by tests
+// that need a valid production configuration.
+var validHIPAAKey = hex.EncodeToString(make([]byte, 32))
 
 func TestLoad_RequiresDatabaseURL(t *testing.T) {
 	os.Unsetenv("DATABASE_URL")
@@ -48,5 +53,89 @@ func TestConfig_IsDev(t *testing.T) {
 	c.Env = "production"
 	if c.IsDev() {
 		t.Error("expected IsDev() to return false for production")
+	}
+}
+
+func TestConfig_IsProduction(t *testing.T) {
+	c := &Config{Env: "production"}
+	if !c.IsProduction() {
+		t.Error("expected IsProduction() to return true for production")
+	}
+
+	c.Env = "development"
+	if c.IsProduction() {
+		t.Error("expected IsProduction() to return false for development")
+	}
+
+	c.Env = "staging"
+	if c.IsProduction() {
+		t.Error("expected IsProduction() to return false for staging")
+	}
+}
+
+func TestLoad_DefaultIsDevelopment(t *testing.T) {
+	// Ensure ENV is not set so the default takes effect.
+	os.Unsetenv("ENV")
+	os.Setenv("DATABASE_URL", "postgres://test:test@localhost:5432/test")
+	defer os.Unsetenv("DATABASE_URL")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Env != "development" {
+		t.Errorf("expected default ENV to be 'development', got %q", cfg.Env)
+	}
+
+	if !cfg.IsDev() {
+		t.Error("expected IsDev() to return true with default ENV")
+	}
+}
+
+func TestValidate_ProductionRequiresAuthIssuer(t *testing.T) {
+	// Production without AUTH_ISSUER should fail validation.
+	c := &Config{
+		Env:        "production",
+		AuthIssuer: "",
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("expected Validate() to return error when ENV=production and AUTH_ISSUER is empty")
+	}
+}
+
+func TestValidate_ProductionWithAuthIssuer(t *testing.T) {
+	c := &Config{
+		Env:                "production",
+		AuthIssuer:         "https://auth.example.com",
+		HIPAAEncryptionKey: validHIPAAKey,
+	}
+	err := c.Validate()
+	if err != nil {
+		t.Fatalf("unexpected Validate() error: %v", err)
+	}
+}
+
+func TestValidate_StagingRequiresAuthIssuer(t *testing.T) {
+	// Any non-development ENV without AUTH_ISSUER should fail.
+	c := &Config{
+		Env:        "staging",
+		AuthIssuer: "",
+	}
+	err := c.Validate()
+	if err == nil {
+		t.Fatal("expected Validate() to return error when ENV=staging and AUTH_ISSUER is empty")
+	}
+}
+
+func TestValidate_DevelopmentDoesNotRequireAuthIssuer(t *testing.T) {
+	c := &Config{
+		Env:        "development",
+		AuthIssuer: "",
+	}
+	err := c.Validate()
+	if err != nil {
+		t.Fatalf("unexpected Validate() error in development: %v", err)
 	}
 }

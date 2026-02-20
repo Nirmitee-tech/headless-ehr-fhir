@@ -37,6 +37,10 @@ type JWTConfig struct {
 	JWKSURL  string
 	// SigningKey is used for development/testing only
 	SigningKey []byte
+	// Skipper defines a function to skip this middleware for certain requests.
+	// When Skipper returns true, the middleware calls next(c) without any
+	// authentication checks. Use AuthSkipper for health/metrics endpoints.
+	Skipper func(echo.Context) bool
 }
 
 // JWKSKey represents a single JSON Web Key from a JWKS endpoint.
@@ -185,6 +189,11 @@ func JWTMiddleware(cfg JWTConfig) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// Skip authentication for designated public paths.
+			if cfg.Skipper != nil && cfg.Skipper(c) {
+				return next(c)
+			}
+
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
 				return echo.NewHTTPError(http.StatusUnauthorized, "missing authorization header")
@@ -241,10 +250,22 @@ func JWTMiddleware(cfg JWTConfig) echo.MiddlewareFunc {
 }
 
 // DevAuthMiddleware is a permissive middleware for development that allows
-// unauthenticated requests with default values.
-func DevAuthMiddleware() echo.MiddlewareFunc {
+// unauthenticated requests with default values. An optional skipper function
+// can be provided to bypass the middleware entirely for certain paths (e.g.
+// health checks). Pass nil to disable skipping.
+func DevAuthMiddleware(skipper ...func(echo.Context) bool) echo.MiddlewareFunc {
+	var skip func(echo.Context) bool
+	if len(skipper) > 0 {
+		skip = skipper[0]
+	}
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// Skip middleware for designated public paths.
+			if skip != nil && skip(c) {
+				return next(c)
+			}
+
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
 				// In dev mode, set defaults

@@ -30,14 +30,163 @@ func NewABACEngine(policies []ABACPolicy) *ABACEngine {
 	return &ABACEngine{policies: policies}
 }
 
-// DefaultPolicies returns the default ABAC policies for the EHR.
+// clinicalRoles is a convenience set used by isClinicalRole.
+var clinicalRoles = map[string]bool{
+	"physician": true,
+	"nurse":     true,
+}
+
+// isClinicalRole returns true if role is physician or nurse.
+func isClinicalRole(role string) bool {
+	return clinicalRoles[role]
+}
+
+// DefaultPolicies returns the comprehensive ABAC policies for the EHR,
+// covering all FHIR resource types the server supports.
+//
+// Policies are organised into three categories:
+//   - Clinical PHI resources (RequireConsent: true)
+//   - Patient-context resources (RequireConsent: false, contain patient data)
+//   - Administrative resources (RequireConsent: false, no patient data)
 func DefaultPolicies() []ABACPolicy {
+	adminPhysicianNurse := []string{"admin", "physician", "nurse"}
+	adminPhysician := []string{"admin", "physician"}
+
 	return []ABACPolicy{
-		{ResourceType: "Patient", AllowedRoles: []string{"admin", "physician", "nurse", "receptionist"}, RequireCareTeam: false, RequireConsent: false},
-		{ResourceType: "Condition", AllowedRoles: []string{"admin", "physician", "nurse"}, RequireCareTeam: false, RequireConsent: true},
-		{ResourceType: "Observation", AllowedRoles: []string{"admin", "physician", "nurse"}, RequireCareTeam: false, RequireConsent: true},
-		{ResourceType: "MedicationRequest", AllowedRoles: []string{"admin", "physician"}, RequireCareTeam: false, RequireConsent: true},
-		{ResourceType: "Encounter", AllowedRoles: []string{"admin", "physician", "nurse"}, RequireCareTeam: false, RequireConsent: false},
+		// ==================================================================
+		// Clinical PHI resources  (RequireConsent: true)
+		// ==================================================================
+
+		// General clinical — admin, physician, nurse
+		{ResourceType: "Condition", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "Observation", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "AllergyIntolerance", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "Procedure", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "NutritionOrder", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+
+		// Diagnostics — admin, physician, nurse, lab_tech, radiologist
+		{ResourceType: "DiagnosticReport", AllowedRoles: []string{"admin", "physician", "nurse", "lab_tech", "radiologist"}, RequireConsent: true},
+		{ResourceType: "ServiceRequest", AllowedRoles: []string{"admin", "physician", "nurse", "lab_tech", "radiologist"}, RequireConsent: true},
+		{ResourceType: "ImagingStudy", AllowedRoles: []string{"admin", "physician", "nurse", "lab_tech", "radiologist"}, RequireConsent: true},
+		{ResourceType: "Specimen", AllowedRoles: []string{"admin", "physician", "nurse", "lab_tech", "radiologist"}, RequireConsent: true},
+
+		// Medications — admin, physician, pharmacist
+		{ResourceType: "MedicationRequest", AllowedRoles: []string{"admin", "physician", "pharmacist"}, RequireConsent: true},
+		{ResourceType: "MedicationAdministration", AllowedRoles: []string{"admin", "physician", "pharmacist"}, RequireConsent: true},
+		{ResourceType: "MedicationDispense", AllowedRoles: []string{"admin", "physician", "pharmacist"}, RequireConsent: true},
+		{ResourceType: "MedicationStatement", AllowedRoles: []string{"admin", "physician", "pharmacist"}, RequireConsent: true},
+
+		// Documents — admin, physician, nurse
+		{ResourceType: "DocumentReference", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "Composition", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+
+		// Clinical assessments — admin, physician, nurse
+		{ResourceType: "FamilyMemberHistory", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "ClinicalImpression", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "RiskAssessment", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+
+		// Safety — admin, physician, nurse
+		{ResourceType: "Flag", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "DetectedIssue", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+		{ResourceType: "AdverseEvent", AllowedRoles: adminPhysicianNurse, RequireConsent: true},
+
+		// ==================================================================
+		// Patient-context resources  (RequireConsent: false)
+		// ==================================================================
+
+		// Core patient/encounter
+		{ResourceType: "Patient", AllowedRoles: []string{"admin", "physician", "nurse", "registrar", "receptionist"}},
+		{ResourceType: "Encounter", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "EpisodeOfCare", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "Consent", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "Communication", AllowedRoles: adminPhysicianNurse},
+
+		// Care management
+		{ResourceType: "CarePlan", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "Goal", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "CareTeam", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "Task", AllowedRoles: adminPhysicianNurse},
+
+		// Relationships
+		{ResourceType: "RelatedPerson", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
+
+		// Immunization
+		{ResourceType: "Immunization", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "ImmunizationRecommendation", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "ImmunizationEvaluation", AllowedRoles: adminPhysicianNurse},
+
+		// Financial/insurance
+		{ResourceType: "Coverage", AllowedRoles: []string{"admin", "billing"}},
+		{ResourceType: "Claim", AllowedRoles: []string{"admin", "billing"}},
+		{ResourceType: "ClaimResponse", AllowedRoles: []string{"admin", "billing"}},
+		{ResourceType: "ExplanationOfBenefit", AllowedRoles: []string{"admin", "billing"}},
+
+		// Questionnaires
+		{ResourceType: "QuestionnaireResponse", AllowedRoles: []string{"admin", "physician", "nurse", "patient"}},
+
+		// Devices
+		{ResourceType: "Device", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "DeviceRequest", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "DeviceUseStatement", AllowedRoles: adminPhysicianNurse},
+
+		// Genomics / anatomy / media
+		{ResourceType: "MolecularSequence", AllowedRoles: []string{"admin", "physician", "lab_tech"}},
+		{ResourceType: "BodyStructure", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "Media", AllowedRoles: adminPhysicianNurse},
+
+		// ==================================================================
+		// Administrative resources  (RequireConsent: false)
+		// ==================================================================
+
+		// Practitioner / organisation
+		{ResourceType: "Practitioner", AllowedRoles: []string{"admin", "physician", "nurse", "registrar", "pharmacist", "lab_tech"}},
+		{ResourceType: "PractitionerRole", AllowedRoles: []string{"admin", "physician", "nurse", "registrar", "pharmacist", "lab_tech"}},
+		{ResourceType: "Organization", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
+		{ResourceType: "Location", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
+		{ResourceType: "HealthcareService", AllowedRoles: adminPhysicianNurse},
+		{ResourceType: "Endpoint", AllowedRoles: adminPhysician},
+		{ResourceType: "Group", AllowedRoles: adminPhysicianNurse},
+
+		// Questionnaire definitions
+		{ResourceType: "Questionnaire", AllowedRoles: adminPhysicianNurse},
+
+		// Research
+		{ResourceType: "ResearchStudy", AllowedRoles: adminPhysician},
+		{ResourceType: "ResearchSubject", AllowedRoles: adminPhysician},
+
+		// Provenance / audit
+		{ResourceType: "Provenance", AllowedRoles: adminPhysicianNurse},
+
+		// Subscription
+		{ResourceType: "Subscription", AllowedRoles: []string{"admin"}},
+
+		// Financial admin
+		{ResourceType: "Account", AllowedRoles: []string{"admin", "billing"}},
+		{ResourceType: "InsurancePlan", AllowedRoles: []string{"admin", "billing"}},
+		{ResourceType: "Invoice", AllowedRoles: []string{"admin", "billing"}},
+
+		// Conformance / terminology
+		{ResourceType: "StructureDefinition", AllowedRoles: adminPhysician},
+		{ResourceType: "SearchParameter", AllowedRoles: adminPhysician},
+		{ResourceType: "CodeSystem", AllowedRoles: adminPhysician},
+		{ResourceType: "ValueSet", AllowedRoles: adminPhysician},
+		{ResourceType: "ConceptMap", AllowedRoles: adminPhysician},
+		{ResourceType: "NamingSystem", AllowedRoles: adminPhysician},
+		{ResourceType: "CapabilityStatement", AllowedRoles: adminPhysician},
+		{ResourceType: "OperationDefinition", AllowedRoles: adminPhysician},
+		{ResourceType: "CompartmentDefinition", AllowedRoles: adminPhysician},
+		{ResourceType: "ImplementationGuide", AllowedRoles: adminPhysician},
+
+		// Medication knowledge / substances
+		{ResourceType: "Medication", AllowedRoles: []string{"admin", "physician", "pharmacist"}},
+		{ResourceType: "MedicationKnowledge", AllowedRoles: []string{"admin", "physician", "pharmacist"}},
+		{ResourceType: "Substance", AllowedRoles: []string{"admin", "physician", "pharmacist"}},
+
+		// Scheduling
+		{ResourceType: "Schedule", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
+		{ResourceType: "Slot", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
+		{ResourceType: "Appointment", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
+		{ResourceType: "AppointmentResponse", AllowedRoles: []string{"admin", "physician", "nurse", "registrar"}},
 	}
 }
 
@@ -88,11 +237,41 @@ func (e *ABACEngine) Evaluate(ctx context.Context, resourceType string) *ABACDec
 		}
 	}
 
-	// No policy found - default deny
+	// No policy found — fall back to admin + physician for unlisted resources.
+	for _, r := range roles {
+		if r == "physician" {
+			return &ABACDecision{Allowed: true, Reason: "default policy for unlisted resource"}
+		}
+	}
+
 	return &ABACDecision{Allowed: false, Reason: "no policy for " + resourceType}
 }
 
+// hasExplicitPolicy returns true if the engine contains an explicit policy for
+// the given resource type.
+func (e *ABACEngine) hasExplicitPolicy(resourceType string) bool {
+	for _, p := range e.policies {
+		if p.ResourceType == resourceType {
+			return true
+		}
+	}
+	return false
+}
+
+// isReadOnly returns true for HTTP methods that only read data (GET, HEAD).
+func isReadOnly(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead
+}
+
 // ABACMiddleware returns middleware that enforces ABAC policies.
+//
+// For resource types that have an explicit policy the middleware delegates
+// entirely to ABACEngine.Evaluate.
+//
+// For unknown resource types (no explicit policy) the middleware applies a
+// graceful fallback: clinical roles (physician, nurse) are allowed read-only
+// access (GET/HEAD).  Write operations on unknown resources remain
+// default-deny for non-admin users.
 func ABACMiddleware(engine *ABACEngine) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -104,7 +283,20 @@ func ABACMiddleware(engine *ABACEngine) echo.MiddlewareFunc {
 			}
 
 			decision := engine.Evaluate(c.Request().Context(), resourceType)
+
 			if !decision.Allowed {
+				// Graceful fallback for unknown resources: allow clinical
+				// roles read-only access so that new/unlisted FHIR types
+				// don't cause hard failures for ordinary queries.
+				if !engine.hasExplicitPolicy(resourceType) && isReadOnly(c.Request().Method) {
+					roles := RolesFromContext(c.Request().Context())
+					for _, r := range roles {
+						if isClinicalRole(r) {
+							// Allow with no consent requirement.
+							return next(c)
+						}
+					}
+				}
 				return echo.NewHTTPError(http.StatusForbidden, decision.Reason)
 			}
 

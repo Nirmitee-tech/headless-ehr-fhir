@@ -225,3 +225,95 @@ func TestTenantFromContext_WithWrongType(t *testing.T) {
 		t.Errorf("expected empty string when context value is wrong type, got %q", tid)
 	}
 }
+
+func TestTenantMiddleware_SkipsPublicPaths(t *testing.T) {
+	publicPaths := []string{
+		"/health",
+		"/health/db",
+		"/metrics",
+		"/.well-known/smart-configuration",
+		"/fhir/metadata",
+	}
+
+	for _, path := range publicPaths {
+		t.Run(path, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetPath(path)
+
+			var handlerCalled bool
+			handler := func(c echo.Context) error {
+				handlerCalled = true
+				// Verify no DB connection was set in context
+				ctx := c.Request().Context()
+				conn := ConnFromContext(ctx)
+				if conn != nil {
+					t.Error("expected no DB connection for public path")
+				}
+				tid := TenantFromContext(ctx)
+				if tid != "" {
+					t.Errorf("expected no tenant ID for public path, got %s", tid)
+				}
+				return c.String(http.StatusOK, "ok")
+			}
+
+			// Pass nil pool — if the middleware does NOT skip, it will panic
+			// or return an error when trying to acquire from nil pool.
+			mw := TenantMiddleware(nil, "default")
+			h := mw(handler)
+			err := h(c)
+
+			if err != nil {
+				t.Fatalf("expected no error for public path %s, got: %v", path, err)
+			}
+			if !handlerCalled {
+				t.Errorf("handler was not called for public path %s", path)
+			}
+		})
+	}
+}
+
+func TestTenantMiddleware_DoesNotSkipProtectedPaths(t *testing.T) {
+	// For protected paths, the middleware should NOT skip and should try to
+	// acquire a connection. With a nil pool this will fail, proving the
+	// middleware did not skip.
+	protectedPaths := []string{
+		"/api/v1/patients",
+		"/fhir/Patient",
+		"/",
+	}
+
+	for _, path := range protectedPaths {
+		t.Run(path, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetPath(path)
+
+			handler := func(c echo.Context) error {
+				return c.String(http.StatusOK, "ok")
+			}
+
+			// nil pool: the middleware will attempt pool.Acquire and panic/error.
+			// We wrap in a recover to detect it was not skipped.
+			mw := TenantMiddleware(nil, "default")
+			h := mw(handler)
+
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// Expected — middleware tried to use nil pool
+						return
+					}
+				}()
+				err := h(c)
+				if err == nil {
+					t.Errorf("expected error or panic for protected path %s with nil pool", path)
+				}
+			}()
+		})
+	}
+}

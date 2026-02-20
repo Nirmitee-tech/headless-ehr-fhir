@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
+
+	"github.com/ehr/ehr/internal/platform/auth"
 )
 
 type contextKey string
@@ -24,6 +27,12 @@ var tenantIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 func TenantMiddleware(pool *pgxpool.Pool, defaultTenant string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// Skip tenant resolution for public infrastructure paths that
+			// do not need a database connection (health, metrics, etc.).
+			if auth.IsPublicPath(c.Path()) {
+				return next(c)
+			}
+
 			tenantID := extractTenantID(c, defaultTenant)
 
 			if !tenantIDPattern.MatchString(tenantID) {
@@ -41,6 +50,28 @@ func TenantMiddleware(pool *pgxpool.Pool, defaultTenant string) echo.MiddlewareF
 			_, err = conn.Exec(ctx, fmt.Sprintf("SET search_path TO %s, shared, public", schema))
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "tenant resolution failed")
+			}
+
+			// Set session variables for RLS policies (migration 036).
+			// These allow PostgreSQL RLS functions to verify that the
+			// search_path and tenant context are consistent, and to
+			// attribute writes to the authenticated user.
+			if _, err = conn.Exec(ctx, "SET app.current_tenant_id = "+quoteLiteral(tenantID)); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "tenant context failed")
+			}
+
+			userID := auth.UserIDFromContext(ctx)
+			if userID != "" {
+				if _, err = conn.Exec(ctx, "SET app.current_user_id = "+quoteLiteral(userID)); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "user context failed")
+				}
+			}
+
+			roles := auth.RolesFromContext(ctx)
+			if len(roles) > 0 {
+				if _, err = conn.Exec(ctx, "SET app.current_user_roles = "+quoteLiteral(strings.Join(roles, ","))); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "role context failed")
+				}
 			}
 
 			ctx = context.WithValue(ctx, TenantIDKey, tenantID)
@@ -104,6 +135,15 @@ func WithTx(ctx context.Context) (context.Context, pgx.Tx, error) {
 func TxFromContext(ctx context.Context) pgx.Tx {
 	tx, _ := ctx.Value(DBTxKey).(pgx.Tx)
 	return tx
+}
+
+// quoteLiteral returns a PostgreSQL-safe quoted string literal.
+// It wraps the value in single quotes and escapes any embedded single quotes,
+// preventing SQL injection in SET commands where parameterized queries
+// are not supported for session variable values.
+func quoteLiteral(s string) string {
+	escaped := strings.ReplaceAll(s, "'", "''")
+	return "'" + escaped + "'"
 }
 
 // CreateTenantSchema creates a new schema for a tenant and runs all migrations against it.

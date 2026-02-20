@@ -363,6 +363,20 @@ func runServer() error {
 		logger.Fatal().Err(err).Msg("failed to load config")
 	}
 
+	// Validate configuration safety (e.g. AUTH_ISSUER required in production)
+	if err := cfg.Validate(); err != nil {
+		logger.Fatal().Err(err).Msg("configuration validation failed")
+	}
+
+	// PHI encryption service
+	phiEncryption, err := hipaa.NewEncryptionService(cfg.HIPAAEncryptionKey, logger)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to initialize PHI encryption")
+	}
+	if !phiEncryption.IsEnabled() {
+		logger.Warn().Msg("PHI field encryption is DISABLED - set HIPAA_ENCRYPTION_KEY for production")
+	}
+
 	// Database
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL, cfg.DBMaxConns, cfg.DBMinConns)
@@ -387,14 +401,15 @@ func runServer() error {
 		AllowHeaders: []string{"Authorization", "Content-Type", "X-Request-ID", "X-Tenant-ID", "X-Break-Glass"},
 	}))
 
-	// Auth middleware
+	// Auth middleware — skip authentication for health/metrics/discovery endpoints
 	if cfg.IsDev() {
-		e.Use(auth.DevAuthMiddleware())
+		e.Use(auth.DevAuthMiddleware(auth.AuthSkipper))
 	} else {
 		e.Use(auth.JWTMiddleware(auth.JWTConfig{
 			Issuer:   cfg.AuthIssuer,
 			Audience: cfg.AuthAudience,
 			JWKSURL:  cfg.AuthJWKSURL,
+			Skipper:  auth.AuthSkipper,
 		}))
 	}
 
@@ -403,6 +418,11 @@ func runServer() error {
 
 	// Audit middleware
 	e.Use(middleware.Audit(logger))
+
+	// Break-glass emergency override middleware.
+	// Must run AFTER auth (so user_id is in context) and BEFORE ABAC/consent
+	// so that it can elevate roles and disable consent checks.
+	e.Use(middleware.BreakGlass(logger))
 
 	// API groups
 	apiV1 := e.Group("/api/v1")
@@ -418,6 +438,11 @@ func runServer() error {
 	}
 	apiV1.Use(middleware.RateLimit(rateLimitCfg))
 	fhirGroup.Use(middleware.RateLimit(rateLimitCfg))
+
+	// SMART on FHIR scope enforcement middleware on FHIR group.
+	// This checks that the JWT scopes grant access to the requested
+	// FHIR resource type + operation before ABAC and consent checks run.
+	fhirGroup.Use(authpkg.FHIRScopeMiddleware())
 
 	// ABAC + Consent enforcement middleware on FHIR group.
 	// The consent repo is created early so the middleware can be wired before
@@ -1485,22 +1510,8 @@ func runServer() error {
 	fhirGroupHandler := admin.NewGroupHandler(fhirGroupSvc)
 	fhirGroupHandler.RegisterGroupRoutes(apiV1, fhirGroup)
 
-	// Identity domain (with optional PHI encryption)
-	var phiEncryptor hipaa.FieldEncryptor
-	if cfg.HIPAAEncryptionKey != "" {
-		keyBytes, err := hex.DecodeString(cfg.HIPAAEncryptionKey)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("HIPAA_ENCRYPTION_KEY must be a valid hex-encoded 32-byte key")
-		}
-		enc, err := hipaa.NewRotatingEncryptor(keyBytes, 1)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("failed to create PHI encryptor")
-		}
-		phiEncryptor = enc
-		logger.Info().Msg("PHI field-level encryption enabled")
-	} else {
-		logger.Warn().Msg("HIPAA_ENCRYPTION_KEY not set; PHI field-level encryption is disabled")
-	}
+	// Identity domain (with PHI encryption from the shared service)
+	phiEncryptor := phiEncryption.Encryptor()
 
 	var patientRepo identity.PatientRepository
 	if phiEncryptor != nil {
