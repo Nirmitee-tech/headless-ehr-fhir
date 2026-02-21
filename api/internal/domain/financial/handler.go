@@ -736,6 +736,7 @@ func (h *Handler) GetAccountFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Account", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, a.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, a.ToFHIR())
 }
 
@@ -840,6 +841,7 @@ func (h *Handler) GetInsurancePlanFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("InsurancePlan", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ip.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ip.ToFHIR())
 }
 
@@ -944,6 +946,7 @@ func (h *Handler) GetPaymentNoticeFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PaymentNotice", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, pn.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, pn.ToFHIR())
 }
 
@@ -1048,6 +1051,7 @@ func (h *Handler) GetPaymentReconciliationFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("PaymentReconciliation", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, pr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, pr.ToFHIR())
 }
 
@@ -1152,6 +1156,7 @@ func (h *Handler) GetChargeItemFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ChargeItem", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ci.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ci.ToFHIR())
 }
 
@@ -1256,6 +1261,7 @@ func (h *Handler) GetChargeItemDefinitionFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ChargeItemDefinition", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, cd.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, cd.ToFHIR())
 }
 
@@ -1360,6 +1366,7 @@ func (h *Handler) GetContractFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Contract", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ct.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ct.ToFHIR())
 }
 
@@ -1464,6 +1471,7 @@ func (h *Handler) GetEnrollmentRequestFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("EnrollmentRequest", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, er.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, er.ToFHIR())
 }
 
@@ -1568,6 +1576,7 @@ func (h *Handler) GetEnrollmentResponseFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("EnrollmentResponse", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, er.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, er.ToFHIR())
 }
 

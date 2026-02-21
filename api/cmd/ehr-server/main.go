@@ -409,10 +409,36 @@ func runServer() error {
 	revocationStore := auth.NewTokenRevocationStore()
 	defer revocationStore.Close()
 
-	// Auth middleware — skip authentication for health/metrics/discovery endpoints
-	if cfg.IsDev() {
+	// SMART on FHIR server — created early so standalone auth can reference it.
+	smartSigningKeyEarly, randomKeyEarly, smartKeyErr := resolveSmartSigningKey(os.Getenv("SMART_SIGNING_KEY"))
+	if smartKeyErr != nil {
+		logger.Fatal().Err(smartKeyErr).Msg("SMART signing key error")
+	}
+	if randomKeyEarly {
+		logger.Warn().Msg("SMART_SIGNING_KEY not set; using random key (tokens will not survive restart)")
+	}
+	smartIssuerEarly := "http://localhost:" + cfg.Port
+	if issuer := os.Getenv("SMART_ISSUER"); issuer != "" {
+		smartIssuerEarly = issuer
+	}
+	smartServer := authpkg.NewSMARTServer(smartIssuerEarly, smartSigningKeyEarly)
+	smartCleanupCtx, smartCleanupCancel := context.WithCancel(context.Background())
+	defer smartCleanupCancel()
+	smartServer.StartCleanup(smartCleanupCtx)
+
+	// Auth middleware — mode determines which authentication strategy is used:
+	//   development → DevAuthMiddleware (no auth, all requests get admin)
+	//   standalone  → StandaloneAuthMiddleware (built-in SMART server)
+	//   external    → JWTMiddleware (Keycloak, Auth0, or other OIDC provider)
+	authMode := cfg.ResolvedAuthMode()
+	switch authMode {
+	case "development":
 		e.Use(auth.DevAuthMiddleware(auth.AuthSkipper))
-	} else {
+	case "standalone":
+		authpkg.RegisterDefaultSMARTClient(smartServer)
+		e.Use(authpkg.StandaloneAuthMiddleware(smartServer, cfg.DefaultTenant, auth.AuthSkipper))
+		authpkg.PrintStandaloneAuthInfo(smartIssuerEarly, cfg.Port)
+	default: // "external"
 		e.Use(auth.JWTMiddleware(auth.JWTConfig{
 			Issuer:          cfg.AuthIssuer,
 			Audience:        cfg.AuthAudience,
@@ -476,7 +502,12 @@ func runServer() error {
 	capBuilder := fhir.NewCapabilityBuilder(baseURL, "0.1.0")
 
 	// Configure SMART on FHIR OAuth URIs
-	if cfg.AuthIssuer != "" {
+	if authMode == "standalone" {
+		capBuilder.SetOAuthURIs(
+			smartIssuerEarly+"/auth/authorize",
+			smartIssuerEarly+"/auth/token",
+		)
+	} else if cfg.AuthIssuer != "" {
 		capBuilder.SetOAuthURIs(
 			cfg.AuthIssuer+"/protocol/openid-connect/auth",
 			cfg.AuthIssuer+"/protocol/openid-connect/token",
@@ -1326,7 +1357,13 @@ func runServer() error {
 	// horizontal scalability (contexts survive restarts and are shared
 	// across instances). Falls back to in-memory if pool is nil.
 	smartStore := auth.NewPGLaunchContextStoreFromPool(pool, 5*time.Minute)
-	auth.RegisterSMARTEndpoints(fhirGroup, cfg.AuthIssuer, smartStore)
+	// Use the correct issuer for well-known: standalone uses built-in server,
+	// external uses the configured AUTH_ISSUER (Keycloak, Auth0, etc.).
+	smartWellKnownIssuer := cfg.AuthIssuer
+	if authMode == "standalone" {
+		smartWellKnownIssuer = smartIssuerEarly
+	}
+	auth.RegisterSMARTEndpoints(fhirGroup, smartWellKnownIssuer, smartStore)
 
 	// FHIR Bundle handler (transaction/batch processing)
 	bundleProcessor := &fhir.DefaultBundleProcessor{}
@@ -1510,7 +1547,7 @@ func runServer() error {
 	userRepo := admin.NewSystemUserRepo(pool)
 	adminSvc := admin.NewService(orgRepo, deptRepo, locRepo, userRepo)
 	adminSvc.SetVersionTracker(versionTracker)
-	adminHandler := admin.NewHandler(adminSvc)
+	adminHandler := admin.NewHandler(adminSvc, pool)
 	adminHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// FHIR Group resource
@@ -1538,14 +1575,14 @@ func runServer() error {
 	practRoleRepo := identity.NewPractitionerRoleRepoPG(pool)
 	identitySvc := identity.NewService(patientRepo, practRepo, patientLinkRepo, practRoleRepo)
 	identitySvc.SetVersionTracker(versionTracker)
-	identityHandler := identity.NewHandler(identitySvc)
+	identityHandler := identity.NewHandler(identitySvc, pool)
 	identityHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Encounter domain
 	encRepo := encounter.NewRepo(pool)
 	encSvc := encounter.NewService(encRepo)
 	encSvc.SetVersionTracker(versionTracker)
-	encHandler := encounter.NewHandler(encSvc)
+	encHandler := encounter.NewHandler(encSvc, pool)
 	encHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Clinical domain
@@ -1555,7 +1592,7 @@ func runServer() error {
 	procRepo := clinical.NewProcedureRepoPG(pool)
 	clinicalSvc := clinical.NewService(condRepo, obsRepo, allergyRepo, procRepo)
 	clinicalSvc.SetVersionTracker(versionTracker)
-	clinicalHandler := clinical.NewHandler(clinicalSvc)
+	clinicalHandler := clinical.NewHandler(clinicalSvc, pool)
 	clinicalHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// NutritionOrder domain
@@ -1572,7 +1609,7 @@ func runServer() error {
 	orderHistRepo := diagnostics.NewOrderStatusHistoryRepoPG(pool)
 	dxSvc := diagnostics.NewService(srRepo, specRepo, dxReportRepo, imgRepo, orderHistRepo)
 	dxSvc.SetVersionTracker(versionTracker)
-	dxHandler := diagnostics.NewHandler(dxSvc)
+	dxHandler := diagnostics.NewHandler(dxSvc, pool)
 	dxHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Medication domain
@@ -1583,7 +1620,7 @@ func runServer() error {
 	medStmtRepo := medication.NewMedicationStatementRepoPG(pool)
 	medSvc := medication.NewService(medRepo, medReqRepo, medAdminRepo, medDispRepo, medStmtRepo)
 	medSvc.SetVersionTracker(versionTracker)
-	medHandler := medication.NewHandler(medSvc, dxSvc)
+	medHandler := medication.NewHandler(medSvc, pool, dxSvc)
 	medHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Scheduling domain
@@ -1615,7 +1652,7 @@ func runServer() error {
 	docTemplateRepo := documents.NewDocumentTemplateRepoPG(pool)
 	docSvc := documents.NewService(consentRepo, docRefRepo, noteRepo, compRepo, docTemplateRepo)
 	docSvc.SetVersionTracker(versionTracker)
-	docHandler := documents.NewHandler(docSvc)
+	docHandler := documents.NewHandler(docSvc, pool)
 	docHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Inbox domain
@@ -1749,7 +1786,7 @@ func runServer() error {
 	immRecRepo := immunization.NewRecommendationRepoPG(pool)
 	immSvc := immunization.NewService(immRepo, immRecRepo)
 	immSvc.SetVersionTracker(versionTracker)
-	immHandler := immunization.NewHandler(immSvc)
+	immHandler := immunization.NewHandler(immSvc, pool)
 	immHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// CarePlan domain
@@ -1757,7 +1794,7 @@ func runServer() error {
 	goalRepo := careplan.NewGoalRepoPG(pool)
 	cpSvc := careplan.NewService(cpRepo, goalRepo)
 	cpSvc.SetVersionTracker(versionTracker)
-	cpHandler := careplan.NewHandler(cpSvc)
+	cpHandler := careplan.NewHandler(cpSvc, pool)
 	cpHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// FamilyHistory domain
@@ -1785,7 +1822,7 @@ func runServer() error {
 	ctRepo := careteam.NewCareTeamRepoPG(pool)
 	ctSvc := careteam.NewService(ctRepo)
 	ctSvc.SetVersionTracker(versionTracker)
-	ctHandler := careteam.NewHandler(ctSvc)
+	ctHandler := careteam.NewHandler(ctSvc, pool)
 	ctHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Task domain
@@ -2874,6 +2911,17 @@ func runServer() error {
 
 	exportManager.RegisterExporter("AllergyIntolerance", &fhir.ServiceExporter{
 		ResourceType: "AllergyIntolerance",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := clinicalSvc.SearchAllergies(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -2892,6 +2940,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("Procedure", &fhir.ServiceExporter{
 		ResourceType: "Procedure",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := clinicalSvc.SearchProcedures(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -2910,6 +2969,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("DiagnosticReport", &fhir.ServiceExporter{
 		ResourceType: "DiagnosticReport",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := dxSvc.SearchDiagnosticReports(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -2928,6 +2998,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("Immunization", &fhir.ServiceExporter{
 		ResourceType: "Immunization",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := immSvc.SearchImmunizations(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -2946,6 +3027,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("CarePlan", &fhir.ServiceExporter{
 		ResourceType: "CarePlan",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := cpSvc.SearchCarePlans(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -2964,6 +3056,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("Coverage", &fhir.ServiceExporter{
 		ResourceType: "Coverage",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := billSvc.SearchCoverages(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -2982,6 +3085,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("DocumentReference", &fhir.ServiceExporter{
 		ResourceType: "DocumentReference",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := docSvc.SearchDocumentReferences(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -3134,6 +3248,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("Goal", &fhir.ServiceExporter{
 		ResourceType: "Goal",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := cpSvc.SearchGoals(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -3275,6 +3400,17 @@ func runServer() error {
 	})
 	exportManager.RegisterExporter("RelatedPerson", &fhir.ServiceExporter{
 		ResourceType: "RelatedPerson",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := rpSvc.SearchRelatedPersons(ctx, nil, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
 		ListByPatientFn: func(ctx context.Context, patientID string, since *time.Time) ([]map[string]interface{}, error) {
 			pid, err := uuid.Parse(patientID)
 			if err != nil {
@@ -3331,6 +3467,49 @@ func runServer() error {
 				return nil, err
 			}
 			items, _, err := taskSvc.ListTasksByPatient(ctx, pid, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+
+	exportManager.RegisterExporter("Organization", &fhir.ServiceExporter{
+		ResourceType: "Organization",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := adminSvc.ListOrganizations(ctx, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Location", &fhir.ServiceExporter{
+		ResourceType: "Location",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := adminSvc.ListLocations(ctx, 10000, 0)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]map[string]interface{}, len(items))
+			for i, v := range items {
+				out[i] = v.ToFHIR()
+			}
+			return out, nil
+		},
+	})
+	exportManager.RegisterExporter("Provenance", &fhir.ServiceExporter{
+		ResourceType: "Provenance",
+		ListFn: func(ctx context.Context, since *time.Time) ([]map[string]interface{}, error) {
+			items, _, err := provSvc.SearchProvenances(ctx, nil, 10000, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -4110,22 +4289,8 @@ func runServer() error {
 	ccdaHandler := ccda.NewHandler(ccdaGenerator, ccdaParser, ccdaFetcher)
 	ccdaHandler.RegisterRoutes(apiV1)
 
-	// SMART on FHIR App Launch — OAuth2 authorization server for SMART apps
-	smartSigningKey, randomKey, err := resolveSmartSigningKey(os.Getenv("SMART_SIGNING_KEY"))
-	if err != nil {
-		logger.Fatal().Err(err).Msg("SMART signing key error")
-	}
-	if randomKey {
-		logger.Warn().Msg("SMART_SIGNING_KEY not set; using random key (tokens will not survive restart)")
-	}
-	smartIssuer := "http://localhost:" + cfg.Port
-	if issuer := os.Getenv("SMART_ISSUER"); issuer != "" {
-		smartIssuer = issuer
-	}
-	smartServer := authpkg.NewSMARTServer(smartIssuer, smartSigningKey)
-	smartCleanupCtx, smartCleanupCancel := context.WithCancel(context.Background())
-	defer smartCleanupCancel()
-	smartServer.StartCleanup(smartCleanupCtx)
+	// SMART on FHIR App Launch — register HTTP routes for the SMART server
+	// (the server itself was created earlier for auth middleware wiring).
 	smartHandler := authpkg.NewSMARTHandler(smartServer)
 	smartHandler.RegisterRoutes(e)
 
@@ -4255,8 +4420,11 @@ func runServer() error {
 
 	// SMART Backend Services (client_credentials with JWT assertion)
 	backendSvcStore := auth.NewInMemoryBackendServiceStore()
-	backendSigningKey, _, _ := resolveSmartSigningKey(os.Getenv("SMART_SIGNING_KEY"))
-	backendSvcMgr := auth.NewBackendServiceManager(backendSvcStore, backendSigningKey, cfg.AuthIssuer, cfg.AuthIssuer+"/auth/token")
+	backendSvcIssuer := smartIssuerEarly
+	if cfg.AuthIssuer != "" {
+		backendSvcIssuer = cfg.AuthIssuer
+	}
+	backendSvcMgr := auth.NewBackendServiceManager(backendSvcStore, smartSigningKeyEarly, backendSvcIssuer, backendSvcIssuer+"/auth/token")
 	auth.RegisterBackendServiceEndpoints(fhirGroup, backendSvcMgr)
 
 	// Webhook Management API

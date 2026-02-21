@@ -457,6 +457,9 @@ func (b *CapabilityBuilder) Build() map[string]interface{} {
 		"kind":         "instance",
 		"fhirVersion":  fhirVersion,
 		"format":       formats,
+		"instantiates": []string{
+			"http://hl7.org/fhir/uv/bulkdata/CapabilityStatement/bulk-data",
+		},
 		"software": map[string]string{
 			"name":    serverName,
 			"version": b.config.ServerVersion,

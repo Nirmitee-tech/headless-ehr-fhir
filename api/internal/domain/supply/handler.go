@@ -209,6 +209,7 @@ func (h *Handler) GetSupplyRequestFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("SupplyRequest", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, sr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, sr.ToFHIR())
 }
 
@@ -347,6 +348,7 @@ func (h *Handler) GetSupplyDeliveryFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("SupplyDelivery", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, sd.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, sd.ToFHIR())
 }
 

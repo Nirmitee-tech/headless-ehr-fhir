@@ -449,6 +449,7 @@ func (h *Handler) GetScheduleFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Schedule", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, sched.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, sched.ToFHIR())
 }
 
@@ -483,6 +484,7 @@ func (h *Handler) GetSlotFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Slot", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, sl.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, sl.ToFHIR())
 }
 
@@ -517,6 +519,7 @@ func (h *Handler) GetAppointmentFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Appointment", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, a.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, a.ToFHIR())
 }
 
@@ -553,6 +556,7 @@ func (h *Handler) GetAppointmentResponseFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AppointmentResponse", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ar.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ar.ToFHIR())
 }
 

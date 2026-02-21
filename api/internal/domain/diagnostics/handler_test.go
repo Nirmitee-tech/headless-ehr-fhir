@@ -13,7 +13,7 @@ import (
 
 func newTestHandler() (*Handler, *echo.Echo) {
 	svc := newTestService()
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 	e := echo.New()
 	return h, e
 }

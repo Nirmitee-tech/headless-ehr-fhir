@@ -17,8 +17,12 @@ import (
 
 const (
 	USCorePatientURL             = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
-	USCoreConditionURL           = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns"
+	USCoreConditionURL                   = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns"
+	USCoreConditionEncounterDiagnosisURL = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-encounter-diagnosis"
 	USCoreObservationLabURL      = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab"
+	USCoreVitalSignsURL          = "http://hl7.org/fhir/StructureDefinition/vitalsigns"
+	USCoreSmokingStatusURL       = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-smokingstatus"
+	USCoreObservationSDOHURL     = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-sdoh-assessment"
 	USCoreAllergyIntoleranceURL  = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-allergyintolerance"
 	USCoreMedicationRequestURL   = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-medicationrequest"
 	USCoreEncounterURL           = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-encounter"

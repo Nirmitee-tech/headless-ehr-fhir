@@ -117,15 +117,30 @@ func TestValidate_ProductionWithAuthIssuer(t *testing.T) {
 	}
 }
 
-func TestValidate_StagingRequiresAuthIssuer(t *testing.T) {
-	// Any non-development ENV without AUTH_ISSUER should fail.
+func TestValidate_StagingWithoutAuthIssuerUsesStandalone(t *testing.T) {
+	// ENV=staging without AUTH_ISSUER resolves to standalone mode (valid).
 	c := &Config{
 		Env:        "staging",
 		AuthIssuer: "",
 	}
 	err := c.Validate()
+	if err != nil {
+		t.Fatalf("unexpected Validate() error: standalone mode should be valid: %v", err)
+	}
+	if c.ResolvedAuthMode() != "standalone" {
+		t.Fatalf("expected standalone auth mode, got %q", c.ResolvedAuthMode())
+	}
+}
+
+func TestValidate_ExternalModeRequiresAuthIssuer(t *testing.T) {
+	// Explicit AUTH_MODE=external without AUTH_ISSUER should fail.
+	c := &Config{
+		Env:      "staging",
+		AuthMode: "external",
+	}
+	err := c.Validate()
 	if err == nil {
-		t.Fatal("expected Validate() to return error when ENV=staging and AUTH_ISSUER is empty")
+		t.Fatal("expected Validate() to return error when AUTH_MODE=external and AUTH_ISSUER is empty")
 	}
 }
 

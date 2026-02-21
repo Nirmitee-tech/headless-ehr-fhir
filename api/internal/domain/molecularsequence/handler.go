@@ -131,6 +131,7 @@ func (h *Handler) GetMolecularSequenceFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MolecularSequence", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, m.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, m.ToFHIR())
 }
 

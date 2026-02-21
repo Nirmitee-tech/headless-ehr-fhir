@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/platform/auth"
@@ -16,11 +17,12 @@ import (
 )
 
 type Handler struct {
-	svc *Service
+	svc  *Service
+	pool *pgxpool.Pool
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, pool *pgxpool.Pool) *Handler {
+	return &Handler{svc: svc, pool: pool}
 }
 
 func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
@@ -510,6 +512,7 @@ func (h *Handler) SearchConsentsFHIR(c echo.Context) error {
 		resources[i] = item.ToFHIR()
 	}
 	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/Consent",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
@@ -523,6 +526,7 @@ func (h *Handler) GetConsentFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Consent", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, consent.VersionID, consent.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, consent.ToFHIR())
 }
 
@@ -549,13 +553,16 @@ func (h *Handler) SearchDocumentReferencesFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/DocumentReference",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
 		Offset:   pg.Offset,
 		Total:    total,
-	}))
+	})
+	fhir.HandleProvenanceRevInclude(bundle, c, h.pool)
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetDocumentReferenceFHIR(c echo.Context) error {
@@ -563,6 +570,7 @@ func (h *Handler) GetDocumentReferenceFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("DocumentReference", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, doc.VersionID, doc.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, doc.ToFHIR())
 }
 
@@ -594,6 +602,7 @@ func (h *Handler) SearchCompositionsFHIR(c echo.Context) error {
 			resources[i] = item.ToFHIR()
 		}
 		return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+			ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 			BaseURL:  "/fhir/Composition",
 			QueryStr: c.QueryString(),
 			Count:    pg.Limit,
@@ -602,6 +611,7 @@ func (h *Handler) SearchCompositionsFHIR(c echo.Context) error {
 		}))
 	}
 	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(nil, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/Composition",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
@@ -615,6 +625,7 @@ func (h *Handler) GetCompositionFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Composition", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, comp.VersionID, comp.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, comp.ToFHIR())
 }
 

@@ -422,6 +422,7 @@ func (h *Handler) GetNamingSystemFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("NamingSystem", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ns.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ns.ToFHIR())
 }
 
@@ -529,6 +530,7 @@ func (h *Handler) GetOperationDefinitionFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("OperationDefinition", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, od.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, od.ToFHIR())
 }
 
@@ -636,6 +638,7 @@ func (h *Handler) GetMessageDefinitionFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MessageDefinition", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, md.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, md.ToFHIR())
 }
 
@@ -740,6 +743,7 @@ func (h *Handler) GetMessageHeaderFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MessageHeader", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, mh.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, mh.ToFHIR())
 }
 

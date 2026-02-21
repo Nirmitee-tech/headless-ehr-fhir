@@ -292,20 +292,26 @@ func TestExtractFullURL(t *testing.T) {
 		{
 			name:     "map with resourceType and id",
 			resource: map[string]interface{}{"resourceType": "Patient", "id": "123"},
-			baseURL:  "/fhir/Patient",
+			baseURL:  "",
 			want:     "Patient/123",
 		},
 		{
 			name:     "map missing id",
 			resource: map[string]interface{}{"resourceType": "Patient"},
-			baseURL:  "/fhir/Patient",
+			baseURL:  "",
 			want:     "",
 		},
 		{
 			name:     "map[string]string type",
 			resource: map[string]string{"resourceType": "Observation", "id": "obs-1"},
-			baseURL:  "/fhir/Observation",
+			baseURL:  "",
 			want:     "Observation/obs-1",
+		},
+		{
+			name:     "absolute URL with server base",
+			resource: map[string]interface{}{"resourceType": "Patient", "id": "456"},
+			baseURL:  "http://localhost:8000/fhir",
+			want:     "http://localhost:8000/fhir/Patient/456",
 		},
 	}
 
@@ -679,7 +685,7 @@ func TestExtractFullURL_EmptyResourceType(t *testing.T) {
 
 func TestExtractFullURL_EmptyID(t *testing.T) {
 	resource := map[string]interface{}{"resourceType": "Patient"}
-	got := extractFullURL(resource, "/fhir/Patient")
+	got := extractFullURL(resource, "")
 	if got != "" {
 		t.Errorf("expected empty fullUrl when id is missing, got %q", got)
 	}
@@ -691,7 +697,7 @@ func TestExtractFullURL_StructInput(t *testing.T) {
 		ID           string `json:"id"`
 	}
 	resource := testResource{ResourceType: "Condition", ID: "cond-99"}
-	got := extractFullURL(resource, "/fhir/Condition")
+	got := extractFullURL(resource, "")
 	if got != "Condition/cond-99" {
 		t.Errorf("expected fullUrl 'Condition/cond-99', got %q", got)
 	}
@@ -699,7 +705,7 @@ func TestExtractFullURL_StructInput(t *testing.T) {
 
 func TestExtractFullURL_UnmarshalableType(t *testing.T) {
 	ch := make(chan int)
-	got := extractFullURL(ch, "/fhir/Patient")
+	got := extractFullURL(ch, "")
 	if got != "" {
 		t.Errorf("expected empty fullUrl for unmarshalable type, got %q", got)
 	}

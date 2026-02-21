@@ -2,6 +2,7 @@ package clinical
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -53,6 +54,17 @@ func (c *Condition) GetVersionID() int { return c.VersionID }
 // SetVersionID sets the current version.
 func (c *Condition) SetVersionID(v int) { c.VersionID = v }
 
+// conditionProfileForCategory returns the appropriate US Core profile URL
+// based on the condition's category code.
+func conditionProfileForCategory(categoryCode string) string {
+	switch strings.ToLower(categoryCode) {
+	case "encounter-diagnosis":
+		return fhir.USCoreConditionEncounterDiagnosisURL
+	default:
+		return fhir.USCoreConditionURL
+	}
+}
+
 func (c *Condition) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "Condition",
@@ -75,7 +87,7 @@ func (c *Condition) ToFHIR() map[string]interface{} {
 		"meta": fhir.Meta{
 			VersionID:   fmt.Sprintf("%d", c.VersionID),
 			LastUpdated: c.UpdatedAt,
-			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns"},
+			Profile:     []string{conditionProfileForCategory(strVal(c.CategoryCode))},
 		},
 	}
 	if c.VerificationStatus != nil {
@@ -167,7 +179,27 @@ func (o *Observation) GetVersionID() int { return o.VersionID }
 // SetVersionID sets the current version.
 func (o *Observation) SetVersionID(v int) { o.VersionID = v }
 
+// observationProfileForCategory returns the appropriate US Core profile URL
+// based on the observation's category code.
+func observationProfileForCategory(categoryCode string) string {
+	switch strings.ToLower(categoryCode) {
+	case "vital-signs":
+		return fhir.USCoreVitalSignsURL
+	case "social-history":
+		return fhir.USCoreSmokingStatusURL
+	case "survey":
+		return fhir.USCoreObservationSDOHURL
+	default:
+		return fhir.USCoreObservationLabURL
+	}
+}
+
 func (o *Observation) ToFHIR() map[string]interface{} {
+	profileURL := fhir.USCoreObservationLabURL
+	if o.CategoryCode != nil {
+		profileURL = observationProfileForCategory(*o.CategoryCode)
+	}
+
 	result := map[string]interface{}{
 		"resourceType": "Observation",
 		"id":           o.FHIRID,
@@ -183,7 +215,7 @@ func (o *Observation) ToFHIR() map[string]interface{} {
 		"meta": fhir.Meta{
 			VersionID:   fmt.Sprintf("%d", o.VersionID),
 			LastUpdated: o.UpdatedAt,
-			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab"},
+			Profile:     []string{profileURL},
 		},
 	}
 	if o.CategoryCode != nil {

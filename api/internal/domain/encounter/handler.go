@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/platform/auth"
@@ -16,11 +17,12 @@ import (
 )
 
 type Handler struct {
-	svc *Service
+	svc  *Service
+	pool *pgxpool.Pool
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, pool *pgxpool.Pool) *Handler {
+	return &Handler{svc: svc, pool: pool}
 }
 
 func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
@@ -235,13 +237,16 @@ func (h *Handler) SearchEncountersFHIR(c echo.Context) error {
 	for i, e := range encs {
 		resources[i] = e.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/Encounter",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
 		Offset:   pg.Offset,
 		Total:    total,
-	}))
+	})
+	fhir.HandleProvenanceRevInclude(bundle, c, h.pool)
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetEncounterFHIR(c echo.Context) error {
@@ -249,6 +254,7 @@ func (h *Handler) GetEncounterFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Encounter", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, enc.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, enc.ToFHIR())
 }
 

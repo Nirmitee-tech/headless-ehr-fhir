@@ -75,6 +75,7 @@ func (h *Handler) GetAuditEventFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("AuditEvent", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, a.Recorded.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, a.ToFHIR())
 }
 

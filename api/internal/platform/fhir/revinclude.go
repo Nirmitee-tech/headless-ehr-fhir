@@ -3,6 +3,9 @@ package fhir
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/labstack/echo/v4"
 )
 
 // RevIncludeProvider is an interface for fetching resources referenced by _revinclude.
@@ -63,4 +66,22 @@ func ApplyRevInclude(bundle *Bundle, ctx context.Context, provider RevIncludePro
 	}
 
 	return nil
+}
+
+// HandleProvenanceRevInclude checks the request for _revinclude=Provenance:target
+// and, if present, appends matching Provenance resources to the bundle.
+// Errors are logged but do not fail the search.
+func HandleProvenanceRevInclude(bundle *Bundle, c echo.Context, pool *pgxpool.Pool) {
+	if pool == nil {
+		return
+	}
+	revIncludes := ExtractRevIncludes(c)
+	for _, ri := range revIncludes {
+		if ri == "Provenance:target" {
+			provider := NewProvenanceRevIncludeProvider(pool)
+			if err := ApplyRevInclude(bundle, c.Request().Context(), provider); err != nil {
+				c.Logger().Warnf("revinclude Provenance failed: %v", err)
+			}
+		}
+	}
 }

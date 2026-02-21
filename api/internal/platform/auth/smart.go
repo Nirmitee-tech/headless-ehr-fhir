@@ -16,13 +16,16 @@ import (
 // SMARTConfiguration represents the SMART on FHIR well-known configuration
 // as defined by the SMART App Launch Framework (HL7).
 type SMARTConfiguration struct {
-	AuthorizationEndpoint        string   `json:"authorization_endpoint"`
-	TokenEndpoint                string   `json:"token_endpoint"`
-	TokenEndpointAuthMethods     []string `json:"token_endpoint_auth_methods_supported"`
-	GrantTypes                   []string `json:"grant_types_supported"`
-	Scopes                       []string `json:"scopes_supported"`
-	ResponseTypes                []string `json:"response_types_supported"`
-	Capabilities                 []string `json:"capabilities"`
+	Issuer                        string   `json:"issuer"`
+	AuthorizationEndpoint         string   `json:"authorization_endpoint"`
+	TokenEndpoint                 string   `json:"token_endpoint"`
+	IntrospectionEndpoint         string   `json:"introspection_endpoint,omitempty"`
+	ManagementEndpoint            string   `json:"management_endpoint,omitempty"`
+	TokenEndpointAuthMethods      []string `json:"token_endpoint_auth_methods_supported"`
+	GrantTypes                    []string `json:"grant_types_supported"`
+	Scopes                        []string `json:"scopes_supported"`
+	ResponseTypes                 []string `json:"response_types_supported"`
+	Capabilities                  []string `json:"capabilities"`
 	CodeChallengeMethodsSupported []string `json:"code_challenge_methods_supported"`
 }
 
@@ -441,25 +444,47 @@ func RegisterSMARTEndpoints(g *echo.Group, issuer string, store ...LaunchContext
 }
 
 // smartConfigurationHandler returns the SMART on FHIR well-known configuration.
+// The issuer determines whether we use standalone (built-in) or external
+// (Keycloak/Auth0) endpoint URLs.
 func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		// Detect whether this is a standalone (built-in) or external (Keycloak) issuer.
+		// External issuers typically contain "/realms/" (Keycloak) or similar.
+		isExternal := strings.Contains(issuer, "/realms/") || strings.Contains(issuer, "/auth0/")
+
+		var authEndpoint, tokenEndpoint, introspectEndpoint string
+		if isExternal {
+			authEndpoint = issuer + "/protocol/openid-connect/auth"
+			tokenEndpoint = issuer + "/protocol/openid-connect/token"
+			introspectEndpoint = issuer + "/protocol/openid-connect/token/introspect"
+		} else {
+			authEndpoint = issuer + "/auth/authorize"
+			tokenEndpoint = issuer + "/auth/token"
+			introspectEndpoint = issuer + "/auth/introspect"
+		}
+
 		cfg := SMARTConfiguration{
-			AuthorizationEndpoint:    issuer + "/protocol/openid-connect/auth",
-			TokenEndpoint:            issuer + "/protocol/openid-connect/token",
-			TokenEndpointAuthMethods: []string{"client_secret_basic", "client_secret_post"},
-			GrantTypes:               []string{"authorization_code", "client_credentials"},
+			Issuer:                issuer,
+			AuthorizationEndpoint: authEndpoint,
+			TokenEndpoint:         tokenEndpoint,
+			IntrospectionEndpoint: introspectEndpoint,
+			ManagementEndpoint:    issuer + "/auth/manage",
+			TokenEndpointAuthMethods: []string{"client_secret_basic", "client_secret_post", "none"},
+			GrantTypes:               []string{"authorization_code", "refresh_token"},
 			Scopes: []string{
-				"openid", "profile", "fhirUser",
-				"launch", "launch/patient",
-				"patient/*.read", "patient/*.write",
-				"user/*.read", "user/*.write",
+				"openid", "profile", "fhirUser", "launch", "launch/patient",
+				"offline_access",
+				"patient/*.read", "patient/*.write", "patient/*.*",
+				"user/*.read", "user/*.write", "user/*.*",
+				"system/*.read", "system/*.write", "system/*.*",
 			},
 			ResponseTypes: []string{"code"},
 			Capabilities: []string{
 				"launch-ehr", "launch-standalone",
 				"client-public", "client-confidential-symmetric",
-				"context-ehr-patient",
-				"permission-patient", "permission-user",
+				"sso-openid-connect",
+				"context-ehr-patient", "context-standalone-patient",
+				"permission-offline", "permission-patient", "permission-user",
 			},
 			CodeChallengeMethodsSupported: []string{"S256"},
 		}

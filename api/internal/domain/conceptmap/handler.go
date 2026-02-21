@@ -131,6 +131,7 @@ func (h *Handler) GetConceptMapFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ConceptMap", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, cm.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, cm.ToFHIR())
 }
 

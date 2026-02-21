@@ -140,8 +140,9 @@ func TestExportManager_KickOff_DefaultTypes(t *testing.T) {
 
 	job := mustKickOff(t, mgr,nil, nil)
 
-	if len(job.ResourceTypes) != 5 {
-		t.Errorf("expected 5 default resource types, got %d", len(job.ResourceTypes))
+	expectedCount := len(defaultExportResourceTypes())
+	if len(job.ResourceTypes) != expectedCount {
+		t.Errorf("expected %d default resource types, got %d", expectedCount, len(job.ResourceTypes))
 	}
 }
 

@@ -513,6 +513,7 @@ func (h *Handler) GetQuestionnaireFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Questionnaire", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, q.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, q.ToFHIR())
 }
 
@@ -547,6 +548,7 @@ func (h *Handler) GetQuestionnaireResponseFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("QuestionnaireResponse", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, qr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, qr.ToFHIR())
 }
 

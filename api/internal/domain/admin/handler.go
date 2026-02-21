@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/platform/auth"
@@ -15,11 +16,12 @@ import (
 )
 
 type Handler struct {
-	svc *Service
+	svc  *Service
+	pool *pgxpool.Pool
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, pool *pgxpool.Pool) *Handler {
+	return &Handler{svc: svc, pool: pool}
 }
 
 func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
@@ -387,13 +389,16 @@ func (h *Handler) SearchOrganizationsFHIR(c echo.Context) error {
 	for i, org := range orgs {
 		resources[i] = org.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/Organization",
 		QueryStr: c.QueryString(),
 		Count:    p.Limit,
 		Offset:   p.Offset,
 		Total:    total,
-	}))
+	})
+	fhir.HandleProvenanceRevInclude(bundle, c, h.pool)
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetOrganizationFHIR(c echo.Context) error {
@@ -401,6 +406,7 @@ func (h *Handler) GetOrganizationFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Organization", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, org.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, org.ToFHIR())
 }
 
@@ -456,13 +462,16 @@ func (h *Handler) SearchLocationsFHIR(c echo.Context) error {
 	for i, loc := range locs {
 		resources[i] = loc.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/Location",
 		QueryStr: c.QueryString(),
 		Count:    p.Limit,
 		Offset:   p.Offset,
 		Total:    total,
-	}))
+	})
+	fhir.HandleProvenanceRevInclude(bundle, c, h.pool)
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetLocationFHIR(c echo.Context) error {
@@ -470,6 +479,7 @@ func (h *Handler) GetLocationFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Location", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, loc.CreatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, loc.ToFHIR())
 }
 

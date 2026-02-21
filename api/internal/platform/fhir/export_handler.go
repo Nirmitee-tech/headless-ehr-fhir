@@ -73,10 +73,12 @@ func (s *ExportStore) Delete(id string) {
 //
 // Endpoints:
 //
-//	GET  /fhir/Patient/:id/$export         Patient-level export kick-off
-//	GET  /fhir/$export                     System-level export kick-off
-//	GET  /fhir/$export-poll-status         Export status polling
-//	DELETE /fhir/$export-poll-status       Cancel/delete an export job
+//	GET  /fhir/$export                          System-level export kick-off
+//	GET  /fhir/Patient/$export                  Patient-level export kick-off (all patients)
+//	GET  /fhir/Patient/:id/$export              Patient-level export kick-off (single patient)
+//	GET  /fhir/Group/:id/$export                Group-level export kick-off
+//	GET  /fhir/$export-poll-status              Export status polling (query param: job=<id>)
+//	DELETE /fhir/$export-poll-status            Cancel/delete an export job
 //	GET  /fhir/$export-output/:jobId/:fileName  Download NDJSON output file
 type BulkExportHandler struct {
 	manager *ExportManager
@@ -102,7 +104,9 @@ func NewBulkExportHandler(store *ExportStore, manager *ExportManager, baseURL st
 func (h *BulkExportHandler) RegisterBulkExportRoutes(fhirGroup *echo.Group) {
 	// Kick-off (GET per spec)
 	fhirGroup.GET("/$export", h.SystemExportKickOff)
+	fhirGroup.GET("/Patient/$export", h.PatientExportKickOffAll)
 	fhirGroup.GET("/Patient/:id/$export", h.PatientExportKickOff)
+	fhirGroup.GET("/Group/:id/$export", h.GroupExportKickOff)
 
 	// Status polling
 	fhirGroup.GET("/$export-poll-status", h.ExportPollStatus)
@@ -118,6 +122,12 @@ func (h *BulkExportHandler) SystemExportKickOff(c echo.Context) error {
 	return h.kickOffExport(c, "")
 }
 
+// PatientExportKickOffAll handles GET /fhir/Patient/$export.
+// Exports all data for all patients (patient-level compartment export).
+func (h *BulkExportHandler) PatientExportKickOffAll(c echo.Context) error {
+	return h.kickOffExport(c, "")
+}
+
 // PatientExportKickOff handles GET /fhir/Patient/:id/$export.
 // Exports all data for a single patient.
 func (h *BulkExportHandler) PatientExportKickOff(c echo.Context) error {
@@ -126,6 +136,80 @@ func (h *BulkExportHandler) PatientExportKickOff(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, ErrorOutcome("patient ID is required"))
 	}
 	return h.kickOffExport(c, patientID)
+}
+
+// GroupExportKickOff handles GET /fhir/Group/:id/$export.
+// Exports data for all members of the specified group.
+func (h *BulkExportHandler) GroupExportKickOff(c echo.Context) error {
+	groupID := c.Param("id")
+	if groupID == "" {
+		return c.JSON(http.StatusBadRequest, ErrorOutcome("group ID is required"))
+	}
+
+	// Validate _outputFormat
+	outputFormat := c.QueryParam("_outputFormat")
+	if outputFormat != "" && !validOutputFormats[outputFormat] {
+		return c.JSON(http.StatusBadRequest, ErrorOutcome(
+			fmt.Sprintf("unsupported _outputFormat: %s; only application/fhir+ndjson is supported", outputFormat)))
+	}
+
+	// Parse _type
+	var resourceTypes []string
+	typeParam := c.QueryParam("_type")
+	if typeParam != "" {
+		for _, t := range strings.Split(typeParam, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				resourceTypes = append(resourceTypes, t)
+			}
+		}
+	}
+
+	// Parse _since
+	var since *time.Time
+	sinceParam := c.QueryParam("_since")
+	if sinceParam != "" {
+		t, err := time.Parse(time.RFC3339, sinceParam)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, ErrorOutcome("invalid _since format, expected RFC3339"))
+		}
+		since = &t
+	}
+
+	// Parse _typeFilter
+	var typeFilter []string
+	typeFilterParam := c.QueryParam("_typeFilter")
+	if typeFilterParam != "" {
+		for _, tf := range strings.Split(typeFilterParam, ",") {
+			tf = strings.TrimSpace(tf)
+			if tf != "" {
+				typeFilter = append(typeFilter, tf)
+			}
+		}
+	}
+
+	job, err := h.manager.KickOffForGroup(resourceTypes, groupID, since, outputFormat, typeFilter)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.JSON(http.StatusNotFound, ErrorOutcome(err.Error()))
+		}
+		if strings.Contains(err.Error(), "concurrent") {
+			c.Response().Header().Set("Retry-After", "120")
+			return c.JSON(http.StatusTooManyRequests, ErrorOutcome(err.Error()))
+		}
+		if strings.Contains(err.Error(), "unsupported") {
+			return c.JSON(http.StatusBadRequest, ErrorOutcome(err.Error()))
+		}
+		return c.JSON(http.StatusInternalServerError, ErrorOutcome(err.Error()))
+	}
+
+	// Store the job for later status queries
+	h.store.Create(job)
+
+	// Return 202 Accepted with Content-Location pointing to the poll status endpoint
+	statusURL := fmt.Sprintf("%s/fhir/$export-poll-status?job=%s", h.baseURL, job.ID)
+	c.Response().Header().Set("Content-Location", statusURL)
+	return c.NoContent(http.StatusAccepted)
 }
 
 func (h *BulkExportHandler) kickOffExport(c echo.Context, patientID string) error {
@@ -287,6 +371,9 @@ func (h *BulkExportHandler) buildOutputURL(jobID, resourceType string) string {
 
 // buildRequestURL reconstructs the original kick-off request URL.
 func (h *BulkExportHandler) buildRequestURL(job *ExportJob) string {
+	if job.GroupID != "" {
+		return fmt.Sprintf("%s/fhir/Group/%s/$export", h.baseURL, job.GroupID)
+	}
 	if job.PatientID != "" {
 		return fmt.Sprintf("%s/fhir/Patient/%s/$export", h.baseURL, job.PatientID)
 	}

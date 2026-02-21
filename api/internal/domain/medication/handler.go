@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/domain/diagnostics"
@@ -19,10 +20,11 @@ import (
 type Handler struct {
 	svc     *Service
 	diagSvc *diagnostics.Service
+	pool    *pgxpool.Pool
 }
 
-func NewHandler(svc *Service, diagSvc ...*diagnostics.Service) *Handler {
-	h := &Handler{svc: svc}
+func NewHandler(svc *Service, pool *pgxpool.Pool, diagSvc ...*diagnostics.Service) *Handler {
+	h := &Handler{svc: svc, pool: pool}
 	if len(diagSvc) > 0 {
 		h.diagSvc = diagSvc[0]
 	}
@@ -552,6 +554,7 @@ func (h *Handler) SearchMedicationsFHIR(c echo.Context) error {
 		}
 	}
 	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/Medication",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
@@ -582,6 +585,7 @@ func (h *Handler) GetMedicationFHIR(c echo.Context) error {
 			Coding: []fhir.Coding{{Code: *m.FormCode, Display: strVal(m.FormDisplay)}},
 		}
 	}
+	fhir.SetVersionHeaders(c, 1, m.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 
@@ -619,13 +623,16 @@ func (h *Handler) SearchMedicationRequestsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/MedicationRequest",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
 		Offset:   pg.Offset,
 		Total:    total,
-	}))
+	})
+	fhir.HandleProvenanceRevInclude(bundle, c, h.pool)
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetMedicationRequestFHIR(c echo.Context) error {
@@ -633,6 +640,7 @@ func (h *Handler) GetMedicationRequestFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationRequest", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, mr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, mr.ToFHIR())
 }
 
@@ -660,6 +668,7 @@ func (h *Handler) SearchMedicationAdministrationsFHIR(c echo.Context) error {
 		resources[i] = item.ToFHIR()
 	}
 	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/MedicationAdministration",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
@@ -673,6 +682,7 @@ func (h *Handler) GetMedicationAdministrationFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationAdministration", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ma.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ma.ToFHIR())
 }
 
@@ -700,6 +710,7 @@ func (h *Handler) SearchMedicationDispensesFHIR(c echo.Context) error {
 		resources[i] = item.ToFHIR()
 	}
 	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/MedicationDispense",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
@@ -713,6 +724,7 @@ func (h *Handler) GetMedicationDispenseFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationDispense", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, md.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, md.ToFHIR())
 }
 
@@ -740,6 +752,7 @@ func (h *Handler) SearchMedicationStatementsFHIR(c echo.Context) error {
 		resources[i] = item.ToFHIR()
 	}
 	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
 		BaseURL:  "/fhir/MedicationStatement",
 		QueryStr: c.QueryString(),
 		Count:    pg.Limit,
@@ -753,6 +766,7 @@ func (h *Handler) GetMedicationStatementFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MedicationStatement", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, ms.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, ms.ToFHIR())
 }
 

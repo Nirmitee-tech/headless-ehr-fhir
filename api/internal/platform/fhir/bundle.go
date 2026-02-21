@@ -3,7 +3,10 @@ package fhir
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/labstack/echo/v4"
 )
 
 // Bundle represents a FHIR Bundle resource.
@@ -49,11 +52,24 @@ type BundleResponse struct {
 
 // SearchBundleParams holds pagination and link information for a search bundle.
 type SearchBundleParams struct {
-	BaseURL    string
-	QueryStr   string
-	Count      int
-	Offset     int
-	Total      int
+	ServerBaseURL string // Absolute server FHIR base URL (e.g. "http://host/fhir") for fullUrl
+	BaseURL       string // Relative path (e.g. "/fhir/Patient") for pagination links
+	QueryStr      string
+	Count         int
+	Offset        int
+	Total         int
+}
+
+// ServerBaseURLFromRequest constructs the server's FHIR base URL from the request.
+func ServerBaseURLFromRequest(c echo.Context) string {
+	scheme := "http"
+	if c.Request().TLS != nil {
+		scheme = "https"
+	}
+	if fwd := c.Request().Header.Get("X-Forwarded-Proto"); fwd != "" {
+		scheme = fwd
+	}
+	return fmt.Sprintf("%s://%s/fhir", scheme, c.Request().Host)
 }
 
 // NewSearchBundle creates a searchset Bundle from a list of resources.
@@ -63,7 +79,7 @@ func NewSearchBundle(resources []interface{}, total int, baseURL string) *Bundle
 	entries := make([]BundleEntry, len(resources))
 	for i, r := range resources {
 		raw, _ := json.Marshal(r)
-		fullURL := extractFullURL(r, baseURL)
+		fullURL := extractFullURL(r, "")
 		entries[i] = BundleEntry{
 			FullURL:  fullURL,
 			Resource: raw,
@@ -91,7 +107,7 @@ func NewSearchBundleWithLinks(resources []interface{}, params SearchBundleParams
 	entries := make([]BundleEntry, len(resources))
 	for i, r := range resources {
 		raw, _ := json.Marshal(r)
-		fullURL := extractFullURL(r, params.BaseURL)
+		fullURL := extractFullURL(r, params.ServerBaseURL)
 		entries[i] = BundleEntry{
 			FullURL:  fullURL,
 			Resource: raw,
@@ -136,7 +152,9 @@ func NewBatchResponse(entries []BundleEntry) *Bundle {
 }
 
 // extractFullURL attempts to build a fullUrl from a resource's resourceType and id.
-func extractFullURL(r interface{}, baseURL string) string {
+// When serverBaseURL is provided (e.g. "http://host/fhir"), it produces absolute URLs
+// as required by Inferno / FHIR spec (e.g. "http://host/fhir/Patient/123").
+func extractFullURL(r interface{}, serverBaseURL string) string {
 	m, ok := toMap(r)
 	if !ok {
 		return ""
@@ -144,6 +162,9 @@ func extractFullURL(r interface{}, baseURL string) string {
 	rt, _ := m["resourceType"].(string)
 	id, _ := m["id"].(string)
 	if rt != "" && id != "" {
+		if serverBaseURL != "" {
+			return fmt.Sprintf("%s/%s/%s", strings.TrimRight(serverBaseURL, "/"), rt, id)
+		}
 		return fmt.Sprintf("%s/%s", rt, id)
 	}
 	return ""
@@ -175,11 +196,26 @@ func toMap(v interface{}) (map[string]interface{}, bool) {
 }
 
 // buildPaginationLinks creates self, next, and previous links for searchset bundles.
+// Links are absolute URLs when ServerBaseURL is set (e.g. "http://host:8000/fhir/Patient?...").
 func buildPaginationLinks(params SearchBundleParams) []BundleLink {
+	// Use absolute URL prefix when available; fall back to relative BaseURL.
+	base := params.BaseURL
+	if params.ServerBaseURL != "" {
+		// ServerBaseURL is like "http://host/fhir", BaseURL is like "/fhir/Patient".
+		// Strip the /fhir prefix from BaseURL to get the resource path.
+		trimmed := params.BaseURL
+		if idx := strings.Index(trimmed, "/fhir/"); idx >= 0 {
+			trimmed = trimmed[idx+len("/fhir"):]
+		} else if trimmed == "/fhir" {
+			trimmed = ""
+		}
+		base = strings.TrimRight(params.ServerBaseURL, "/") + trimmed
+	}
+
 	links := []BundleLink{
 		{
 			Relation: "self",
-			URL:      fmt.Sprintf("%s?%s_count=%d&_offset=%d", params.BaseURL, conditionalAmpersand(params.QueryStr), params.Count, params.Offset),
+			URL:      fmt.Sprintf("%s?%s_count=%d&_offset=%d", base, conditionalAmpersand(params.QueryStr), params.Count, params.Offset),
 		},
 	}
 
@@ -188,7 +224,7 @@ func buildPaginationLinks(params SearchBundleParams) []BundleLink {
 	if nextOffset < params.Total {
 		links = append(links, BundleLink{
 			Relation: "next",
-			URL:      fmt.Sprintf("%s?%s_count=%d&_offset=%d", params.BaseURL, conditionalAmpersand(params.QueryStr), params.Count, nextOffset),
+			URL:      fmt.Sprintf("%s?%s_count=%d&_offset=%d", base, conditionalAmpersand(params.QueryStr), params.Count, nextOffset),
 		})
 	}
 
@@ -200,7 +236,7 @@ func buildPaginationLinks(params SearchBundleParams) []BundleLink {
 		}
 		links = append(links, BundleLink{
 			Relation: "previous",
-			URL:      fmt.Sprintf("%s?%s_count=%d&_offset=%d", params.BaseURL, conditionalAmpersand(params.QueryStr), params.Count, prevOffset),
+			URL:      fmt.Sprintf("%s?%s_count=%d&_offset=%d", base, conditionalAmpersand(params.QueryStr), params.Count, prevOffset),
 		})
 	}
 
@@ -269,7 +305,7 @@ func NewCapabilityStatement(baseURL string, resources []CSResource) *CapabilityS
 		Date:         time.Now().UTC().Format("2006-01-02"),
 		Kind:         "instance",
 		FHIRVersion:  "4.0.1",
-		Format:       []string{"json"},
+		Format:       []string{"application/fhir+json", "json"},
 		Implementation: &CSImplementation{
 			Description: "Headless EHR FHIR R4 Server",
 			URL:         baseURL,

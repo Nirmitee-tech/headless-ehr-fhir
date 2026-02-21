@@ -57,7 +57,7 @@ func NewSearchBundleWithCursor(resources []interface{}, params CursorBundleParam
 	entries := make([]BundleEntry, len(resources))
 	for i, r := range resources {
 		raw, _ := json.Marshal(r)
-		fullURL := extractFullURL(r, params.BaseURL)
+		fullURL := extractFullURL(r, "")
 		entries[i] = BundleEntry{
 			FullURL:  fullURL,
 			Resource: raw,

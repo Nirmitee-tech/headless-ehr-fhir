@@ -133,6 +133,7 @@ func (h *Handler) GetMeasureReportFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("MeasureReport", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, mr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, mr.ToFHIR())
 }
 

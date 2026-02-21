@@ -59,6 +59,33 @@ var validOutputFormats = map[string]bool{
 	"ndjson":                  true,
 }
 
+// defaultExportResourceTypes returns the full set of US Core / g(10) resource
+// types that should be exported when no _type filter is specified.
+func defaultExportResourceTypes() []string {
+	return []string{
+		"Patient",
+		"AllergyIntolerance",
+		"CarePlan",
+		"CareTeam",
+		"Condition",
+		"Coverage",
+		"Device",
+		"DiagnosticReport",
+		"DocumentReference",
+		"Encounter",
+		"Goal",
+		"Immunization",
+		"Location",
+		"MedicationRequest",
+		"Observation",
+		"Organization",
+		"Practitioner",
+		"Procedure",
+		"Provenance",
+		"RelatedPerson",
+	}
+}
+
 // ExportJob represents a FHIR $export bulk data job.
 type ExportJob struct {
 	ID            string             `json:"id"`
@@ -200,9 +227,10 @@ func (m *ExportManager) KickOffWithFormat(resourceTypes []string, patientID stri
 	id := uuid.New().String()
 	now := time.Now().UTC()
 
-	// Default resource types if none specified
+	// Default resource types if none specified — includes all US Core resource
+	// types required by g(10) / Inferno Bulk Data tests.
 	if len(resourceTypes) == 0 {
-		resourceTypes = []string{"Patient", "Observation", "Condition", "Encounter", "MedicationRequest"}
+		resourceTypes = defaultExportResourceTypes()
 	}
 
 	job := &ExportJob{
@@ -269,7 +297,7 @@ func (m *ExportManager) KickOffForGroup(resourceTypes []string, groupID string, 
 	now := time.Now().UTC()
 
 	if len(resourceTypes) == 0 {
-		resourceTypes = []string{"Patient", "Observation", "Condition", "Encounter", "MedicationRequest"}
+		resourceTypes = defaultExportResourceTypes()
 	}
 
 	job := &ExportJob{

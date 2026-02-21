@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Port                string   `mapstructure:"PORT"`
 	Env                 string   `mapstructure:"ENV"`
+	AuthMode            string   `mapstructure:"AUTH_MODE"`
 	DatabaseURL         string   `mapstructure:"DATABASE_URL"`
 	DBMaxConns          int32    `mapstructure:"DB_MAX_CONNS"`
 	DBMinConns          int32    `mapstructure:"DB_MIN_CONNS"`
@@ -37,6 +38,7 @@ func Load() (*Config, error) {
 	// Defaults
 	v.SetDefault("PORT", "8000")
 	v.SetDefault("ENV", "development")
+	v.SetDefault("AUTH_MODE", "") // auto-detect: "" -> inferred from ENV
 	v.SetDefault("DB_MAX_CONNS", 20)
 	v.SetDefault("DB_MIN_CONNS", 5)
 	v.SetDefault("DEFAULT_TENANT", "default")
@@ -47,6 +49,7 @@ func Load() (*Config, error) {
 	// Bind env vars explicitly so Unmarshal picks them up
 	v.BindEnv("PORT")
 	v.BindEnv("ENV")
+	v.BindEnv("AUTH_MODE")
 	v.BindEnv("DATABASE_URL")
 	v.BindEnv("DB_MAX_CONNS")
 	v.BindEnv("DB_MIN_CONNS")
@@ -103,15 +106,38 @@ func (c *Config) IsProduction() bool {
 	return c.Env == "production"
 }
 
+// ResolvedAuthMode returns the effective auth mode. If AUTH_MODE is explicitly
+// set, it is returned. Otherwise, the mode is inferred:
+//   - ENV=development → "development" (no auth, all requests get admin)
+//   - AUTH_ISSUER set → "external" (Keycloak, Auth0, etc.)
+//   - Otherwise       → "standalone" (built-in SMART on FHIR server)
+func (c *Config) ResolvedAuthMode() string {
+	if c.AuthMode != "" {
+		return c.AuthMode
+	}
+	if c.IsDev() {
+		return "development"
+	}
+	if c.AuthIssuer != "" {
+		return "external"
+	}
+	return "standalone"
+}
+
 // Validate checks that the configuration is safe to run. In non-development
 // modes AUTH_ISSUER must be set so that real JWT authentication is enforced.
 // In production, HIPAA_ENCRYPTION_KEY is required and must be a valid
 // 64-character hex string (32 bytes when decoded).
 func (c *Config) Validate() error {
-	if !c.IsDev() && c.AuthIssuer == "" {
+	mode := c.ResolvedAuthMode()
+	if mode == "external" && c.AuthIssuer == "" {
 		return fmt.Errorf(
-			"AUTH_ISSUER must be set when ENV is not \"development\" (current ENV=%q). "+
-				"Refusing to start without authentication configuration", c.Env)
+			"AUTH_ISSUER must be set when AUTH_MODE is \"external\" (current ENV=%q). "+
+				"Refusing to start without authentication configuration. "+
+				"Use AUTH_MODE=standalone to use the built-in SMART on FHIR server", c.Env)
+	}
+	if mode != "development" && mode != "standalone" && mode != "external" {
+		return fmt.Errorf("AUTH_MODE must be \"development\", \"standalone\", or \"external\", got %q", mode)
 	}
 
 	// HIPAA encryption key validation

@@ -318,6 +318,7 @@ func (h *Handler) GetActivityDefinitionFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ActivityDefinition", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, a.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, a.ToFHIR())
 }
 
@@ -410,6 +411,7 @@ func (h *Handler) GetRequestGroupFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("RequestGroup", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, rg.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, rg.ToFHIR())
 }
 
@@ -502,6 +504,7 @@ func (h *Handler) GetGuidanceResponseFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("GuidanceResponse", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, gr.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, gr.ToFHIR())
 }
 

@@ -173,6 +173,7 @@ func (h *Handler) GetFHIRListFHIR(c echo.Context) error {
 		}
 		result["entry"] = fhirEntries
 	}
+	fhir.SetVersionHeaders(c, 1, l.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, result)
 }
 

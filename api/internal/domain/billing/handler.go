@@ -505,6 +505,7 @@ func (h *Handler) GetCoverageFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Coverage", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, cov.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, cov.ToFHIR())
 }
 
@@ -539,6 +540,7 @@ func (h *Handler) GetClaimFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Claim", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, cl.UpdatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, cl.ToFHIR())
 }
 
@@ -573,6 +575,7 @@ func (h *Handler) GetClaimResponseFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ClaimResponse", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, cr.CreatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, cr.ToFHIR())
 }
 
@@ -607,6 +610,7 @@ func (h *Handler) GetEOBFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("ExplanationOfBenefit", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, eob.CreatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, eob.ToFHIR())
 }
 
@@ -995,6 +999,7 @@ func (h *Handler) GetInvoiceFHIR(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, fhir.NotFoundOutcome("Invoice", c.Param("id")))
 	}
+	fhir.SetVersionHeaders(c, 1, inv.CreatedAt.Format("2006-01-02T15:04:05Z"))
 	return c.JSON(http.StatusOK, inv.ToFHIR())
 }
 
