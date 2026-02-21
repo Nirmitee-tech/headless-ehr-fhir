@@ -138,7 +138,11 @@ func RegisterDefaultSMARTClient(server *SMARTServer) {
 	// Inferno test client — public client with PKCE
 	infernoClient := &SMARTClient{
 		ClientID:     "inferno-test",
-		RedirectURIs: []string{"http://localhost:4567/inferno/callback", "http://localhost:4567/custom/smart/redirect"},
+		RedirectURIs: []string{
+			"http://localhost:4567/inferno/callback",
+			"http://localhost:4567/custom/smart/redirect",
+			"http://localhost:4567/inferno/oauth2/static/redirect",
+		},
 		Scope:        "launch launch/patient openid fhirUser offline_access patient/*.read user/*.read user/*.write",
 		Name:         "Inferno Test Client",
 		IsPublic:     true,

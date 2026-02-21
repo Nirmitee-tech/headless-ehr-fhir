@@ -461,9 +461,11 @@ func TestDateSearchClause_MonthOnlyFormat(t *testing.T) {
 }
 
 func TestReferenceSearchClause_SQLFormat(t *testing.T) {
+	// Non-UUID FHIR ID should use a subquery to resolve via fhir_id.
 	clause, args, nextIdx := ReferenceSearchClause("subject_id", "Patient/abc-123", 3)
-	if clause != "subject_id = $3" {
-		t.Errorf("clause = %q, want %q", clause, "subject_id = $3")
+	wantClause := "subject_id = (SELECT id FROM patient WHERE fhir_id = $3 LIMIT 1)"
+	if clause != wantClause {
+		t.Errorf("clause = %q, want %q", clause, wantClause)
 	}
 	if len(args) != 1 || args[0] != "abc-123" {
 		t.Errorf("args = %v, want [abc-123]", args)
@@ -473,13 +475,29 @@ func TestReferenceSearchClause_SQLFormat(t *testing.T) {
 	}
 }
 
-func TestReferenceSearchClause_NestedSlashes(t *testing.T) {
-	// Reference with multiple slashes, e.g., "http://example.org/fhir/Patient/123"
-	clause, args, nextIdx := ReferenceSearchClause("ref_col", "http://example.org/fhir/Patient/123", 1)
-	if clause != "ref_col = $1" {
-		t.Errorf("clause = %q, want %q", clause, "ref_col = $1")
+func TestReferenceSearchClause_UUID(t *testing.T) {
+	// UUID values should match directly without subquery.
+	clause, args, nextIdx := ReferenceSearchClause("subject_id", "Patient/a0000000-0000-4000-8000-000000000100", 1)
+	if clause != "subject_id = $1" {
+		t.Errorf("clause = %q, want %q", clause, "subject_id = $1")
 	}
-	// LastIndex should extract just "123"
+	if len(args) != 1 || args[0] != "a0000000-0000-4000-8000-000000000100" {
+		t.Errorf("args = %v, want [a0000000-0000-4000-8000-000000000100]", args)
+	}
+	if nextIdx != 2 {
+		t.Errorf("nextIdx = %d, want 2", nextIdx)
+	}
+}
+
+func TestReferenceSearchClause_NestedSlashes(t *testing.T) {
+	// Full URL reference should extract the last segment as the ID.
+	clause, args, nextIdx := ReferenceSearchClause("ref_col", "http://example.org/fhir/Patient/123", 1)
+	// "123" is not a UUID, and resource type from the URL prefix is "http://example.org/fhir/Patient",
+	// so it falls back to inferring from column name "ref_col" → no "_id" suffix → fallback to direct.
+	wantClause := "ref_col = $1"
+	if clause != wantClause {
+		t.Errorf("clause = %q, want %q", clause, wantClause)
+	}
 	if len(args) != 1 || args[0] != "123" {
 		t.Errorf("args = %v, want [123]", args)
 	}

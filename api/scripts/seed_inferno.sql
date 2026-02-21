@@ -1217,7 +1217,7 @@ INSERT INTO provenance (
      1, NOW(), NOW()),
     -- Provenance for Condition diabetes
     ('a0000000-0000-4000-8000-000000001902'::uuid,
-     'provenance-condition-diabetes', 'Condition', 'condition-diabetes-john',
+     'provenance-condition-diabetes', 'Condition', 'condition-john-diabetes',
      '2024-01-15T10:30:00Z', 'CREATE', 'create',
      1, NOW(), NOW()),
     -- Provenance for Encounter John
@@ -1227,12 +1227,12 @@ INSERT INTO provenance (
      1, NOW(), NOW()),
     -- Provenance for AllergyIntolerance penicillin
     ('a0000000-0000-4000-8000-000000001904'::uuid,
-     'provenance-allergy-penicillin', 'AllergyIntolerance', 'allergy-penicillin-john',
+     'provenance-allergy-penicillin', 'AllergyIntolerance', 'allergy-john-penicillin',
      '2024-01-15T10:15:00Z', 'CREATE', 'create',
      1, NOW(), NOW()),
     -- Provenance for MedicationRequest metformin
     ('a0000000-0000-4000-8000-000000001905'::uuid,
-     'provenance-medrx-metformin', 'MedicationRequest', 'medrx-metformin-john',
+     'provenance-medrx-metformin', 'MedicationRequest', 'medicationrequest-john-metformin',
      '2024-01-15T11:00:00Z', 'CREATE', 'create',
      1, NOW(), NOW())
 ON CONFLICT DO NOTHING;

@@ -634,11 +634,11 @@ func TestChainedSearchClause_ReferenceParam(t *testing.T) {
 	}
 
 	clause, args, nextIdx := ChainedSearchClause(config, "Patient/abc-123", 1)
-	expected := "encounter_id IN (SELECT id FROM encounters WHERE patient_id = $1)"
+	// Non-UUID FHIR ID resolves via subquery on the patient table.
+	expected := "encounter_id IN (SELECT id FROM encounters WHERE patient_id = (SELECT id FROM patient WHERE fhir_id = $1 LIMIT 1))"
 	if clause != expected {
 		t.Errorf("clause = %q, want %q", clause, expected)
 	}
-	// Reference should strip the ResourceType/ prefix
 	if len(args) != 1 || args[0] != "abc-123" {
 		t.Errorf("args = %v, want [abc-123]", args)
 	}

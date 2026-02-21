@@ -8,11 +8,16 @@ import (
 // resolution. These are infrastructure endpoints (health checks, metrics)
 // and FHIR discovery endpoints that must be accessible without credentials.
 var publicPaths = map[string]bool{
-	"/health":                            true,
-	"/health/db":                         true,
-	"/metrics":                           true,
-	"/.well-known/smart-configuration":   true,
-	"/fhir/metadata":                     true,
+	"/health":                                 true,
+	"/health/db":                              true,
+	"/metrics":                                true,
+	"/.well-known/smart-configuration":        true,
+	"/fhir/.well-known/smart-configuration":   true,
+	"/fhir/metadata":                          true,
+	"/auth/authorize":                         true,
+	"/auth/token":                             true,
+	"/auth/introspect":                        true,
+	"/auth/register":                          true,
 }
 
 // AuthSkipper returns true for requests whose path should skip authentication.

@@ -41,6 +41,17 @@ func isClinicalRole(role string) bool {
 	return clinicalRoles[role]
 }
 
+// hasFHIRScope returns true if the scope list contains any SMART on FHIR
+// resource scope (patient/*, user/*, or system/*).
+func hasFHIRScope(scopes []string) bool {
+	for _, s := range scopes {
+		if strings.HasPrefix(s, "patient/") || strings.HasPrefix(s, "user/") || strings.HasPrefix(s, "system/") {
+			return true
+		}
+	}
+	return false
+}
+
 // DefaultPolicies returns the comprehensive ABAC policies for the EHR,
 // covering all FHIR resource types the server supports.
 //
@@ -275,10 +286,24 @@ func isReadOnly(method string) bool {
 func ABACMiddleware(engine *ABACEngine) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// Skip public/discovery endpoints.
+			if IsPublicPath(c.Path()) {
+				return next(c)
+			}
+
 			// Extract resource type from path
 			path := c.Path()
 			resourceType := extractABACResourceType(path)
 			if resourceType == "" {
+				return next(c)
+			}
+
+			// If SMART scopes are present and already validated by FHIRScopeMiddleware,
+			// the scope check is authoritative — skip role-based ABAC. This allows
+			// SMART tokens with patient/* or user/* scopes to access resources
+			// even if the inferred role (e.g. "patient") isn't in the ABAC policy.
+			scopes := ScopesFromContext(c.Request().Context())
+			if len(scopes) > 0 && hasFHIRScope(scopes) {
 				return next(c)
 			}
 

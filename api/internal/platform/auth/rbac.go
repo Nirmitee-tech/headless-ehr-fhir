@@ -9,10 +9,20 @@ import (
 )
 
 // RequireRole returns middleware that checks if the user has at least one of the specified roles.
+// If the user has valid SMART on FHIR scopes (patient/*, user/*, system/*),
+// the role check is bypassed because scope enforcement is authoritative.
 func RequireRole(roles ...string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			userRoles := RolesFromContext(c.Request().Context())
+			ctx := c.Request().Context()
+
+			// If SMART scopes are present, they are authoritative — bypass role check.
+			scopes := ScopesFromContext(ctx)
+			if hasFHIRScope(scopes) {
+				return next(c)
+			}
+
+			userRoles := RolesFromContext(ctx)
 			for _, required := range roles {
 				for _, has := range userRoles {
 					if has == required || has == "admin" {

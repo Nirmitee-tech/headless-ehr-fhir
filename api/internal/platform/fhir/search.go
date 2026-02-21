@@ -179,12 +179,70 @@ func parseFlexDate(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unable to parse date: %s", s)
 }
 
-// ReferenceSearchClause parses a FHIR reference value and returns a UUID-matching SQL clause.
-// Handles formats: "Patient/uuid", "uuid"
+// ReferenceSearchClause parses a FHIR reference value and returns a SQL clause.
+// Handles formats: "Patient/fhir-id", "Patient/uuid", "fhir-id", "uuid".
+// When the value is not a valid UUID, it resolves via a subquery against the
+// referenced table's fhir_id column (e.g. patient_id → patient table).
 func ReferenceSearchClause(column string, value string, argIdx int) (string, []interface{}, int) {
-	// Strip ResourceType/ prefix if present
+	// Extract resource type prefix if present (e.g. "Patient/abc" → resourceType="Patient", value="abc")
+	var resourceType string
 	if idx := strings.LastIndex(value, "/"); idx >= 0 {
+		resourceType = value[:idx]
 		value = value[idx+1:]
 	}
+
+	// If the value looks like a UUID, match directly.
+	if isUUID(value) {
+		return fmt.Sprintf("%s = $%d", column, argIdx), []interface{}{value}, argIdx + 1
+	}
+
+	// Not a UUID — resolve via fhir_id subquery.
+	// Infer the target table from the column name (e.g. "patient_id" → "patient")
+	// or from the resource type prefix (e.g. "Patient" → "patient").
+	tableName := referenceTargetTable(column, resourceType)
+	if tableName != "" {
+		clause := fmt.Sprintf("%s = (SELECT id FROM %s WHERE fhir_id = $%d LIMIT 1)", column, tableName, argIdx)
+		return clause, []interface{}{value}, argIdx + 1
+	}
+
+	// Fallback: direct comparison (may fail if column is UUID type).
 	return fmt.Sprintf("%s = $%d", column, argIdx), []interface{}{value}, argIdx + 1
+}
+
+// isUUID checks if a string looks like a valid UUID.
+func isUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i, c := range s {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if c != '-' {
+				return false
+			}
+		} else if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+// referenceTargetTable infers the PostgreSQL table name from either the column
+// name (e.g. "patient_id" → "patient") or the FHIR resource type prefix
+// (e.g. "Patient" → "patient").
+func referenceTargetTable(column, resourceType string) string {
+	// First try from resource type prefix.
+	if resourceType != "" {
+		// Skip URL-style references (e.g. "http://example.org/fhir/Patient") — these
+		// indicate a full URL reference where the ID may not be a FHIR ID in our system.
+		if strings.Contains(resourceType, "://") || strings.Contains(resourceType, ".") {
+			// Fall through to column-based inference.
+		} else {
+			return strings.ToLower(resourceType)
+		}
+	}
+	// Infer from column name: "patient_id" → "patient", "encounter_id" → "encounter".
+	if strings.HasSuffix(column, "_id") {
+		return strings.TrimSuffix(column, "_id")
+	}
+	return ""
 }

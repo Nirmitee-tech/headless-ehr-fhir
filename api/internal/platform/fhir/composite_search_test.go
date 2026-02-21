@@ -559,8 +559,9 @@ func TestCompositeSearchClause_ReferenceComponent(t *testing.T) {
 
 	clause, args, nextIdx := CompositeSearchClause(config, "Patient/abc-123$final", 1)
 
-	if !strings.Contains(clause, "patient_id = $1") {
-		t.Errorf("clause should contain patient_id = $1, got %q", clause)
+	// Non-UUID FHIR ID resolves via subquery.
+	if !strings.Contains(clause, "patient_id = (SELECT id FROM patient WHERE fhir_id = $1 LIMIT 1)") {
+		t.Errorf("clause should contain patient_id subquery, got %q", clause)
 	}
 	if !strings.Contains(clause, "code_value = $2") {
 		t.Errorf("clause should contain code_value = $2, got %q", clause)
