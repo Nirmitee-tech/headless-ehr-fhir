@@ -1,4 +1,39 @@
--- 027_simple_resources.sql: Endpoint, BodyStructure, Substance, Media, DeviceRequest, DeviceUseStatement
+-- 027_simple_resources.sql: Device, Endpoint, BodyStructure, Substance, Media, DeviceRequest, DeviceUseStatement
+
+-- Device table must be created before device_use_statement which references it.
+CREATE TABLE IF NOT EXISTS device (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    fhir_id TEXT UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    status_reason VARCHAR(100),
+    distinct_identifier VARCHAR(200),
+    manufacturer_name VARCHAR(255),
+    manufacture_date TIMESTAMPTZ,
+    expiration_date TIMESTAMPTZ,
+    lot_number VARCHAR(100),
+    serial_number VARCHAR(200),
+    model_number VARCHAR(200),
+    device_name VARCHAR(255) NOT NULL,
+    device_name_type VARCHAR(50) NOT NULL DEFAULT 'user-friendly-name',
+    type_code VARCHAR(50),
+    type_display VARCHAR(200),
+    type_system VARCHAR(200),
+    version_value VARCHAR(100),
+    patient_id UUID REFERENCES patient(id),
+    owner_id UUID REFERENCES organization(id),
+    location_id UUID REFERENCES location(id),
+    contact_phone VARCHAR(50),
+    contact_email VARCHAR(100),
+    url TEXT,
+    note TEXT,
+    safety_code VARCHAR(50),
+    safety_display VARCHAR(200),
+    udi_carrier TEXT,
+    udi_entry_type VARCHAR(50),
+    version_id INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS endpoint (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
