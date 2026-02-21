@@ -1,6 +1,7 @@
 package relatedperson
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -47,7 +48,11 @@ func (rp *RelatedPerson) ToFHIR() map[string]interface{} {
 		"relationship": []fhir.CodeableConcept{{
 			Coding: []fhir.Coding{{Code: rp.RelationshipCode, Display: rp.RelationshipDisplay}},
 		}},
-		"meta": fhir.Meta{LastUpdated: rp.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", rp.VersionID),
+			LastUpdated: rp.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/RelatedPerson"},
+		},
 	}
 	if rp.FamilyName != nil || rp.GivenName != nil {
 		name := map[string]interface{}{}

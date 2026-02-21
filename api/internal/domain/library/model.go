@@ -37,7 +37,10 @@ func (l *Library) ToFHIR() map[string]interface{} {
 		"id":           l.FHIRID,
 		"status":       l.Status,
 		"type":         fhir.CodeableConcept{Coding: []fhir.Coding{{Code: l.TypeCode, Display: strVal(l.TypeDisplay)}}},
-		"meta":         fhir.Meta{LastUpdated: l.UpdatedAt},
+		"meta":         fhir.Meta{
+			LastUpdated: l.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Library"},
+		},
 	}
 	if l.URL != nil {
 		result["url"] = *l.URL

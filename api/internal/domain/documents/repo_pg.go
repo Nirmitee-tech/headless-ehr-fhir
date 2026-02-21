@@ -259,6 +259,8 @@ var docRefSearchParams = map[string]fhir.SearchParamConfig{
 	"status":   {Type: fhir.SearchParamToken, Column: "status"},
 	"type":     {Type: fhir.SearchParamToken, Column: "type_code"},
 	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+	"date":     {Type: fhir.SearchParamDate, Column: "created_at"},
+	"_id":      {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *docRefRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DocumentReference, int, error) {

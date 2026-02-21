@@ -180,7 +180,13 @@ func (h *Handler) SearchCareTeamsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/CareTeam"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/CareTeam",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetCareTeamFHIR(c echo.Context) error {

@@ -1,6 +1,7 @@
 package supply
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -54,7 +55,11 @@ func (s *SupplyRequest) ToFHIR() map[string]interface{} {
 			"value": s.QuantityValue,
 			"unit":  strVal(s.QuantityUnit),
 		},
-		"meta": fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SupplyRequest"},
+		},
 	}
 	if s.CategoryCode != nil {
 		result["category"] = fhir.CodeableConcept{
@@ -123,7 +128,11 @@ func (s *SupplyDelivery) ToFHIR() map[string]interface{} {
 		"resourceType": "SupplyDelivery",
 		"id":           s.FHIRID,
 		"status":       s.Status,
-		"meta":         fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SupplyDelivery"},
+		},
 	}
 	if s.BasedOnID != nil {
 		result["basedOn"] = []fhir.Reference{{Reference: fhir.FormatReference("SupplyRequest", s.BasedOnID.String())}}

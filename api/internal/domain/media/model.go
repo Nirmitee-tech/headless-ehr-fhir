@@ -1,6 +1,7 @@
 package media
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -46,7 +47,11 @@ func (m *Media) ToFHIR() map[string]interface{} {
 		"resourceType": "Media",
 		"id":           m.FHIRID,
 		"status":       m.Status,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Media"},
+		},
 	}
 	if m.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.TypeCode, Display: strVal(m.TypeDisplay)}}}

@@ -1,6 +1,7 @@
 package researchelementdefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -34,7 +35,11 @@ func (e *ResearchElementDefinition) ToFHIR() map[string]interface{} {
 		"id":           e.FHIRID,
 		"status":       e.Status,
 		"type":         e.Type,
-		"meta":         fhir.Meta{LastUpdated: e.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", e.VersionID),
+			LastUpdated: e.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ResearchElementDefinition"},
+		},
 	}
 	if e.URL != nil {
 		result["url"] = *e.URL

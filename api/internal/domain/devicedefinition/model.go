@@ -1,6 +1,7 @@
 package devicedefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -35,7 +36,11 @@ func (d *DeviceDefinition) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "DeviceDefinition",
 		"id":           d.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: d.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", d.VersionID),
+			LastUpdated: d.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/DeviceDefinition"},
+		},
 	}
 	if d.ManufacturerString != nil {
 		result["manufacturerString"] = *d.ManufacturerString

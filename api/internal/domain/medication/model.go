@@ -1,6 +1,7 @@
 package medication
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -129,7 +130,11 @@ func (mr *MedicationRequest) ToFHIR() map[string]interface{} {
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", mr.PatientID.String())},
 		"requester": fhir.Reference{Reference: fhir.FormatReference("Practitioner", mr.RequesterID.String())},
-		"meta":     fhir.Meta{LastUpdated: mr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", mr.VersionID),
+			LastUpdated: mr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-medicationrequest"},
+		},
 	}
 	if mr.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{
@@ -286,7 +291,11 @@ func (ma *MedicationAdministration) ToFHIR() map[string]interface{} {
 			Reference: fhir.FormatReference("Medication", ma.MedicationID.String()),
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", ma.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: ma.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ma.VersionID),
+			LastUpdated: ma.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicationAdministration"},
+		},
 	}
 	if ma.CategoryCode != nil {
 		result["category"] = fhir.CodeableConcept{
@@ -408,7 +417,11 @@ func (md *MedicationDispense) ToFHIR() map[string]interface{} {
 			Reference: fhir.FormatReference("Medication", md.MedicationID.String()),
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", md.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: md.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", md.VersionID),
+			LastUpdated: md.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicationDispense"},
+		},
 	}
 	if md.CategoryCode != nil {
 		result["category"] = fhir.CodeableConcept{
@@ -515,7 +528,10 @@ func (ms *MedicationStatement) ToFHIR() map[string]interface{} {
 		"id":           ms.FHIRID,
 		"status":       ms.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", ms.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: ms.UpdatedAt},
+		"meta": fhir.Meta{
+			LastUpdated: ms.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicationStatement"},
+		},
 	}
 	if ms.MedicationID != nil {
 		result["medicationReference"] = fhir.Reference{

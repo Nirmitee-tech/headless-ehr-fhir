@@ -463,7 +463,13 @@ func (h *Handler) SearchServiceRequestsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/ServiceRequest"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/ServiceRequest",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetServiceRequestFHIR(c echo.Context) error {
@@ -497,7 +503,13 @@ func (h *Handler) SearchDiagnosticReportsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/DiagnosticReport"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/DiagnosticReport",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetDiagnosticReportFHIR(c echo.Context) error {
@@ -531,7 +543,13 @@ func (h *Handler) SearchSpecimensFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Specimen"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Specimen",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetSpecimenFHIR(c echo.Context) error {
@@ -565,7 +583,13 @@ func (h *Handler) SearchImagingStudiesFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/ImagingStudy"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/ImagingStudy",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetImagingStudyFHIR(c echo.Context) error {

@@ -1,6 +1,7 @@
 package structuremap
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -36,7 +37,11 @@ func (sm *StructureMap) ToFHIR() map[string]interface{} {
 		"status":       sm.Status,
 		"url":          sm.URL,
 		"name":         sm.Name,
-		"meta":         fhir.Meta{LastUpdated: sm.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", sm.VersionID),
+			LastUpdated: sm.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/StructureMap"},
+		},
 	}
 	if sm.Title != nil {
 		result["title"] = *sm.Title

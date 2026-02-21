@@ -1,6 +1,7 @@
 package financial
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (a *Account) ToFHIR() map[string]interface{} {
 		"resourceType": "Account",
 		"id":           a.FHIRID,
 		"status":       a.Status,
-		"meta":         fhir.Meta{LastUpdated: a.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", a.VersionID),
+			LastUpdated: a.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Account"},
+		},
 	}
 	if a.TypeCode != nil {
 		cc := fhir.CodeableConcept{
@@ -90,7 +95,11 @@ func (ip *InsurancePlan) ToFHIR() map[string]interface{} {
 		"resourceType": "InsurancePlan",
 		"id":           ip.FHIRID,
 		"status":       ip.Status,
-		"meta":         fhir.Meta{LastUpdated: ip.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ip.VersionID),
+			LastUpdated: ip.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/InsurancePlan"},
+		},
 	}
 	if ip.TypeCode != nil {
 		cc := fhir.CodeableConcept{
@@ -155,7 +164,11 @@ func (pn *PaymentNotice) ToFHIR() map[string]interface{} {
 		"id":           pn.FHIRID,
 		"status":       pn.Status,
 		"created":      pn.Created.Format("2006-01-02T15:04:05Z"),
-		"meta":         fhir.Meta{LastUpdated: pn.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", pn.VersionID),
+			LastUpdated: pn.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/PaymentNotice"},
+		},
 	}
 	if pn.RequestReference != nil {
 		result["request"] = fhir.Reference{Reference: *pn.RequestReference}
@@ -227,7 +240,11 @@ func (pr *PaymentReconciliation) ToFHIR() map[string]interface{} {
 		"status":       pr.Status,
 		"created":      pr.Created.Format("2006-01-02T15:04:05Z"),
 		"paymentDate":  pr.PaymentDate.Format("2006-01-02"),
-		"meta":         fhir.Meta{LastUpdated: pr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", pr.VersionID),
+			LastUpdated: pr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/PaymentReconciliation"},
+		},
 	}
 	cur := "USD"
 	if pr.PaymentCurrency != nil {
@@ -305,7 +322,11 @@ func (ci *ChargeItem) ToFHIR() map[string]interface{} {
 		"id":           ci.FHIRID,
 		"status":       ci.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", ci.SubjectPatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: ci.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ci.VersionID),
+			LastUpdated: ci.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ChargeItem"},
+		},
 	}
 	if ci.CodeCode != nil {
 		coding := fhir.Coding{Code: *ci.CodeCode}
@@ -391,7 +412,11 @@ func (cd *ChargeItemDefinition) ToFHIR() map[string]interface{} {
 		"resourceType": "ChargeItemDefinition",
 		"id":           cd.FHIRID,
 		"status":       cd.Status,
-		"meta":         fhir.Meta{LastUpdated: cd.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cd.VersionID),
+			LastUpdated: cd.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ChargeItemDefinition"},
+		},
 	}
 	if cd.URL != nil {
 		result["url"] = *cd.URL
@@ -456,7 +481,11 @@ func (ct *Contract) ToFHIR() map[string]interface{} {
 		"resourceType": "Contract",
 		"id":           ct.FHIRID,
 		"status":       ct.Status,
-		"meta":         fhir.Meta{LastUpdated: ct.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ct.VersionID),
+			LastUpdated: ct.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Contract"},
+		},
 	}
 	if ct.TypeCode != nil {
 		cc := fhir.CodeableConcept{
@@ -523,7 +552,11 @@ func (er *EnrollmentRequest) ToFHIR() map[string]interface{} {
 		"id":           er.FHIRID,
 		"status":       er.Status,
 		"created":      er.Created.Format("2006-01-02T15:04:05Z"),
-		"meta":         fhir.Meta{LastUpdated: er.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", er.VersionID),
+			LastUpdated: er.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/EnrollmentRequest"},
+		},
 	}
 	if er.InsurerOrgID != nil {
 		result["insurer"] = fhir.Reference{Reference: fhir.FormatReference("Organization", er.InsurerOrgID.String())}
@@ -564,7 +597,11 @@ func (er *EnrollmentResponse) ToFHIR() map[string]interface{} {
 		"id":           er.FHIRID,
 		"status":       er.Status,
 		"created":      er.Created.Format("2006-01-02T15:04:05Z"),
-		"meta":         fhir.Meta{LastUpdated: er.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", er.VersionID),
+			LastUpdated: er.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/EnrollmentResponse"},
+		},
 	}
 	if er.RequestID != nil {
 		result["request"] = fhir.Reference{Reference: fhir.FormatReference("EnrollmentRequest", er.RequestID.String())}

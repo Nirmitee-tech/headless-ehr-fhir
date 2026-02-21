@@ -1,6 +1,7 @@
 package documentmanifest
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (d *DocumentManifest) ToFHIR() map[string]interface{} {
 		"resourceType": "DocumentManifest",
 		"id":           d.FHIRID,
 		"status":       d.Status,
-		"meta":         fhir.Meta{LastUpdated: d.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", d.VersionID),
+			LastUpdated: d.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/DocumentManifest"},
+		},
 	}
 	if d.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *d.TypeCode, Display: strVal(d.TypeDisplay)}}}

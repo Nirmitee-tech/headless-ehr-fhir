@@ -1,6 +1,7 @@
 package communicationrequest
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -41,7 +42,11 @@ func (cr *CommunicationRequest) ToFHIR() map[string]interface{} {
 		"resourceType": "CommunicationRequest",
 		"id":           cr.FHIRID,
 		"status":       cr.Status,
-		"meta":         fhir.Meta{LastUpdated: cr.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cr.VersionID),
+			LastUpdated: cr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/CommunicationRequest"},
+		},
 	}
 	if cr.PatientID != nil {
 		result["subject"] = fhir.Reference{Reference: fhir.FormatReference("Patient", cr.PatientID.String())}

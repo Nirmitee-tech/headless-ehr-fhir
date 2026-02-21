@@ -1,6 +1,7 @@
 package bodystructure
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -36,7 +37,11 @@ func (b *BodyStructure) ToFHIR() map[string]interface{} {
 		"id":           b.FHIRID,
 		"active":       b.Active,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", b.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: b.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", b.VersionID),
+			LastUpdated: b.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/BodyStructure"},
+		},
 	}
 	if b.MorphologyCode != nil {
 		result["morphology"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *b.MorphologyCode, Display: strVal(b.MorphologyDisplay), System: strVal(b.MorphologySystem)}}}

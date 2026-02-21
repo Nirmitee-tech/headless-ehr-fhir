@@ -121,9 +121,11 @@ func (r *orgRepoPG) List(ctx context.Context, limit, offset int) ([]*Organizatio
 }
 
 var organizationSearchParams = map[string]fhir.SearchParamConfig{
-	"name":   {Type: fhir.SearchParamString, Column: "name"},
-	"type":   {Type: fhir.SearchParamToken, Column: "type_code"},
-	"active": {Type: fhir.SearchParamToken, Column: "active"},
+	"name":    {Type: fhir.SearchParamString, Column: "name"},
+	"type":    {Type: fhir.SearchParamToken, Column: "type_code"},
+	"active":  {Type: fhir.SearchParamToken, Column: "active"},
+	"address": {Type: fhir.SearchParamString, Column: "city"},
+	"_id":     {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *orgRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Organization, int, error) {

@@ -133,6 +133,8 @@ var carePlanSearchParams = map[string]fhir.SearchParamConfig{
 	"patient":  {Type: fhir.SearchParamReference, Column: "patient_id"},
 	"status":   {Type: fhir.SearchParamToken, Column: "status"},
 	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
+	"date":     {Type: fhir.SearchParamDate, Column: "created_at"},
+	"_id":      {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *carePlanRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*CarePlan, int, error) {
@@ -311,6 +313,8 @@ func (r *goalRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, lim
 var goalSearchParams = map[string]fhir.SearchParamConfig{
 	"patient":          {Type: fhir.SearchParamReference, Column: "patient_id"},
 	"lifecycle-status": {Type: fhir.SearchParamToken, Column: "lifecycle_status"},
+	"target-date":      {Type: fhir.SearchParamDate, Column: "target_due_date"},
+	"_id":              {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *goalRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Goal, int, error) {

@@ -2,6 +2,7 @@ package portal
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -89,7 +90,11 @@ func (q *Questionnaire) ToFHIR() map[string]interface{} {
 		"id":           q.FHIRID,
 		"name":         q.Name,
 		"status":       q.Status,
-		"meta":         fhir.Meta{LastUpdated: q.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", q.VersionID),
+			LastUpdated: q.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Questionnaire"},
+		},
 	}
 	if q.Title != nil {
 		result["title"] = *q.Title
@@ -168,7 +173,11 @@ func (qr *QuestionnaireResponse) ToFHIR() map[string]interface{} {
 		"status":       qr.Status,
 		"questionnaire": qr.QuestionnaireID.String(),
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", qr.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: qr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", qr.VersionID),
+			LastUpdated: qr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/QuestionnaireResponse"},
+		},
 	}
 	if qr.EncounterID != nil {
 		result["encounter"] = fhir.Reference{Reference: fhir.FormatReference("Encounter", qr.EncounterID.String())}

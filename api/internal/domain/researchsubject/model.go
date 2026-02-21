@@ -1,6 +1,7 @@
 package researchsubject
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -32,7 +33,11 @@ func (r *ResearchSubject) ToFHIR() map[string]interface{} {
 		"resourceType": "ResearchSubject",
 		"id":           r.FHIRID,
 		"status":       r.Status,
-		"meta":         fhir.Meta{LastUpdated: r.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", r.VersionID),
+			LastUpdated: r.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ResearchSubject"},
+		},
 	}
 	if r.StudyReference != nil {
 		result["study"] = fhir.Reference{Reference: *r.StudyReference}

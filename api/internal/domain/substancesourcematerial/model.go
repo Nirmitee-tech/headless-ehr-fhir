@@ -1,6 +1,7 @@
 package substancesourcematerial
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (m *SubstanceSourceMaterial) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "SubstanceSourceMaterial",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SubstanceSourceMaterial"},
+		},
 	}
 	if m.SourceMaterialClassCode != nil { result["sourceMaterialClass"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.SourceMaterialClassCode, Display: strVal(m.SourceMaterialClassDisplay)}}} }
 	if m.SourceMaterialTypeCode != nil { result["sourceMaterialType"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.SourceMaterialTypeCode, Display: strVal(m.SourceMaterialTypeDisplay)}}} }

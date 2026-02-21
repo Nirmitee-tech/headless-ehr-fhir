@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -67,7 +68,11 @@ func (c *Coverage) ToFHIR() map[string]interface{} {
 		"id":           c.FHIRID,
 		"status":       c.Status,
 		"beneficiary":  fhir.Reference{Reference: fhir.FormatReference("Patient", c.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: c.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", c.VersionID),
+			LastUpdated: c.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Coverage"},
+		},
 	}
 	if c.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{
@@ -151,7 +156,11 @@ func (cl *Claim) ToFHIR() map[string]interface{} {
 		"id":           cl.FHIRID,
 		"status":       cl.Status,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", cl.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: cl.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cl.VersionID),
+			LastUpdated: cl.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Claim"},
+		},
 	}
 	if cl.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{
@@ -294,7 +303,11 @@ func (cr *ClaimResponse) ToFHIR() map[string]interface{} {
 		"id":           cr.FHIRID,
 		"status":       cr.Status,
 		"request":      fhir.Reference{Reference: fhir.FormatReference("Claim", cr.ClaimID.String())},
-		"meta":         fhir.Meta{LastUpdated: cr.CreatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cr.VersionID),
+			LastUpdated: cr.CreatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ClaimResponse"},
+		},
 	}
 	if cr.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{
@@ -395,7 +408,11 @@ func (eob *ExplanationOfBenefit) ToFHIR() map[string]interface{} {
 		"id":           eob.FHIRID,
 		"status":       eob.Status,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", eob.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: eob.CreatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", eob.VersionID),
+			LastUpdated: eob.CreatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ExplanationOfBenefit"},
+		},
 	}
 	if eob.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{
@@ -508,7 +525,10 @@ func (inv *Invoice) ToFHIR() map[string]interface{} {
 		"id":           inv.FHIRID,
 		"status":       inv.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", inv.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: inv.CreatedAt},
+		"meta": fhir.Meta{
+			LastUpdated: inv.CreatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Invoice"},
+		},
 	}
 	if inv.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{

@@ -1,6 +1,7 @@
 package organizationaffiliation
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -36,7 +37,11 @@ func (o *OrganizationAffiliation) ToFHIR() map[string]interface{} {
 		"resourceType": "OrganizationAffiliation",
 		"id":           o.FHIRID,
 		"active":       o.Active,
-		"meta":         fhir.Meta{LastUpdated: o.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", o.VersionID),
+			LastUpdated: o.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/OrganizationAffiliation"},
+		},
 	}
 	if o.OrganizationID != nil {
 		result["organization"] = fhir.Reference{Reference: fhir.FormatReference("Organization", o.OrganizationID.String())}

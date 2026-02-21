@@ -453,6 +453,8 @@ var drSearchParams = map[string]fhir.SearchParamConfig{
 	"status":   {Type: fhir.SearchParamToken, Column: "status"},
 	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
 	"code":     {Type: fhir.SearchParamToken, Column: "code_value"},
+	"date":     {Type: fhir.SearchParamDate, Column: "effective_datetime"},
+	"_id":      {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *diagnosticReportRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*DiagnosticReport, int, error) {

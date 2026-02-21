@@ -1,6 +1,7 @@
 package substancespecification
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (s *SubstanceSpecification) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "SubstanceSpecification",
 		"id":           s.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SubstanceSpecification"},
+		},
 	}
 	if s.Status != nil {
 		result["status"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *s.Status}}}

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -57,7 +58,11 @@ func (o *Organization) ToFHIR() map[string]interface{} {
 				}},
 			},
 		},
-		"meta": fhir.Meta{LastUpdated: o.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", o.VersionID),
+			LastUpdated: o.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"},
+		},
 	}
 
 	var telecoms []fhir.ContactPoint
@@ -154,7 +159,11 @@ func (l *Location) ToFHIR() map[string]interface{} {
 		"id":           l.FHIRID,
 		"status":       l.Status,
 		"name":         l.Name,
-		"meta":         fhir.Meta{LastUpdated: l.CreatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", l.VersionID),
+			LastUpdated: l.CreatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-location"},
+		},
 	}
 
 	if l.TypeCode != nil {

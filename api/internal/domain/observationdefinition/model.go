@@ -1,6 +1,7 @@
 package observationdefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -44,7 +45,11 @@ func (od *ObservationDefinition) ToFHIR() map[string]interface{} {
 		"id":           od.FHIRID,
 		"status":       od.Status,
 		"code":         fhir.CodeableConcept{Coding: []fhir.Coding{codeCoding}},
-		"meta":         fhir.Meta{LastUpdated: od.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", od.VersionID),
+			LastUpdated: od.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ObservationDefinition"},
+		},
 	}
 	if od.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{Coding: []fhir.Coding{{Code: *od.CategoryCode, Display: strVal(od.CategoryDisplay)}}}}

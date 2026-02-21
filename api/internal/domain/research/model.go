@@ -58,7 +58,10 @@ func (s *ResearchStudy) ToFHIR() map[string]interface{} {
 			System: "urn:ehr:research:protocol",
 			Value:  s.ProtocolNumber,
 		}},
-		"meta": fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta": fhir.Meta{
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ResearchStudy"},
+		},
 	}
 	if s.Phase != nil {
 		result["phase"] = fhir.CodeableConcept{

@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -66,7 +67,11 @@ func (sr *ServiceRequest) ToFHIR() map[string]interface{} {
 		},
 		"subject":   fhir.Reference{Reference: fhir.FormatReference("Patient", sr.PatientID.String())},
 		"requester": fhir.Reference{Reference: fhir.FormatReference("Practitioner", sr.RequesterID.String())},
-		"meta":      fhir.Meta{LastUpdated: sr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", sr.VersionID),
+			LastUpdated: sr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ServiceRequest"},
+		},
 	}
 	if sr.Priority != nil {
 		result["priority"] = *sr.Priority
@@ -151,7 +156,11 @@ func (sp *Specimen) ToFHIR() map[string]interface{} {
 		"id":           sp.FHIRID,
 		"status":       sp.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", sp.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: sp.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", sp.VersionID),
+			LastUpdated: sp.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Specimen"},
+		},
 	}
 	if sp.AccessionID != nil {
 		result["accessionIdentifier"] = fhir.Identifier{Value: *sp.AccessionID}
@@ -250,7 +259,11 @@ func (dr *DiagnosticReport) ToFHIR() map[string]interface{} {
 			Text: dr.CodeDisplay,
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", dr.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: dr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", dr.VersionID),
+			LastUpdated: dr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-diagnosticreport-lab"},
+		},
 	}
 	if dr.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{
@@ -333,7 +346,11 @@ func (is *ImagingStudy) ToFHIR() map[string]interface{} {
 		"id":           is.FHIRID,
 		"status":       is.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", is.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: is.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", is.VersionID),
+			LastUpdated: is.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ImagingStudy"},
+		},
 	}
 	if is.ModalityCode != nil {
 		result["modality"] = []fhir.Coding{{Code: *is.ModalityCode, Display: strVal(is.ModalityDisplay)}}

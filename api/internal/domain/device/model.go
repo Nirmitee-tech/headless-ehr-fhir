@@ -1,6 +1,7 @@
 package device
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -57,7 +58,11 @@ func (d *Device) ToFHIR() map[string]interface{} {
 			"name": d.DeviceName,
 			"type": d.DeviceNameType,
 		}},
-		"meta": fhir.Meta{LastUpdated: d.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", d.VersionID),
+			LastUpdated: d.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Device"},
+		},
 	}
 	if d.StatusReason != nil {
 		result["statusReason"] = []fhir.CodeableConcept{{

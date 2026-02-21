@@ -1,6 +1,7 @@
 package catalogentry
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (ce *CatalogEntry) ToFHIR() map[string]interface{} {
 		"orderable":      ce.Orderable,
 		"referencedItem": fhir.Reference{Reference: fhir.FormatReference(ce.ReferencedItemType, ce.ReferencedItemReference)},
 		"status":         ce.Status,
-		"meta":           fhir.Meta{LastUpdated: ce.UpdatedAt},
+		"meta":           fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ce.VersionID),
+			LastUpdated: ce.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/CatalogEntry"},
+		},
 	}
 	if ce.Type != nil {
 		result["type"] = *ce.Type

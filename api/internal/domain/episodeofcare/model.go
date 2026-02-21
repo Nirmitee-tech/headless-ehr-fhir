@@ -1,6 +1,7 @@
 package episodeofcare
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (e *EpisodeOfCare) ToFHIR() map[string]interface{} {
 		"id":           e.FHIRID,
 		"status":       e.Status,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", e.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: e.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", e.VersionID),
+			LastUpdated: e.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/EpisodeOfCare"},
+		},
 	}
 	if e.TypeCode != nil {
 		result["type"] = []fhir.CodeableConcept{{Coding: []fhir.Coding{{Code: *e.TypeCode, Display: strVal(e.TypeDisplay)}}}}

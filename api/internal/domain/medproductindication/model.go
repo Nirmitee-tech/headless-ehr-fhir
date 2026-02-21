@@ -1,6 +1,7 @@
 package medproductindication
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -37,7 +38,11 @@ func (m *MedicinalProductIndication) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "MedicinalProductIndication",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicinalProductIndication"},
+		},
 	}
 	if m.SubjectReference != nil { result["subject"] = []fhir.Reference{{Reference: *m.SubjectReference}} }
 	if m.DiseaseSymptomProcedureCode != nil { result["diseaseSymptomProcedure"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.DiseaseSymptomProcedureCode, Display: strVal(m.DiseaseSymptomProcedureDisplay)}}} }

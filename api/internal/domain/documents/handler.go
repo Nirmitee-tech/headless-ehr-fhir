@@ -509,7 +509,13 @@ func (h *Handler) SearchConsentsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Consent"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Consent",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetConsentFHIR(c echo.Context) error {
@@ -543,7 +549,13 @@ func (h *Handler) SearchDocumentReferencesFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/DocumentReference"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/DocumentReference",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetDocumentReferenceFHIR(c echo.Context) error {
@@ -581,9 +593,21 @@ func (h *Handler) SearchCompositionsFHIR(c echo.Context) error {
 		for i, item := range items {
 			resources[i] = item.ToFHIR()
 		}
-		return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Composition"))
+		return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+			BaseURL:  "/fhir/Composition",
+			QueryStr: c.QueryString(),
+			Count:    pg.Limit,
+			Offset:   pg.Offset,
+			Total:    total,
+		}))
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(nil, 0, "/fhir/Composition"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(nil, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Composition",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    0,
+	}))
 }
 
 func (h *Handler) GetCompositionFHIR(c echo.Context) error {

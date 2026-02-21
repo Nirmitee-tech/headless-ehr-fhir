@@ -251,7 +251,13 @@ func (h *Handler) SearchCarePlansFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/CarePlan"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/CarePlan",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetCarePlanFHIR(c echo.Context) error {
@@ -355,7 +361,13 @@ func (h *Handler) SearchGoalsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Goal"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Goal",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetGoalFHIR(c echo.Context) error {

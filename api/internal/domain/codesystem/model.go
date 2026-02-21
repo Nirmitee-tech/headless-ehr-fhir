@@ -1,6 +1,7 @@
 package codesystem
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -38,7 +39,11 @@ func (cs *CodeSystem) ToFHIR() map[string]interface{} {
 		"id":           cs.FHIRID,
 		"status":       cs.Status,
 		"content":      cs.Content,
-		"meta":         fhir.Meta{LastUpdated: cs.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cs.VersionID),
+			LastUpdated: cs.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/CodeSystem"},
+		},
 	}
 	if cs.URL != nil {
 		result["url"] = *cs.URL

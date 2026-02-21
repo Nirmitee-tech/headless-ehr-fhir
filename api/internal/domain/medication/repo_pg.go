@@ -333,6 +333,8 @@ var medRequestSearchParams = map[string]fhir.SearchParamConfig{
 	"status":     {Type: fhir.SearchParamToken, Column: "status"},
 	"intent":     {Type: fhir.SearchParamToken, Column: "intent"},
 	"medication": {Type: fhir.SearchParamReference, Column: "medication_id"},
+	"authoredon": {Type: fhir.SearchParamDate, Column: "authored_on"},
+	"_id":        {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *medRequestRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*MedicationRequest, int, error) {

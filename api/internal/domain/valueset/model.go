@@ -1,6 +1,7 @@
 package valueset
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -38,7 +39,11 @@ func (vs *ValueSet) ToFHIR() map[string]interface{} {
 		"resourceType": "ValueSet",
 		"id":           vs.FHIRID,
 		"status":       vs.Status,
-		"meta":         fhir.Meta{LastUpdated: vs.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", vs.VersionID),
+			LastUpdated: vs.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ValueSet"},
+		},
 	}
 	if vs.URL != nil {
 		result["url"] = *vs.URL

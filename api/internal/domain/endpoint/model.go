@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (e *Endpoint) ToFHIR() map[string]interface{} {
 		"id":           e.FHIRID,
 		"status":       e.Status,
 		"address":      e.Address,
-		"meta":         fhir.Meta{LastUpdated: e.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", e.VersionID),
+			LastUpdated: e.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Endpoint"},
+		},
 	}
 	if e.ConnectionTypeCode != nil {
 		result["connectionType"] = fhir.Coding{Code: *e.ConnectionTypeCode, Display: strVal(e.ConnectionTypeDisplay)}

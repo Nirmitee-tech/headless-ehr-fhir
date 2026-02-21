@@ -2,6 +2,7 @@ package task
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -54,7 +55,11 @@ func (t *Task) ToFHIR() map[string]interface{} {
 		"status":       t.Status,
 		"intent":       t.Intent,
 		"for":          fhir.Reference{Reference: fhir.FormatReference("Patient", t.ForPatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: t.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", t.VersionID),
+			LastUpdated: t.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Task"},
+		},
 	}
 
 	if t.StatusReason != nil {

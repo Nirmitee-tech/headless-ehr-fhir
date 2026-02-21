@@ -545,10 +545,19 @@ func (h *Handler) SearchMedicationsFHIR(c echo.Context) error {
 			"code": fhir.CodeableConcept{
 				Coding: []fhir.Coding{{System: strVal(item.CodeSystem), Code: item.CodeValue, Display: item.CodeDisplay}},
 			},
-			"meta": fhir.Meta{LastUpdated: item.UpdatedAt},
+			"meta": fhir.Meta{
+				LastUpdated: item.UpdatedAt,
+				Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-medication"},
+			},
 		}
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Medication"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Medication",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetMedicationFHIR(c echo.Context) error {
@@ -563,7 +572,10 @@ func (h *Handler) GetMedicationFHIR(c echo.Context) error {
 		"code": fhir.CodeableConcept{
 			Coding: []fhir.Coding{{System: strVal(m.CodeSystem), Code: m.CodeValue, Display: m.CodeDisplay}},
 		},
-		"meta": fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta": fhir.Meta{
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-medication"},
+		},
 	}
 	if m.FormCode != nil {
 		result["form"] = fhir.CodeableConcept{
@@ -589,7 +601,10 @@ func (h *Handler) CreateMedicationFHIR(c echo.Context) error {
 		"code": fhir.CodeableConcept{
 			Coding: []fhir.Coding{{System: strVal(m.CodeSystem), Code: m.CodeValue, Display: m.CodeDisplay}},
 		},
-		"meta": fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta": fhir.Meta{
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-medication"},
+		},
 	})
 }
 
@@ -604,7 +619,13 @@ func (h *Handler) SearchMedicationRequestsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/MedicationRequest"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/MedicationRequest",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetMedicationRequestFHIR(c echo.Context) error {
@@ -638,7 +659,13 @@ func (h *Handler) SearchMedicationAdministrationsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/MedicationAdministration"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/MedicationAdministration",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetMedicationAdministrationFHIR(c echo.Context) error {
@@ -672,7 +699,13 @@ func (h *Handler) SearchMedicationDispensesFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/MedicationDispense"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/MedicationDispense",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetMedicationDispenseFHIR(c echo.Context) error {
@@ -706,7 +739,13 @@ func (h *Handler) SearchMedicationStatementsFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/MedicationStatement"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/MedicationStatement",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetMedicationStatementFHIR(c echo.Context) error {
@@ -1211,7 +1250,10 @@ func medicationToFHIR(m *Medication) map[string]interface{} {
 		"code": fhir.CodeableConcept{
 			Coding: []fhir.Coding{{System: strVal(m.CodeSystem), Code: m.CodeValue, Display: m.CodeDisplay}},
 		},
-		"meta": fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta": fhir.Meta{
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-medication"},
+		},
 	}
 	if m.FormCode != nil {
 		result["form"] = fhir.CodeableConcept{

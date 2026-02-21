@@ -1,6 +1,7 @@
 package medproductcontraindication
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (m *MedicinalProductContraindication) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "MedicinalProductContraindication",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicinalProductContraindication"},
+		},
 	}
 	if m.SubjectReference != nil {
 		result["subject"] = []fhir.Reference{{Reference: *m.SubjectReference}}

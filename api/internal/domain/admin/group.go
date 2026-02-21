@@ -81,7 +81,11 @@ func (g *Group) ToFHIR() map[string]interface{} {
 		"active":       g.Active,
 		"name":         g.Name,
 		"quantity":     g.Quantity,
-		"meta":         fhir.Meta{LastUpdated: g.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", g.VersionID),
+			LastUpdated: g.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Group"},
+		},
 	}
 
 	if g.Code != nil {

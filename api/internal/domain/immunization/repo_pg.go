@@ -145,6 +145,8 @@ var immunizationSearchParams = map[string]fhir.SearchParamConfig{
 	"patient":      {Type: fhir.SearchParamReference, Column: "patient_id"},
 	"status":       {Type: fhir.SearchParamToken, Column: "status"},
 	"vaccine-code": {Type: fhir.SearchParamToken, Column: "vaccine_code"},
+	"date":         {Type: fhir.SearchParamDate, Column: "occurrence_datetime"},
+	"_id":          {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *immunizationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Immunization, int, error) {

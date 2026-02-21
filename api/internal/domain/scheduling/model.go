@@ -1,6 +1,7 @@
 package scheduling
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (s *Schedule) ToFHIR() map[string]interface{} {
 		"actor": []fhir.Reference{{
 			Reference: fhir.FormatReference("Practitioner", s.PractitionerID.String()),
 		}},
-		"meta": fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Schedule"},
+		},
 	}
 	if s.Active != nil {
 		result["active"] = *s.Active
@@ -103,7 +108,11 @@ func (sl *Slot) ToFHIR() map[string]interface{} {
 		"status":       sl.Status,
 		"start":        sl.StartTime.Format(time.RFC3339),
 		"end":          sl.EndTime.Format(time.RFC3339),
-		"meta":         fhir.Meta{LastUpdated: sl.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", sl.VersionID),
+			LastUpdated: sl.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Slot"},
+		},
 	}
 	if sl.Overbooked != nil {
 		result["overbooked"] = *sl.Overbooked
@@ -173,7 +182,11 @@ func (a *Appointment) ToFHIR() map[string]interface{} {
 		"resourceType": "Appointment",
 		"id":           a.FHIRID,
 		"status":       a.Status,
-		"meta":         fhir.Meta{LastUpdated: a.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", a.VersionID),
+			LastUpdated: a.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Appointment"},
+		},
 	}
 	if a.ServiceTypeCode != nil {
 		result["serviceType"] = []fhir.CodeableConcept{{
@@ -291,7 +304,11 @@ func (ar *AppointmentResponse) ToFHIR() map[string]interface{} {
 		"appointment":       fhir.Reference{Reference: fhir.FormatReference("Appointment", ar.AppointmentID.String())},
 		"actor":             fhir.Reference{Reference: fhir.FormatReference(ar.ActorType, ar.ActorID.String())},
 		"participantStatus": ar.ParticipantStatus,
-		"meta":              fhir.Meta{LastUpdated: ar.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ar.VersionID),
+			LastUpdated: ar.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/AppointmentResponse"},
+		},
 	}
 	if ar.Comment != nil {
 		result["comment"] = *ar.Comment

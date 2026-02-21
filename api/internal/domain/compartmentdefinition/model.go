@@ -1,6 +1,7 @@
 package compartmentdefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -38,7 +39,11 @@ func (cd *CompartmentDefinition) ToFHIR() map[string]interface{} {
 		"name":         cd.Name,
 		"code":         cd.Code,
 		"search":       cd.Search,
-		"meta":         fhir.Meta{LastUpdated: cd.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cd.VersionID),
+			LastUpdated: cd.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/CompartmentDefinition"},
+		},
 	}
 	if cd.Description != nil {
 		result["description"] = *cd.Description

@@ -1,6 +1,7 @@
 package immunization
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -56,7 +57,11 @@ func (im *Immunization) ToFHIR() map[string]interface{} {
 		},
 		"patient":       fhir.Reference{Reference: fhir.FormatReference("Patient", im.PatientID.String())},
 		"primarySource": im.PrimarySource,
-		"meta":          fhir.Meta{LastUpdated: im.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", im.VersionID),
+			LastUpdated: im.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-immunization"},
+		},
 	}
 	if im.EncounterID != nil {
 		result["encounter"] = fhir.Reference{Reference: fhir.FormatReference("Encounter", im.EncounterID.String())}
@@ -159,7 +164,11 @@ func (r *ImmunizationRecommendation) ToFHIR() map[string]interface{} {
 		"patient":        fhir.Reference{Reference: fhir.FormatReference("Patient", r.PatientID.String())},
 		"date":           r.Date.Format(time.RFC3339),
 		"recommendation": []map[string]interface{}{rec},
-		"meta":           fhir.Meta{LastUpdated: r.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", r.VersionID),
+			LastUpdated: r.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ImmunizationRecommendation"},
+		},
 	}
 	return result
 }

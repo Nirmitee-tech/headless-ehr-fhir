@@ -1,6 +1,7 @@
 package biologicallyderivedproduct
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -36,7 +37,11 @@ func (b *BiologicallyDerivedProduct) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "BiologicallyDerivedProduct",
 		"id":           b.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: b.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", b.VersionID),
+			LastUpdated: b.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/BiologicallyDerivedProduct"},
+		},
 	}
 	if b.ProductCategory != nil {
 		result["productCategory"] = *b.ProductCategory

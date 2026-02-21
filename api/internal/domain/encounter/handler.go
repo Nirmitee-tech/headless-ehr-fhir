@@ -235,7 +235,13 @@ func (h *Handler) SearchEncountersFHIR(c echo.Context) error {
 	for i, e := range encs {
 		resources[i] = e.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Encounter"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Encounter",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetEncounterFHIR(c echo.Context) error {

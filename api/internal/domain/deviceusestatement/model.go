@@ -1,6 +1,7 @@
 package deviceusestatement
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -38,7 +39,11 @@ func (d *DeviceUseStatement) ToFHIR() map[string]interface{} {
 		"id":           d.FHIRID,
 		"status":       d.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", d.SubjectPatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: d.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", d.VersionID),
+			LastUpdated: d.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/DeviceUseStatement"},
+		},
 	}
 	if d.DeviceID != nil {
 		result["device"] = fhir.Reference{Reference: fhir.FormatReference("Device", d.DeviceID.String())}

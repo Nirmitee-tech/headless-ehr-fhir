@@ -1,6 +1,7 @@
 package structuredefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -42,7 +43,11 @@ func (s *StructureDefinition) ToFHIR() map[string]interface{} {
 		"kind":         s.Kind,
 		"abstract":     s.Abstract,
 		"type":         s.Type,
-		"meta":         fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/StructureDefinition"},
+		},
 	}
 	if s.BaseDefinition != nil {
 		result["baseDefinition"] = *s.BaseDefinition

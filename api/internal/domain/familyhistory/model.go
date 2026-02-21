@@ -1,6 +1,7 @@
 package familyhistory
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -42,7 +43,11 @@ func (f *FamilyMemberHistory) ToFHIR() map[string]interface{} {
 		"relationship": fhir.CodeableConcept{
 			Coding: []fhir.Coding{{Code: f.RelationshipCode, Display: f.RelationshipDisplay}},
 		},
-		"meta": fhir.Meta{LastUpdated: f.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", f.VersionID),
+			LastUpdated: f.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/FamilyMemberHistory"},
+		},
 	}
 	if f.Name != nil {
 		result["name"] = *f.Name

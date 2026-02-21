@@ -67,7 +67,11 @@ func (e *Encounter) ToFHIR() map[string]interface{} {
 			Start: &e.PeriodStart,
 			End:   e.PeriodEnd,
 		},
-		"meta": fhir.Meta{VersionID: fmt.Sprintf("%d", e.VersionID), LastUpdated: e.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", e.VersionID),
+			LastUpdated: e.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-encounter"},
+		},
 	}
 
 	if e.TypeCode != nil {

@@ -1,6 +1,7 @@
 package substancepolymer
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -29,7 +30,11 @@ func (m *SubstancePolymer) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "SubstancePolymer",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SubstancePolymer"},
+		},
 	}
 	if m.ClassCode != nil { result["class"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.ClassCode, Display: strVal(m.ClassDisplay)}}} }
 	if m.GeometryCode != nil { result["geometry"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.GeometryCode, Display: strVal(m.GeometryDisplay)}}} }

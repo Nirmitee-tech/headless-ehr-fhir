@@ -36,7 +36,10 @@ func (v *VisionPrescription) ToFHIR() map[string]interface{} {
 		"id":           v.FHIRID,
 		"status":       v.Status,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", v.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: v.UpdatedAt},
+		"meta":         fhir.Meta{
+			LastUpdated: v.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/VisionPrescription"},
+		},
 	}
 	if v.Created != nil {
 		result["created"] = v.Created.Format("2006-01-02T15:04:05Z")

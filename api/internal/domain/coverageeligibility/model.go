@@ -1,6 +1,7 @@
 package coverageeligibility
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (r *CoverageEligibilityRequest) ToFHIR() map[string]interface{} {
 		"status":       r.Status,
 		"purpose":      []string{r.Purpose},
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", r.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: r.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", r.VersionID),
+			LastUpdated: r.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/CoverageEligibilityRequest"},
+		},
 	}
 	if r.ProviderID != nil {
 		result["provider"] = fhir.Reference{Reference: fhir.FormatReference("Practitioner", r.ProviderID.String())}
@@ -76,7 +81,11 @@ func (r *CoverageEligibilityResponse) ToFHIR() map[string]interface{} {
 		"status":       r.Status,
 		"outcome":      r.Outcome,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", r.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: r.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", r.VersionID),
+			LastUpdated: r.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/CoverageEligibilityResponse"},
+		},
 	}
 	if r.RequestID != nil {
 		result["request"] = fhir.Reference{Reference: fhir.FormatReference("CoverageEligibilityRequest", r.RequestID.String())}

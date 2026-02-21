@@ -1,6 +1,7 @@
 package medproductauthorization
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -35,7 +36,11 @@ func (m *MedicinalProductAuthorization) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "MedicinalProductAuthorization",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicinalProductAuthorization"},
+		},
 	}
 	if m.Status != nil {
 		result["status"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.Status}}}

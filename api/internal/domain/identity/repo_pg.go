@@ -193,6 +193,7 @@ var patientSearchParams = map[string]fhir.SearchParamConfig{
 	"birthdate":  {Type: fhir.SearchParamDate, Column: "birth_date"},
 	"gender":     {Type: fhir.SearchParamToken, Column: "gender"},
 	"identifier": {Type: fhir.SearchParamToken, Column: "mrn"},
+	"_id":        {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *patientRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Patient, int, error) {
@@ -669,6 +670,7 @@ func (r *practRepoPG) List(ctx context.Context, limit, offset int) ([]*Practitio
 var practitionerSearchParams = map[string]fhir.SearchParamConfig{
 	"family":     {Type: fhir.SearchParamString, Column: "last_name"},
 	"identifier": {Type: fhir.SearchParamToken, Column: "npi_number"},
+	"_id":        {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *practRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Practitioner, int, error) {

@@ -1,6 +1,7 @@
 package specimendefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -34,7 +35,11 @@ func (s *SpecimenDefinition) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "SpecimenDefinition",
 		"id":           s.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SpecimenDefinition"},
+		},
 	}
 	if s.TypeCode != nil {
 		result["typeCollected"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *s.TypeCode, Display: strVal(s.TypeDisplay)}}}

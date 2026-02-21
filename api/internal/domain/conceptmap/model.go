@@ -1,6 +1,7 @@
 package conceptmap
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -34,7 +35,11 @@ func (cm *ConceptMap) ToFHIR() map[string]interface{} {
 		"resourceType": "ConceptMap",
 		"id":           cm.FHIRID,
 		"status":       cm.Status,
-		"meta":         fhir.Meta{LastUpdated: cm.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cm.VersionID),
+			LastUpdated: cm.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ConceptMap"},
+		},
 	}
 	if cm.URL != nil {
 		result["url"] = *cm.URL

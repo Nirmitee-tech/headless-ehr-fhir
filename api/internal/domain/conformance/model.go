@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -40,7 +41,11 @@ func (ns *NamingSystem) ToFHIR() map[string]interface{} {
 		"name":         ns.Name,
 		"status":       ns.Status,
 		"kind":         ns.Kind,
-		"meta":         fhir.Meta{LastUpdated: ns.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ns.VersionID),
+			LastUpdated: ns.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/NamingSystem"},
+		},
 	}
 	if ns.Date != nil {
 		result["date"] = *ns.Date
@@ -121,7 +126,11 @@ func (od *OperationDefinition) ToFHIR() map[string]interface{} {
 		"status":       od.Status,
 		"kind":         od.Kind,
 		"code":         od.Code,
-		"meta":         fhir.Meta{LastUpdated: od.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", od.VersionID),
+			LastUpdated: od.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/OperationDefinition"},
+		},
 	}
 	if od.URL != nil {
 		result["url"] = *od.URL
@@ -204,7 +213,11 @@ func (md *MessageDefinition) ToFHIR() map[string]interface{} {
 			Code:    md.EventCodingCode,
 			Display: strVal(md.EventCodingDisplay),
 		},
-		"meta": fhir.Meta{LastUpdated: md.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", md.VersionID),
+			LastUpdated: md.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MessageDefinition"},
+		},
 	}
 	if md.URL != nil {
 		result["url"] = *md.URL
@@ -279,7 +292,11 @@ func (mh *MessageHeader) ToFHIR() map[string]interface{} {
 		"source": map[string]interface{}{
 			"endpoint": mh.SourceEndpoint,
 		},
-		"meta": fhir.Meta{LastUpdated: mh.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", mh.VersionID),
+			LastUpdated: mh.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MessageHeader"},
+		},
 	}
 	if mh.SourceName != nil {
 		result["source"].(map[string]interface{})["name"] = *mh.SourceName

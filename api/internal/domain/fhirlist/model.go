@@ -1,6 +1,7 @@
 package fhirlist
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -40,7 +41,11 @@ func (l *FHIRList) ToFHIR() map[string]interface{} {
 		"id":           l.FHIRID,
 		"status":       l.Status,
 		"mode":         l.Mode,
-		"meta":         fhir.Meta{LastUpdated: l.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", l.VersionID),
+			LastUpdated: l.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/List"},
+		},
 	}
 	if l.Title != nil {
 		result["title"] = *l.Title

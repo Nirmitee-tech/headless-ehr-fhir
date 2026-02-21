@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -30,7 +31,11 @@ func (b *Basic) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "Basic",
 		"id":           b.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: b.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", b.VersionID),
+			LastUpdated: b.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Basic"},
+		},
 		"code": fhir.CodeableConcept{
 			Coding: []fhir.Coding{{
 				Code:    b.CodeCode,

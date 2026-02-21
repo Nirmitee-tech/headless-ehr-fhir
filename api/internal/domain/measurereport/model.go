@@ -1,6 +1,7 @@
 package measurereport
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -45,7 +46,11 @@ func (mr *MeasureReport) ToFHIR() map[string]interface{} {
 			Start: &mr.PeriodStart,
 			End:   &mr.PeriodEnd,
 		},
-		"meta": fhir.Meta{LastUpdated: mr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", mr.VersionID),
+			LastUpdated: mr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MeasureReport"},
+		},
 	}
 	if mr.MeasureURL != nil {
 		result["measure"] = *mr.MeasureURL

@@ -1,6 +1,7 @@
 package measure
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (m *Measure) ToFHIR() map[string]interface{} {
 		"resourceType": "Measure",
 		"id":           m.FHIRID,
 		"status":       m.Status,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Measure"},
+		},
 	}
 	if m.URL != nil {
 		result["url"] = *m.URL

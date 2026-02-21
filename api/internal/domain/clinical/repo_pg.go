@@ -144,6 +144,8 @@ var conditionSearchParams = map[string]fhir.SearchParamConfig{
 	"clinical-status": {Type: fhir.SearchParamToken, Column: "clinical_status"},
 	"category":        {Type: fhir.SearchParamToken, Column: "category_code"},
 	"code":            {Type: fhir.SearchParamToken, Column: "code_value", SysColumn: "code_system"},
+	"onset-date":      {Type: fhir.SearchParamDate, Column: "onset_datetime"},
+	"_id":             {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *conditionRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Condition, int, error) {
@@ -304,6 +306,8 @@ var observationSearchParams = map[string]fhir.SearchParamConfig{
 	"category": {Type: fhir.SearchParamToken, Column: "category_code"},
 	"code":     {Type: fhir.SearchParamToken, Column: "code_value", SysColumn: "code_system"},
 	"status":   {Type: fhir.SearchParamToken, Column: "status"},
+	"date":     {Type: fhir.SearchParamDate, Column: "effective_datetime"},
+	"_id":      {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *observationRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Observation, int, error) {
@@ -464,8 +468,37 @@ func (r *allergyRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID, 
 	return items, total, nil
 }
 
+var allergySearchParams = map[string]fhir.SearchParamConfig{
+	"patient":         {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"clinical-status": {Type: fhir.SearchParamToken, Column: "clinical_status"},
+	"code":            {Type: fhir.SearchParamToken, Column: "code_value", SysColumn: "code_system"},
+	"_id":             {Type: fhir.SearchParamToken, Column: "fhir_id"},
+}
+
 func (r *allergyRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*AllergyIntolerance, int, error) {
-	return r.ListByPatient(ctx, uuid.Nil, limit, offset) // Simplified; full impl would parse params
+	qb := fhir.NewSearchQuery("allergy_intolerance", allergyCols)
+	qb.ApplyParams(params, allergySearchParams)
+	qb.OrderBy("created_at DESC")
+
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*AllergyIntolerance
+	for rows.Next() {
+		a, err := r.scanAllergy(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, a)
+	}
+	return items, total, nil
 }
 
 func (r *allergyRepoPG) AddReaction(ctx context.Context, rx *AllergyReaction) error {
@@ -611,8 +644,38 @@ func (r *procedureRepoPG) ListByPatient(ctx context.Context, patientID uuid.UUID
 	return items, total, nil
 }
 
+var procedureSearchParams = map[string]fhir.SearchParamConfig{
+	"patient": {Type: fhir.SearchParamReference, Column: "patient_id"},
+	"status":  {Type: fhir.SearchParamToken, Column: "status"},
+	"code":    {Type: fhir.SearchParamToken, Column: "code_value", SysColumn: "code_system"},
+	"date":    {Type: fhir.SearchParamDate, Column: "performed_datetime"},
+	"_id":     {Type: fhir.SearchParamToken, Column: "fhir_id"},
+}
+
 func (r *procedureRepoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*ProcedureRecord, int, error) {
-	return r.ListByPatient(ctx, uuid.Nil, limit, offset) // Simplified
+	qb := fhir.NewSearchQuery("procedure_record", procCols)
+	qb.ApplyParams(params, procedureSearchParams)
+	qb.OrderBy("created_at DESC")
+
+	var total int
+	if err := r.conn(ctx).QueryRow(ctx, qb.CountSQL(), qb.CountArgs()...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.conn(ctx).Query(ctx, qb.DataSQL(limit, offset), qb.DataArgs(limit, offset)...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []*ProcedureRecord
+	for rows.Next() {
+		p, err := r.scanProc(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, p)
+	}
+	return items, total, nil
 }
 
 func (r *procedureRepoPG) AddPerformer(ctx context.Context, pf *ProcedurePerformer) error {

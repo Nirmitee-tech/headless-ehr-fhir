@@ -1,6 +1,7 @@
 package testreport
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -34,7 +35,11 @@ func (e *TestReport) ToFHIR() map[string]interface{} {
 		"id":           e.FHIRID,
 		"status":       e.Status,
 		"result":       e.Result,
-		"meta":         fhir.Meta{LastUpdated: e.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", e.VersionID),
+			LastUpdated: e.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/TestReport"},
+		},
 	}
 	if e.Name != nil {
 		result["name"] = *e.Name

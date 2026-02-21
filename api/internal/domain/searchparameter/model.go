@@ -45,7 +45,10 @@ func (s *SearchParameter) ToFHIR() map[string]interface{} {
 		"code":         s.Code,
 		"base":         splitComma(s.Base),
 		"type":         s.Type,
-		"meta":         fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta":         fhir.Meta{
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SearchParameter"},
+		},
 	}
 	if s.Expression != nil {
 		result["expression"] = *s.Expression

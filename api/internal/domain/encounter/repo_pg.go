@@ -152,6 +152,8 @@ var encounterSearchParams = map[string]fhir.SearchParamConfig{
 	"status":  {Type: fhir.SearchParamToken, Column: "status"},
 	"class":   {Type: fhir.SearchParamToken, Column: "class_code"},
 	"date":    {Type: fhir.SearchParamDate, Column: "period_start"},
+	"type":    {Type: fhir.SearchParamToken, Column: "type_code"},
+	"_id":     {Type: fhir.SearchParamToken, Column: "fhir_id"},
 }
 
 func (r *repoPG) Search(ctx context.Context, params map[string]string, limit, offset int) ([]*Encounter, int, error) {

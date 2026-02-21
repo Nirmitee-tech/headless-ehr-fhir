@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -51,7 +52,11 @@ func (a *ActivityDefinition) ToFHIR() map[string]interface{} {
 		"id":           a.FHIRID,
 		"status":       a.Status,
 		"doNotPerform": a.DoNotPerform,
-		"meta":         fhir.Meta{LastUpdated: a.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", a.VersionID),
+			LastUpdated: a.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ActivityDefinition"},
+		},
 	}
 	if a.URL != nil {
 		result["url"] = *a.URL
@@ -150,7 +155,11 @@ func (rg *RequestGroup) ToFHIR() map[string]interface{} {
 		"id":           rg.FHIRID,
 		"status":       rg.Status,
 		"intent":       rg.Intent,
-		"meta":         fhir.Meta{LastUpdated: rg.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", rg.VersionID),
+			LastUpdated: rg.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/RequestGroup"},
+		},
 	}
 	if rg.Priority != nil {
 		result["priority"] = *rg.Priority
@@ -233,7 +242,11 @@ func (gr *GuidanceResponse) ToFHIR() map[string]interface{} {
 		"id":           gr.FHIRID,
 		"moduleUri":    gr.ModuleURI,
 		"status":       gr.Status,
-		"meta":         fhir.Meta{LastUpdated: gr.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", gr.VersionID),
+			LastUpdated: gr.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/GuidanceResponse"},
+		},
 	}
 	if gr.RequestIdentifier != nil {
 		result["requestIdentifier"] = fhir.Identifier{Value: *gr.RequestIdentifier}

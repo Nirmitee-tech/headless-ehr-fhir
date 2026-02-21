@@ -1,6 +1,7 @@
 package person
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -36,7 +37,11 @@ func (p *Person) ToFHIR() map[string]interface{} {
 		"resourceType": "Person",
 		"id":           p.FHIRID,
 		"active":       p.Active,
-		"meta":         fhir.Meta{LastUpdated: p.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", p.VersionID),
+			LastUpdated: p.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Person"},
+		},
 	}
 	if p.NameFamily != nil || p.NameGiven != nil {
 		name := fhir.HumanName{}

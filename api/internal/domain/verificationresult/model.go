@@ -1,6 +1,7 @@
 package verificationresult
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -40,7 +41,11 @@ func (v *VerificationResult) ToFHIR() map[string]interface{} {
 		"resourceType": "VerificationResult",
 		"id":           v.FHIRID,
 		"status":       v.Status,
-		"meta":         fhir.Meta{LastUpdated: v.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", v.VersionID),
+			LastUpdated: v.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/VerificationResult"},
+		},
 	}
 	if v.TargetType != nil && v.TargetReference != nil {
 		result["target"] = []fhir.Reference{

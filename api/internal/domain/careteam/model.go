@@ -1,6 +1,7 @@
 package careteam
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -41,7 +42,11 @@ func (ct *CareTeam) ToFHIR() map[string]interface{} {
 		"id":           ct.FHIRID,
 		"status":       ct.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", ct.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: ct.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ct.VersionID),
+			LastUpdated: ct.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-careteam"},
+		},
 	}
 	if ct.Name != nil {
 		result["name"] = *ct.Name

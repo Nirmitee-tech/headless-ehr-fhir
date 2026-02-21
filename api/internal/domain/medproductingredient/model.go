@@ -1,6 +1,7 @@
 package medproductingredient
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (m *MedicinalProductIngredient) ToFHIR() map[string]interface{} {
 		"resourceType": "MedicinalProductIngredient",
 		"id":           m.FHIRID,
 		"role":         fhir.CodeableConcept{Coding: []fhir.Coding{{Code: m.RoleCode, Display: strVal(m.RoleDisplay)}}},
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicinalProductIngredient"},
+		},
 	}
 	if m.AllergenicIndicator != nil {
 		result["allergenicIndicator"] = *m.AllergenicIndicator

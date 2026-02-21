@@ -1,6 +1,7 @@
 package linkage
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -30,7 +31,11 @@ func (l *Linkage) ToFHIR() map[string]interface{} {
 		"resourceType": "Linkage",
 		"id":           l.FHIRID,
 		"active":       l.Active,
-		"meta":         fhir.Meta{LastUpdated: l.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", l.VersionID),
+			LastUpdated: l.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Linkage"},
+		},
 	}
 	if l.AuthorID != nil {
 		result["author"] = fhir.Reference{Reference: fhir.FormatReference("Practitioner", l.AuthorID.String())}

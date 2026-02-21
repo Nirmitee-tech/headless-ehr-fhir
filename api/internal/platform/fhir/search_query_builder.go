@@ -205,10 +205,21 @@ func (q *SearchQuery) ApplySort(sortParam, defaultOrder string, configs map[stri
 func ExtractSearchParams(c echo.Context) map[string]string {
 	params := map[string]string{}
 	for k, v := range c.QueryParams() {
-		if len(v) == 0 || strings.HasPrefix(k, "_") {
+		if len(v) == 0 {
+			continue
+		}
+		// Skip FHIR control params except _id and _revinclude
+		if strings.HasPrefix(k, "_") && k != "_id" && k != "_revinclude" {
 			continue
 		}
 		params[k] = v[0]
 	}
 	return params
+}
+
+// ExtractRevIncludes extracts _revinclude parameters from the request.
+// Returns a slice of "ResourceType:searchParam" strings.
+func ExtractRevIncludes(c echo.Context) []string {
+	vals := c.QueryParams()["_revinclude"]
+	return vals
 }

@@ -1,6 +1,7 @@
 package testscript
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -37,7 +38,11 @@ func (ts *TestScript) ToFHIR() map[string]interface{} {
 		"id":           ts.FHIRID,
 		"status":       ts.Status,
 		"name":         ts.Name,
-		"meta":         fhir.Meta{LastUpdated: ts.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ts.VersionID),
+			LastUpdated: ts.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/TestScript"},
+		},
 	}
 	if ts.URL != nil {
 		result["url"] = *ts.URL

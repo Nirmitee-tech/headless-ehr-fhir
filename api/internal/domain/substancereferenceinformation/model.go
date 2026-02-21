@@ -1,6 +1,7 @@
 package substancereferenceinformation
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -32,7 +33,11 @@ func (m *SubstanceReferenceInformation) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "SubstanceReferenceInformation",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SubstanceReferenceInformation"},
+		},
 	}
 	if m.Comment != nil { result["comment"] = *m.Comment }
 	if m.GeneElementTypeCode != nil || m.GeneElementSourceReference != nil {

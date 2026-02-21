@@ -51,7 +51,11 @@ func (c *Consent) ToFHIR() map[string]interface{} {
 		"id":           c.FHIRID,
 		"status":       c.Status,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", c.PatientID.String())},
-		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: c.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", versionID),
+			LastUpdated: c.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Consent"},
+		},
 	}
 	if c.Scope != nil {
 		result["scope"] = fhir.CodeableConcept{
@@ -134,7 +138,11 @@ func (d *DocumentReference) ToFHIR() map[string]interface{} {
 		"id":           d.FHIRID,
 		"status":       d.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", d.PatientID.String())},
-		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: d.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", versionID),
+			LastUpdated: d.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-documentreference"},
+		},
 	}
 	if d.DocStatus != nil {
 		result["docStatus"] = *d.DocStatus
@@ -262,7 +270,11 @@ func (comp *Composition) ToFHIR() map[string]interface{} {
 		"id":           comp.FHIRID,
 		"status":       comp.Status,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", comp.PatientID.String())},
-		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: comp.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", versionID),
+			LastUpdated: comp.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Composition"},
+		},
 	}
 	if comp.TypeCode != nil {
 		result["type"] = fhir.CodeableConcept{

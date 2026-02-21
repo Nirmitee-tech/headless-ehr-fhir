@@ -1,6 +1,7 @@
 package devicerequest
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -40,7 +41,11 @@ func (d *DeviceRequest) ToFHIR() map[string]interface{} {
 		"status":       d.Status,
 		"intent":       d.Intent,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", d.SubjectPatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: d.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", d.VersionID),
+			LastUpdated: d.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/DeviceRequest"},
+		},
 	}
 	if d.Priority != nil {
 		result["priority"] = *d.Priority

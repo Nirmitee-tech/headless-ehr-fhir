@@ -1,6 +1,7 @@
 package implementationguide
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (ig *ImplementationGuide) ToFHIR() map[string]interface{} {
 		"url":          ig.URL,
 		"name":         ig.Name,
 		"status":       ig.Status,
-		"meta":         fhir.Meta{LastUpdated: ig.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ig.VersionID),
+			LastUpdated: ig.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ImplementationGuide"},
+		},
 	}
 	if ig.Title != nil {
 		result["title"] = *ig.Title

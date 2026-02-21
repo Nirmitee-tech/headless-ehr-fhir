@@ -1,6 +1,7 @@
 package careplan
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -41,7 +42,11 @@ func (cp *CarePlan) ToFHIR() map[string]interface{} {
 		"status":       cp.Status,
 		"intent":       cp.Intent,
 		"subject":      fhir.Reference{Reference: fhir.FormatReference("Patient", cp.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: cp.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", cp.VersionID),
+			LastUpdated: cp.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-careplan"},
+		},
 	}
 	if cp.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{
@@ -117,7 +122,11 @@ func (g *Goal) ToFHIR() map[string]interface{} {
 			Text: g.Description,
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", g.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: g.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", g.VersionID),
+			LastUpdated: g.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-goal"},
+		},
 	}
 	if g.AchievementStatus != nil {
 		result["achievementStatus"] = fhir.CodeableConcept{

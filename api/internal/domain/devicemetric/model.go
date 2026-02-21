@@ -1,6 +1,7 @@
 package devicemetric
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -39,7 +40,11 @@ func (m *DeviceMetric) ToFHIR() map[string]interface{} {
 		"id":           m.FHIRID,
 		"type":         fhir.CodeableConcept{Coding: []fhir.Coding{{Code: m.TypeCode, Display: strVal(m.TypeDisplay)}}},
 		"category":     m.Category,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/DeviceMetric"},
+		},
 	}
 	if m.SourceID != nil {
 		result["source"] = fhir.Reference{Reference: fhir.FormatReference("Device", m.SourceID.String())}

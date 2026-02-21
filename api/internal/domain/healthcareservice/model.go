@@ -1,6 +1,7 @@
 package healthcareservice
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -46,7 +47,11 @@ func (hs *HealthcareService) ToFHIR() map[string]interface{} {
 		"active":            hs.Active,
 		"name":              hs.Name,
 		"appointmentRequired": hs.AppointmentRequired,
-		"meta":              fhir.Meta{LastUpdated: hs.UpdatedAt},
+		"meta":              fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", hs.VersionID),
+			LastUpdated: hs.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/HealthcareService"},
+		},
 	}
 	if hs.ProvidedByOrgID != nil {
 		result["providedBy"] = fhir.Reference{Reference: fhir.FormatReference("Organization", hs.ProvidedByOrgID.String())}

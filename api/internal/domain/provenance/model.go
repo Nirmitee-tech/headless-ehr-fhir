@@ -1,6 +1,7 @@
 package provenance
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -37,7 +38,11 @@ func (p *Provenance) ToFHIR() map[string]interface{} {
 			Reference: fhir.FormatReference(p.TargetType, p.TargetID),
 		}},
 		"recorded": p.Recorded.Format(time.RFC3339),
-		"meta":     fhir.Meta{LastUpdated: p.UpdatedAt},
+		"meta":     fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", p.VersionID),
+			LastUpdated: p.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Provenance"},
+		},
 	}
 	if p.ActivityCode != nil {
 		result["activity"] = fhir.CodeableConcept{

@@ -1,6 +1,7 @@
 package molecularsequence
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -36,7 +37,11 @@ func (m *MolecularSequence) ToFHIR() map[string]interface{} {
 		"id":               m.FHIRID,
 		"type":             m.Type,
 		"coordinateSystem": m.CoordinateSystem,
-		"meta":             fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":             fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MolecularSequence"},
+		},
 	}
 	if m.PatientID != nil {
 		result["patient"] = fhir.Reference{Reference: fhir.FormatReference("Patient", m.PatientID.String())}

@@ -387,7 +387,13 @@ func (h *Handler) SearchOrganizationsFHIR(c echo.Context) error {
 	for i, org := range orgs {
 		resources[i] = org.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Organization"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Organization",
+		QueryStr: c.QueryString(),
+		Count:    p.Limit,
+		Offset:   p.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetOrganizationFHIR(c echo.Context) error {
@@ -450,7 +456,13 @@ func (h *Handler) SearchLocationsFHIR(c echo.Context) error {
 	for i, loc := range locs {
 		resources[i] = loc.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Location"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Location",
+		QueryStr: c.QueryString(),
+		Count:    p.Limit,
+		Offset:   p.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetLocationFHIR(c echo.Context) error {

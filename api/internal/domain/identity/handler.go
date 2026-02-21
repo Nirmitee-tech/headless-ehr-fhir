@@ -379,7 +379,13 @@ func (h *Handler) SearchPatientsFHIR(c echo.Context) error {
 	for i, p := range patients {
 		resources[i] = p.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Patient"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Patient",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetPatientFHIR(c echo.Context) error {
@@ -445,7 +451,13 @@ func (h *Handler) SearchPractitionersFHIR(c echo.Context) error {
 	for i, p := range practs {
 		resources[i] = p.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Practitioner"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/Practitioner",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetPractitionerFHIR(c echo.Context) error {
@@ -511,7 +523,13 @@ func (h *Handler) SearchPractitionerRolesFHIR(c echo.Context) error {
 	for i, r := range roles {
 		resources[i] = r.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/PractitionerRole"))
+	return c.JSON(http.StatusOK, fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		BaseURL:  "/fhir/PractitionerRole",
+		QueryStr: c.QueryString(),
+		Count:    pg.Limit,
+		Offset:   pg.Offset,
+		Total:    total,
+	}))
 }
 
 func (h *Handler) GetPractitionerRoleFHIR(c echo.Context) error {

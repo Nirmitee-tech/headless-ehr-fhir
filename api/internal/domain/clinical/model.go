@@ -1,6 +1,7 @@
 package clinical
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -71,7 +72,11 @@ func (c *Condition) ToFHIR() map[string]interface{} {
 			Text: c.CodeDisplay,
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", c.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: c.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", c.VersionID),
+			LastUpdated: c.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns"},
+		},
 	}
 	if c.VerificationStatus != nil {
 		result["verificationStatus"] = fhir.CodeableConcept{
@@ -83,7 +88,10 @@ func (c *Condition) ToFHIR() map[string]interface{} {
 	}
 	if c.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{
-			Coding: []fhir.Coding{{Code: *c.CategoryCode}},
+			Coding: []fhir.Coding{{
+				System: "http://terminology.hl7.org/CodeSystem/condition-category",
+				Code:   *c.CategoryCode,
+			}},
 		}}
 	}
 	if c.SeverityCode != nil {
@@ -172,7 +180,11 @@ func (o *Observation) ToFHIR() map[string]interface{} {
 			}},
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", o.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: o.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", o.VersionID),
+			LastUpdated: o.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab"},
+		},
 	}
 	if o.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{
@@ -285,7 +297,11 @@ func (a *AllergyIntolerance) ToFHIR() map[string]interface{} {
 		"resourceType": "AllergyIntolerance",
 		"id":           a.FHIRID,
 		"patient":      fhir.Reference{Reference: fhir.FormatReference("Patient", a.PatientID.String())},
-		"meta":         fhir.Meta{LastUpdated: a.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", a.VersionID),
+			LastUpdated: a.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-allergyintolerance"},
+		},
 	}
 	if a.ClinicalStatus != nil {
 		result["clinicalStatus"] = fhir.CodeableConcept{
@@ -395,7 +411,11 @@ func (p *ProcedureRecord) ToFHIR() map[string]interface{} {
 			Coding: []fhir.Coding{{System: strVal(p.CodeSystem), Code: p.CodeValue, Display: p.CodeDisplay}},
 		},
 		"subject": fhir.Reference{Reference: fhir.FormatReference("Patient", p.PatientID.String())},
-		"meta":    fhir.Meta{LastUpdated: p.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", p.VersionID),
+			LastUpdated: p.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-procedure"},
+		},
 	}
 	if p.CategoryCode != nil {
 		result["category"] = fhir.CodeableConcept{

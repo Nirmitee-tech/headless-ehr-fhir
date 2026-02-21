@@ -1,6 +1,7 @@
 package examplescenario
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -33,7 +34,11 @@ func (e *ExampleScenario) ToFHIR() map[string]interface{} {
 		"resourceType": "ExampleScenario",
 		"id":           e.FHIRID,
 		"status":       e.Status,
-		"meta":         fhir.Meta{LastUpdated: e.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", e.VersionID),
+			LastUpdated: e.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ExampleScenario"},
+		},
 	}
 	if e.URL != nil {
 		result["url"] = *e.URL

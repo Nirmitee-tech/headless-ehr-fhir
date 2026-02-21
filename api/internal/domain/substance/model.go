@@ -1,6 +1,7 @@
 package substance
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -34,7 +35,11 @@ func (s *Substance) ToFHIR() map[string]interface{} {
 		"id":           s.FHIRID,
 		"status":       s.Status,
 		"code":         fhir.CodeableConcept{Coding: []fhir.Coding{{Code: s.CodeCode, Display: strVal(s.CodeDisplay), System: strVal(s.CodeSystem)}}},
-		"meta":         fhir.Meta{LastUpdated: s.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", s.VersionID),
+			LastUpdated: s.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Substance"},
+		},
 	}
 	if s.CategoryCode != nil {
 		result["category"] = []fhir.CodeableConcept{{Coding: []fhir.Coding{{Code: *s.CategoryCode, Display: strVal(s.CategoryDisplay)}}}}

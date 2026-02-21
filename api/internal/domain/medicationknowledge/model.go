@@ -1,6 +1,7 @@
 package medicationknowledge
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -35,7 +36,11 @@ func (m *MedicationKnowledge) ToFHIR() map[string]interface{} {
 		"resourceType": "MedicationKnowledge",
 		"id":           m.FHIRID,
 		"status":       m.Status,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicationKnowledge"},
+		},
 	}
 	if m.CodeCode != nil {
 		result["code"] = fhir.CodeableConcept{Coding: []fhir.Coding{{

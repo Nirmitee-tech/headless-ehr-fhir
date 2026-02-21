@@ -1,6 +1,7 @@
 package substanceprotein
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -26,7 +27,11 @@ func (m *SubstanceProtein) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "SubstanceProtein",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/SubstanceProtein"},
+		},
 	}
 	if m.SequenceTypeCode != nil { result["sequenceType"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.SequenceTypeCode, Display: strVal(m.SequenceTypeDisplay)}}} }
 	if m.NumberOfSubunits != nil { result["numberOfSubunits"] = *m.NumberOfSubunits }

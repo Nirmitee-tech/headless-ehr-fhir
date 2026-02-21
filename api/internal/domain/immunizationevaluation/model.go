@@ -1,6 +1,7 @@
 package immunizationevaluation
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -42,7 +43,11 @@ func (ie *ImmunizationEvaluation) ToFHIR() map[string]interface{} {
 		"targetDisease": fhir.CodeableConcept{Coding: []fhir.Coding{{Code: ie.TargetDiseaseCode, Display: strVal(ie.TargetDiseaseDisplay)}}},
 		"immunizationEvent": fhir.Reference{Reference: ie.ImmunizationEventRef},
 		"doseStatus":   fhir.CodeableConcept{Coding: []fhir.Coding{{Code: ie.DoseStatusCode, Display: strVal(ie.DoseStatusDisplay)}}},
-		"meta":         fhir.Meta{LastUpdated: ie.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", ie.VersionID),
+			LastUpdated: ie.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/ImmunizationEvaluation"},
+		},
 	}
 	if ie.Date != nil {
 		result["date"] = ie.Date.Format("2006-01-02T15:04:05Z")

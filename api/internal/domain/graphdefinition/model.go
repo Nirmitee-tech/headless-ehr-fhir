@@ -1,6 +1,7 @@
 package graphdefinition
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -34,7 +35,11 @@ func (g *GraphDefinition) ToFHIR() map[string]interface{} {
 		"name":         g.Name,
 		"status":       g.Status,
 		"start":        g.StartType,
-		"meta":         fhir.Meta{LastUpdated: g.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", g.VersionID),
+			LastUpdated: g.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/GraphDefinition"},
+		},
 	}
 	if g.URL != nil {
 		result["url"] = *g.URL

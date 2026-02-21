@@ -1,6 +1,7 @@
 package medproductpharmaceutical
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -28,7 +29,11 @@ func (m *MedicinalProductPharmaceutical) ToFHIR() map[string]interface{} {
 	result := map[string]interface{}{
 		"resourceType": "MedicinalProductPharmaceutical",
 		"id":           m.FHIRID,
-		"meta":         fhir.Meta{LastUpdated: m.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", m.VersionID),
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/MedicinalProductPharmaceutical"},
+		},
 		"administrableDoseForm": fhir.CodeableConcept{Coding: []fhir.Coding{{Code: m.AdministrableDoseFormCode, Display: strVal(m.AdministrableDoseFormDisplay)}}},
 	}
 	if m.UnitOfPresentationCode != nil { result["unitOfPresentation"] = fhir.CodeableConcept{Coding: []fhir.Coding{{Code: *m.UnitOfPresentationCode, Display: strVal(m.UnitOfPresentationDisplay)}}} }

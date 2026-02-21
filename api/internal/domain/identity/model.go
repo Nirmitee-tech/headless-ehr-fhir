@@ -48,6 +48,13 @@ type Patient struct {
 	InterpreterNeeded      bool       `db:"interpreter_needed" json:"interpreter_needed"`
 	PrimaryCareProviderID  *uuid.UUID `db:"primary_care_provider_id" json:"primary_care_provider_id,omitempty"`
 	ManagingOrgID          *uuid.UUID `db:"managing_org_id" json:"managing_org_id,omitempty"`
+	RaceCode               *string    `db:"race_code" json:"race_code,omitempty"`
+	RaceDisplay            *string    `db:"race_display" json:"race_display,omitempty"`
+	RaceText               *string    `db:"race_text" json:"race_text,omitempty"`
+	EthnicityCode          *string    `db:"ethnicity_code" json:"ethnicity_code,omitempty"`
+	EthnicityDisplay       *string    `db:"ethnicity_display" json:"ethnicity_display,omitempty"`
+	EthnicityText          *string    `db:"ethnicity_text" json:"ethnicity_text,omitempty"`
+	BirthSex               *string    `db:"birth_sex" json:"birth_sex,omitempty"`
 	VersionID              int        `db:"version_id" json:"version_id"`
 	CreatedAt              time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time  `db:"updated_at" json:"updated_at"`
@@ -65,7 +72,11 @@ func (p *Patient) ToFHIR() map[string]interface{} {
 		"resourceType": "Patient",
 		"id":           p.FHIRID,
 		"active":       p.Active,
-		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: p.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", versionID),
+			LastUpdated: p.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"},
+		},
 	}
 
 	// Name
@@ -89,6 +100,7 @@ func (p *Patient) ToFHIR() map[string]interface{} {
 	identifiers := []fhir.Identifier{
 		{
 			Use:    "usual",
+			System: "http://terminology.hl7.org/CodeSystem/v2-0203",
 			Type:   &fhir.CodeableConcept{Coding: []fhir.Coding{{System: "http://terminology.hl7.org/CodeSystem/v2-0203", Code: "MR"}}},
 			Value:  p.MRN,
 		},
@@ -180,6 +192,62 @@ func (p *Patient) ToFHIR() map[string]interface{} {
 				"preferred": true,
 			},
 		}
+	}
+
+	// US Core extensions (race, ethnicity are complex extensions with sub-extensions)
+	var extensions []interface{}
+
+	if p.RaceCode != nil {
+		raceExt := map[string]interface{}{
+			"url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+			"extension": []map[string]interface{}{
+				{
+					"url": "ombCategory",
+					"valueCoding": map[string]interface{}{
+						"system":  "urn:oid:2.16.840.1.113883.6.238",
+						"code":    *p.RaceCode,
+						"display": strVal(p.RaceDisplay),
+					},
+				},
+				{
+					"url":         "text",
+					"valueString": strVal(p.RaceText),
+				},
+			},
+		}
+		extensions = append(extensions, raceExt)
+	}
+
+	if p.EthnicityCode != nil {
+		ethExt := map[string]interface{}{
+			"url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity",
+			"extension": []map[string]interface{}{
+				{
+					"url": "ombCategory",
+					"valueCoding": map[string]interface{}{
+						"system":  "urn:oid:2.16.840.1.113883.6.238",
+						"code":    *p.EthnicityCode,
+						"display": strVal(p.EthnicityDisplay),
+					},
+				},
+				{
+					"url":         "text",
+					"valueString": strVal(p.EthnicityText),
+				},
+			},
+		}
+		extensions = append(extensions, ethExt)
+	}
+
+	if p.BirthSex != nil {
+		extensions = append(extensions, map[string]interface{}{
+			"url":       "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+			"valueCode": *p.BirthSex,
+		})
+	}
+
+	if len(extensions) > 0 {
+		result["extension"] = extensions
 	}
 
 	return result
@@ -280,7 +348,11 @@ func (p *Practitioner) ToFHIR() map[string]interface{} {
 		"resourceType": "Practitioner",
 		"id":           p.FHIRID,
 		"active":       p.Active,
-		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: p.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", versionID),
+			LastUpdated: p.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner"},
+		},
 	}
 
 	name := fhir.HumanName{
@@ -406,7 +478,11 @@ func (r *PractitionerRole) ToFHIR() map[string]interface{} {
 		"resourceType": "PractitionerRole",
 		"id":           r.FHIRID,
 		"active":       r.Active,
-		"meta":         fhir.Meta{VersionID: fmt.Sprintf("%d", versionID), LastUpdated: r.UpdatedAt},
+		"meta": fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", versionID),
+			LastUpdated: r.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitionerrole"},
+		},
 	}
 
 	// Practitioner reference
@@ -443,4 +519,12 @@ func (r *PractitionerRole) ToFHIR() map[string]interface{} {
 	}
 
 	return result
+}
+
+// strVal safely dereferences a string pointer, returning empty string for nil.
+func strVal(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

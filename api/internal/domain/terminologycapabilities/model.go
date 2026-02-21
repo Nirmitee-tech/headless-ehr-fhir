@@ -1,6 +1,7 @@
 package terminologycapabilities
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ehr/ehr/internal/platform/fhir"
@@ -40,7 +41,11 @@ func (tc *TerminologyCapabilities) ToFHIR() map[string]interface{} {
 		"kind":         tc.Kind,
 		"translation":  tc.Translation,
 		"closure":      map[string]interface{}{"translation": tc.Closure},
-		"meta":         fhir.Meta{LastUpdated: tc.UpdatedAt},
+		"meta":         fhir.Meta{
+			VersionID:   fmt.Sprintf("%d", tc.VersionID),
+			LastUpdated: tc.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/TerminologyCapabilities"},
+		},
 	}
 	if tc.URL != nil {
 		result["url"] = *tc.URL
