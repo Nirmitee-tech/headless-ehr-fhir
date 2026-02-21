@@ -41,6 +41,10 @@ type JWTConfig struct {
 	// When Skipper returns true, the middleware calls next(c) without any
 	// authentication checks. Use AuthSkipper for health/metrics endpoints.
 	Skipper func(echo.Context) bool
+	// RevocationStore, when set, is checked after successful token validation
+	// to reject tokens that have been explicitly revoked. If nil, revocation
+	// checking is disabled.
+	RevocationStore *TokenRevocationStore
 }
 
 // JWKSKey represents a single JSON Web Key from a JWKS endpoint.
@@ -232,6 +236,13 @@ func JWTMiddleware(cfg JWTConfig) echo.MiddlewareFunc {
 
 			if err != nil || !token.Valid {
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
+			}
+
+			// Check token revocation list
+			if cfg.RevocationStore != nil && claims.ID != "" {
+				if cfg.RevocationStore.IsRevoked(claims.ID) {
+					return echo.NewHTTPError(http.StatusUnauthorized, "token has been revoked")
+				}
 			}
 
 			// Set values on echo context for tenant middleware

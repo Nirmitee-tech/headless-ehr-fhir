@@ -581,23 +581,29 @@ func (b *CapabilityBuilder) buildResourceEntry(entry *resourceEntry, rt string) 
 	return res
 }
 
-// buildSecurity creates the SMART on FHIR security section with OAuth extension.
+// buildSecurity creates the SMART on FHIR security section with OAuth extension
+// and SMART capabilities per the FHIR spec.
 func (b *CapabilityBuilder) buildSecurity() map[string]interface{} {
 	service := map[string]interface{}{
 		"coding": []map[string]string{
 			{
-				"system": "http://hl7.org/fhir/restful-security-service",
-				"code":   "SMART-on-FHIR",
+				"system":  "http://terminology.hl7.org/CodeSystem/restful-security-service",
+				"code":    "SMART-on-FHIR",
+				"display": "SMART on FHIR",
 			},
 		},
 	}
 
 	security := map[string]interface{}{
-		"cors":    true,
-		"service": []map[string]interface{}{service},
+		"cors":        true,
+		"service":     []map[string]interface{}{service},
+		"description": "OAuth2 using SMART on FHIR profile (see http://docs.smarthealthit.org)",
 	}
 
-	// Add SMART on FHIR OAuth extension if URIs are configured
+	// Build extensions list
+	var extensions []map[string]interface{}
+
+	// Add SMART on FHIR OAuth URI extension if URIs are configured
 	if b.AuthorizeURL != "" || b.TokenURL != "" {
 		oauthExtensions := make([]map[string]string, 0, 2)
 		if b.AuthorizeURL != "" {
@@ -618,7 +624,29 @@ func (b *CapabilityBuilder) buildSecurity() map[string]interface{} {
 			"extension": oauthExtensions,
 		}
 
-		security["extension"] = []map[string]interface{}{smartExtension}
+		extensions = append(extensions, smartExtension)
+	}
+
+	// SMART capabilities extension — declares supported SMART on FHIR features
+	smartCapabilities := []string{
+		"launch-ehr",
+		"launch-standalone",
+		"client-public",
+		"client-confidential-symmetric",
+		"sso-openid-connect",
+		"permission-patient",
+		"permission-user",
+		"context-ehr-patient",
+	}
+	for _, cap := range smartCapabilities {
+		extensions = append(extensions, map[string]interface{}{
+			"url":       "http://fhir-registry.smarthealthit.org/StructureDefinition/capabilities",
+			"valueCode": cap,
+		})
+	}
+
+	if len(extensions) > 0 {
+		security["extension"] = extensions
 	}
 
 	return security

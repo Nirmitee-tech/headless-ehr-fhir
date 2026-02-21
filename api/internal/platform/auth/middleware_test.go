@@ -289,3 +289,185 @@ func TestDevAuthMiddleware_WithDefaults(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestJWTMiddleware_RevokedToken(t *testing.T) {
+	store := NewTokenRevocationStore()
+	defer store.Close()
+
+	jti := "revoked-jti-123"
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
+			Subject:   "user-123",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		TenantID: "tenant-1",
+		Roles:    []string{"physician"},
+	}
+
+	tokenStr := createTestToken(t, claims, testSigningKey)
+
+	// Revoke the token
+	store.Revoke(jti, time.Now().Add(1*time.Hour))
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenStr)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	}
+
+	cfg := JWTConfig{
+		SigningKey:       testSigningKey,
+		RevocationStore: store,
+	}
+	mw := JWTMiddleware(cfg)
+	h := mw(handler)
+	err := h(c)
+
+	if err == nil {
+		t.Fatal("expected error for revoked token")
+	}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok {
+		t.Fatalf("expected echo.HTTPError, got %T", err)
+	}
+	if httpErr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", httpErr.Code)
+	}
+}
+
+func TestJWTMiddleware_ValidToken_NotRevoked(t *testing.T) {
+	store := NewTokenRevocationStore()
+	defer store.Close()
+
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        "valid-jti-456",
+			Subject:   "user-123",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		TenantID: "tenant-1",
+		Roles:    []string{"physician"},
+	}
+
+	tokenStr := createTestToken(t, claims, testSigningKey)
+
+	// Revoke a DIFFERENT token
+	store.Revoke("other-jti", time.Now().Add(1*time.Hour))
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenStr)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	var handlerCalled bool
+	handler := func(c echo.Context) error {
+		handlerCalled = true
+		return c.String(http.StatusOK, "ok")
+	}
+
+	cfg := JWTConfig{
+		SigningKey:       testSigningKey,
+		RevocationStore: store,
+	}
+	mw := JWTMiddleware(cfg)
+	h := mw(handler)
+	err := h(c)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handlerCalled {
+		t.Error("handler was not called for non-revoked token")
+	}
+}
+
+func TestJWTMiddleware_NoJTI_SkipsRevocationCheck(t *testing.T) {
+	store := NewTokenRevocationStore()
+	defer store.Close()
+
+	// Token without a JTI claim
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "user-123",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		TenantID: "tenant-1",
+	}
+
+	tokenStr := createTestToken(t, claims, testSigningKey)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenStr)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	var handlerCalled bool
+	handler := func(c echo.Context) error {
+		handlerCalled = true
+		return c.String(http.StatusOK, "ok")
+	}
+
+	cfg := JWTConfig{
+		SigningKey:       testSigningKey,
+		RevocationStore: store,
+	}
+	mw := JWTMiddleware(cfg)
+	h := mw(handler)
+	err := h(c)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handlerCalled {
+		t.Error("handler should be called when token has no JTI")
+	}
+}
+
+func TestJWTMiddleware_NilRevocationStore(t *testing.T) {
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        "some-jti",
+			Subject:   "user-123",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		TenantID: "tenant-1",
+	}
+
+	tokenStr := createTestToken(t, claims, testSigningKey)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenStr)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	var handlerCalled bool
+	handler := func(c echo.Context) error {
+		handlerCalled = true
+		return c.String(http.StatusOK, "ok")
+	}
+
+	// No revocation store configured
+	cfg := JWTConfig{SigningKey: testSigningKey}
+	mw := JWTMiddleware(cfg)
+	h := mw(handler)
+	err := h(c)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handlerCalled {
+		t.Error("handler should be called when no revocation store is configured")
+	}
+}

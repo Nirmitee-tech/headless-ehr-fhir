@@ -1531,6 +1531,663 @@ func TestExportManager_TransactionTime(t *testing.T) {
 	}
 }
 
+// =========== ExportStore Tests ===========
+
+func TestExportStore_CreateAndGet(t *testing.T) {
+	store := NewExportStore()
+	now := time.Now().UTC()
+
+	job := &ExportJob{
+		ID:            "store-test-1",
+		Status:        "in-progress",
+		ResourceTypes: []string{"Patient"},
+		OutputFormat:  "application/fhir+ndjson",
+		CreatedAt:     now,
+		RequestTime:   now,
+	}
+	store.Create(job)
+
+	got, ok := store.Get("store-test-1")
+	if !ok {
+		t.Fatal("expected to find job")
+	}
+	if got.ID != "store-test-1" {
+		t.Errorf("expected ID 'store-test-1', got %q", got.ID)
+	}
+	if got.Status != "in-progress" {
+		t.Errorf("expected status 'in-progress', got %q", got.Status)
+	}
+}
+
+func TestExportStore_GetNotFound(t *testing.T) {
+	store := NewExportStore()
+	_, ok := store.Get("nonexistent")
+	if ok {
+		t.Error("expected not found")
+	}
+}
+
+func TestExportStore_Update(t *testing.T) {
+	store := NewExportStore()
+	now := time.Now().UTC()
+
+	job := &ExportJob{
+		ID:            "store-update-1",
+		Status:        "in-progress",
+		ResourceTypes: []string{"Patient"},
+		CreatedAt:     now,
+		RequestTime:   now,
+	}
+	store.Create(job)
+
+	job.Status = "complete"
+	store.Update(job)
+
+	got, ok := store.Get("store-update-1")
+	if !ok {
+		t.Fatal("expected to find job")
+	}
+	if got.Status != "complete" {
+		t.Errorf("expected status 'complete', got %q", got.Status)
+	}
+}
+
+func TestExportStore_Delete(t *testing.T) {
+	store := NewExportStore()
+	now := time.Now().UTC()
+
+	job := &ExportJob{
+		ID:        "store-delete-1",
+		Status:    "complete",
+		CreatedAt: now,
+	}
+	store.Create(job)
+
+	store.Delete("store-delete-1")
+
+	_, ok := store.Get("store-delete-1")
+	if ok {
+		t.Error("expected job to be deleted")
+	}
+}
+
+// =========== BulkExportHandler Tests (GET-based, spec-compliant) ===========
+
+func TestBulkExportHandler_SystemExportKickOff(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export?_type=Patient,Observation", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.SystemExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+	contentLocation := rec.Header().Get("Content-Location")
+	if contentLocation == "" {
+		t.Error("expected Content-Location header")
+	}
+	if !strings.Contains(contentLocation, "$export-poll-status?job=") {
+		t.Errorf("Content-Location should contain $export-poll-status?job=, got %q", contentLocation)
+	}
+}
+
+func TestBulkExportHandler_PatientExportKickOff(t *testing.T) {
+	mgr := NewExportManager()
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "patient-99"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/Patient/patient-99/$export?_type=Patient", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("patient-99")
+
+	err := h.PatientExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+	contentLocation := rec.Header().Get("Content-Location")
+	if contentLocation == "" {
+		t.Error("expected Content-Location header")
+	}
+}
+
+func TestBulkExportHandler_PatientExportKickOff_RequiresPatientID(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/Patient//$export", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	// Do not set param -- simulates empty patient ID
+	c.SetParamNames("id")
+	c.SetParamValues("")
+
+	err := h.PatientExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing patient ID, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_PollStatus_InProgress(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+
+	// Manually create an in-progress job
+	mgr.mu.Lock()
+	mgr.jobs["poll-ip-1"] = &ExportJob{
+		ID:            "poll-ip-1",
+		Status:        "in-progress",
+		ResourceTypes: []string{"Patient"},
+		OutputFormat:  "application/fhir+ndjson",
+		CreatedAt:     time.Now().UTC(),
+		RequestTime:   time.Now().UTC(),
+		TotalTypes:    2,
+		ProcessedTypes: 1,
+	}
+	mgr.mu.Unlock()
+
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-poll-status?job=poll-ip-1", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+	retryAfter := rec.Header().Get("Retry-After")
+	if retryAfter != "10" {
+		t.Errorf("expected Retry-After '10', got %q", retryAfter)
+	}
+	xProgress := rec.Header().Get("X-Progress")
+	if xProgress != "1/2 resource types processed" {
+		t.Errorf("expected X-Progress '1/2 resource types processed', got %q", xProgress)
+	}
+}
+
+func TestBulkExportHandler_PollStatus_Complete(t *testing.T) {
+	mgr := NewExportManager()
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+			{"resourceType": "Patient", "id": "p2"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+
+	job := mustKickOff(t, mgr, []string{"Patient"}, nil)
+	store.Create(job)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-poll-status?job="+job.ID, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+
+	var result map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &result)
+
+	if result["transactionTime"] == nil {
+		t.Error("expected transactionTime in response")
+	}
+	rat, ok := result["requiresAccessToken"].(bool)
+	if !ok || !rat {
+		t.Errorf("expected requiresAccessToken: true, got %v", result["requiresAccessToken"])
+	}
+	output, ok := result["output"].([]interface{})
+	if !ok {
+		t.Fatal("expected output array in response")
+	}
+	if len(output) != 1 {
+		t.Errorf("expected 1 output file, got %d", len(output))
+	}
+	firstOutput := output[0].(map[string]interface{})
+	url, _ := firstOutput["url"].(string)
+	if !strings.Contains(url, "$export-output/") {
+		t.Errorf("expected output URL to contain $export-output/, got %q", url)
+	}
+	if !strings.HasSuffix(url, ".ndjson") {
+		t.Errorf("expected output URL to end with .ndjson, got %q", url)
+	}
+	// Verify error array is present and empty
+	errArr, ok := result["error"].([]interface{})
+	if !ok {
+		t.Error("expected error array in response")
+	}
+	if len(errArr) != 0 {
+		t.Errorf("expected empty error array, got %d", len(errArr))
+	}
+}
+
+func TestBulkExportHandler_PollStatus_Error(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+
+	mgr.mu.Lock()
+	mgr.jobs["poll-err-1"] = &ExportJob{
+		ID:           "poll-err-1",
+		Status:       "error",
+		ErrorMessage: "something went wrong",
+		CreatedAt:    time.Now().UTC(),
+	}
+	mgr.mu.Unlock()
+
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-poll-status?job=poll-err-1", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_PollStatus_NotFound(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-poll-status?job=nonexistent", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_PollStatus_MissingJobParam(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-poll-status", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.ExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing job param, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_DeleteExportPollStatus(t *testing.T) {
+	mgr := NewExportManager()
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+
+	job := mustKickOff(t, mgr, []string{"Patient"}, nil)
+	store.Create(job)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodDelete, "/fhir/$export-poll-status?job="+job.ID, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.DeleteExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+
+	// Verify job is gone from manager
+	_, mgrErr := mgr.GetStatus(job.ID)
+	if mgrErr == nil {
+		t.Error("expected job to be deleted from manager")
+	}
+	// Verify job is gone from store
+	_, found := store.Get(job.ID)
+	if found {
+		t.Error("expected job to be deleted from store")
+	}
+}
+
+func TestBulkExportHandler_DeleteExportPollStatus_NotFound(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodDelete, "/fhir/$export-poll-status?job=nonexistent", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.DeleteExportPollStatus(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_ExportOutput(t *testing.T) {
+	mgr := NewExportManager()
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+			{"resourceType": "Patient", "id": "p2"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+
+	job := mustKickOff(t, mgr, []string{"Patient"}, nil)
+	store.Create(job)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-output/"+job.ID+"/Patient.ndjson", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("jobId", "fileName")
+	c.SetParamValues(job.ID, "Patient.ndjson")
+
+	err := h.ExportOutput(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	contentType := rec.Header().Get("Content-Type")
+	if contentType != "application/fhir+ndjson" {
+		t.Errorf("expected content-type 'application/fhir+ndjson', got %q", contentType)
+	}
+	if rec.Body.Len() == 0 {
+		t.Error("expected non-empty body")
+	}
+
+	// Verify NDJSON content
+	lines := parseNDJSONLines(t, rec.Body.Bytes())
+	if len(lines) != 2 {
+		t.Errorf("expected 2 NDJSON lines, got %d", len(lines))
+	}
+}
+
+func TestBulkExportHandler_ExportOutput_NotFound(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export-output/nonexistent/Patient.ndjson", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("jobId", "fileName")
+	c.SetParamValues("nonexistent", "Patient.ndjson")
+
+	err := h.ExportOutput(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_InvalidOutputFormat(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export?_outputFormat=text/csv", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.SystemExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_SinceParameter(t *testing.T) {
+	mgr := NewExportManager()
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "recent"},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export?_type=Patient&_since=2024-06-01T00:00:00Z", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.SystemExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+
+	// Verify since was passed through
+	contentLocation := rec.Header().Get("Content-Location")
+	parts := strings.Split(contentLocation, "job=")
+	if len(parts) < 2 {
+		t.Fatalf("could not extract job ID from Content-Location: %s", contentLocation)
+	}
+	jobID := parts[1]
+
+	waitForComplete(t, mgr, jobID, 5*time.Second)
+
+	if exporter.sincePassed == nil {
+		t.Fatal("expected _since to be passed to exporter")
+	}
+	expected := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+	if !exporter.sincePassed.Equal(expected) {
+		t.Errorf("expected since %v, got %v", expected, *exporter.sincePassed)
+	}
+}
+
+func TestBulkExportHandler_TypeParameter(t *testing.T) {
+	mgr := NewExportManager()
+	patientExp := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1"},
+		},
+	}
+	condExp := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Condition", "id": "c1"},
+		},
+	}
+	mgr.RegisterExporter("Patient", patientExp)
+	mgr.RegisterExporter("Condition", condExp)
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export?_type=Patient,Condition", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.SystemExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
+	}
+
+	// Extract job ID and verify both types were included
+	contentLocation := rec.Header().Get("Content-Location")
+	parts := strings.Split(contentLocation, "job=")
+	jobID := parts[1]
+
+	completed := waitForComplete(t, mgr, jobID, 5*time.Second)
+	if len(completed.OutputFiles) != 2 {
+		t.Errorf("expected 2 output files, got %d", len(completed.OutputFiles))
+	}
+}
+
+func TestBulkExportHandler_InvalidSince(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/fhir/$export?_since=not-a-date", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := h.SystemExportKickOff(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestBulkExportHandler_RegisterRoutes(t *testing.T) {
+	mgr := NewExportManager()
+	store := NewExportStore()
+	h := NewBulkExportHandler(store, mgr, "https://example.com")
+	e := echo.New()
+	fhirGroup := e.Group("/fhir")
+
+	h.RegisterBulkExportRoutes(fhirGroup)
+
+	routes := e.Routes()
+	routePaths := make(map[string]bool)
+	for _, r := range routes {
+		routePaths[r.Method+":"+r.Path] = true
+	}
+
+	expected := []string{
+		"GET:/fhir/$export",
+		"GET:/fhir/Patient/:id/$export",
+		"GET:/fhir/$export-poll-status",
+		"DELETE:/fhir/$export-poll-status",
+		"GET:/fhir/$export-output/:jobId/:fileName",
+	}
+	for _, path := range expected {
+		if !routePaths[path] {
+			t.Errorf("missing expected route: %s", path)
+		}
+	}
+}
+
+func TestBulkExportHandler_NDJSONWriterIntegration(t *testing.T) {
+	// Verify NDJSONWriter produces the same output format as the export engine
+	mgr := NewExportManager()
+	exporter := &mockExporter{
+		resources: []map[string]interface{}{
+			{"resourceType": "Patient", "id": "p1", "active": true},
+			{"resourceType": "Patient", "id": "p2", "active": false},
+		},
+	}
+	mgr.RegisterExporter("Patient", exporter)
+
+	job := mustKickOff(t, mgr, []string{"Patient"}, nil)
+	waitForComplete(t, mgr, job.ID, 5*time.Second)
+
+	exportData, err := mgr.GetJobData(job.ID, "Patient")
+	if err != nil {
+		t.Fatalf("GetJobData failed: %v", err)
+	}
+
+	// Write the same resources using NDJSONWriter
+	var buf bytes.Buffer
+	w := NewNDJSONWriter(&buf)
+	for _, r := range exporter.resources {
+		if err := w.WriteResource(r); err != nil {
+			t.Fatalf("WriteResource failed: %v", err)
+		}
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
+	// Both should produce valid NDJSON with the same number of lines
+	exportLines := parseNDJSONLines(t, exportData)
+	writerLines := parseNDJSONLines(t, buf.Bytes())
+
+	if len(exportLines) != len(writerLines) {
+		t.Errorf("export produced %d lines, NDJSONWriter produced %d lines", len(exportLines), len(writerLines))
+	}
+
+	// Verify content matches
+	for i := 0; i < len(exportLines) && i < len(writerLines); i++ {
+		if exportLines[i]["id"] != writerLines[i]["id"] {
+			t.Errorf("line %d: export id=%v, writer id=%v", i, exportLines[i]["id"], writerLines[i]["id"])
+		}
+	}
+}
+
 // =========== Test Helpers ===========
 
 // blockingExporter is a test helper that blocks until released.

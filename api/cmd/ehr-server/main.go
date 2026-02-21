@@ -393,6 +393,9 @@ func runServer() error {
 
 	// Global middleware
 	e.Use(middleware.Recovery(logger))
+	e.Use(middleware.SecurityHeaders())
+	e.Use(middleware.SanitizeWithLogger(logger))
+	e.Use(middleware.RequestTimeout(30 * time.Second))
 	e.Use(middleware.RequestID())
 	e.Use(middleware.Logger(logger))
 	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
@@ -400,16 +403,22 @@ func runServer() error {
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
 		AllowHeaders: []string{"Authorization", "Content-Type", "X-Request-ID", "X-Tenant-ID", "X-Break-Glass"},
 	}))
+	e.Use(middleware.BodyLimit("1M", "10M"))
+
+	// Token revocation store — allows immediate invalidation of JWT tokens
+	revocationStore := auth.NewTokenRevocationStore()
+	defer revocationStore.Close()
 
 	// Auth middleware — skip authentication for health/metrics/discovery endpoints
 	if cfg.IsDev() {
 		e.Use(auth.DevAuthMiddleware(auth.AuthSkipper))
 	} else {
 		e.Use(auth.JWTMiddleware(auth.JWTConfig{
-			Issuer:   cfg.AuthIssuer,
-			Audience: cfg.AuthAudience,
-			JWKSURL:  cfg.AuthJWKSURL,
-			Skipper:  auth.AuthSkipper,
+			Issuer:          cfg.AuthIssuer,
+			Audience:        cfg.AuthAudience,
+			JWKSURL:         cfg.AuthJWKSURL,
+			Skipper:         auth.AuthSkipper,
+			RevocationStore: revocationStore,
 		}))
 	}
 
@@ -3355,6 +3364,12 @@ func runServer() error {
 	exportHandler := fhir.NewExportHandler(exportManager)
 	exportHandler.RegisterRoutes(fhirGroup)
 
+	// Bulk Data Export (FHIR Bulk Data Access / Flat FHIR spec-compliant endpoints)
+	exportStore := fhir.NewExportStore()
+	serverBaseURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
+	bulkExportHandler := fhir.NewBulkExportHandler(exportStore, exportManager, serverBaseURL)
+	bulkExportHandler.RegisterBulkExportRoutes(fhirGroup)
+
 	// FHIR Binary resource
 	binaryStore := fhir.NewInMemoryBinaryStore()
 	binaryHandler := fhir.NewBinaryHandler(binaryStore)
@@ -4200,6 +4215,14 @@ func runServer() error {
 	auditSearchHandler := hipaa.NewAuditSearchHandler(auditSearcher)
 	auditSearchHandler.RegisterRoutes(apiV1)
 
+	// Data retention policies
+	retentionService := hipaa.NewRetentionService(hipaa.DefaultRetentionPolicies(), logger)
+	hipaa.RegisterRetentionRoutes(apiV1, retentionService)
+
+	// Accounting of disclosures (HIPAA §164.528)
+	disclosureStore := hipaa.NewDisclosureStore()
+	hipaa.RegisterDisclosureRoutes(apiV1, fhirGroup, disclosureStore)
+
 	// FHIR Bulk Import/Edit operations
 	bulkStore := fhir.NewInMemoryResourceStore()
 	bulkMgr := fhir.NewBulkOperationManager(bulkStore)
@@ -4215,6 +4238,9 @@ func runServer() error {
 	closureMgr := fhir.NewClosureManager()
 	closureHandler := fhir.NewClosureHandler(closureMgr)
 	closureHandler.RegisterRoutes(fhirGroup)
+
+	// Token Revocation Management (admin-only)
+	auth.RegisterRevocationRoutes(apiV1, revocationStore)
 
 	// API Key Management
 	apiKeyStore := auth.NewInMemoryAPIKeyStore()
@@ -4309,9 +4335,16 @@ func runServer() error {
 	// Graceful shutdown
 	go func() {
 		addr := ":" + cfg.Port
-		logger.Info().Str("addr", addr).Msg("starting server")
-		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
-			logger.Fatal().Err(err).Msg("server error")
+		if cfg.TLSEnabled {
+			logger.Info().Str("addr", addr).Msg("starting HTTPS server")
+			if err := e.StartTLS(addr, cfg.TLSCertFile, cfg.TLSKeyFile); err != nil && err != http.ErrServerClosed {
+				logger.Fatal().Err(err).Msg("server error")
+			}
+		} else {
+			logger.Info().Str("addr", addr).Msg("starting HTTP server")
+			if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+				logger.Fatal().Err(err).Msg("server error")
+			}
 		}
 	}()
 

@@ -24,6 +24,9 @@ type Config struct {
 	HIPAAEncryptionKey  string   `mapstructure:"HIPAA_ENCRYPTION_KEY"`
 	RateLimitRPS        float64  `mapstructure:"RATE_LIMIT_RPS"`
 	RateLimitBurst      int      `mapstructure:"RATE_LIMIT_BURST"`
+	TLSEnabled          bool     `mapstructure:"TLS_ENABLED"`
+	TLSCertFile         string   `mapstructure:"TLS_CERT_FILE"`
+	TLSKeyFile          string   `mapstructure:"TLS_KEY_FILE"`
 }
 
 func Load() (*Config, error) {
@@ -56,6 +59,9 @@ func Load() (*Config, error) {
 	v.BindEnv("HIPAA_ENCRYPTION_KEY")
 	v.BindEnv("RATE_LIMIT_RPS")
 	v.BindEnv("RATE_LIMIT_BURST")
+	v.BindEnv("TLS_ENABLED")
+	v.BindEnv("TLS_CERT_FILE")
+	v.BindEnv("TLS_KEY_FILE")
 
 	// Try reading .env file, but don't fail if missing
 	_ = v.ReadInConfig()
@@ -119,6 +125,16 @@ func (c *Config) Validate() error {
 		}
 		if len(keyBytes) != 32 {
 			return fmt.Errorf("HIPAA_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes", len(keyBytes))
+		}
+	}
+
+	// TLS validation: when TLS is enabled, cert and key files must be specified.
+	if c.TLSEnabled {
+		if c.TLSCertFile == "" {
+			return fmt.Errorf("TLS_CERT_FILE is required when TLS_ENABLED is true")
+		}
+		if c.TLSKeyFile == "" {
+			return fmt.Errorf("TLS_KEY_FILE is required when TLS_ENABLED is true")
 		}
 	}
 

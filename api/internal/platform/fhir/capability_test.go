@@ -158,6 +158,15 @@ func TestCapabilityBuilder_SecuritySection(t *testing.T) {
 		t.Error("expected cors to be true")
 	}
 
+	// Check description
+	desc, ok := security["description"].(string)
+	if !ok || desc == "" {
+		t.Error("expected security description to be set")
+	}
+	if desc != "OAuth2 using SMART on FHIR profile (see http://docs.smarthealthit.org)" {
+		t.Errorf("unexpected description: %s", desc)
+	}
+
 	// Check service coding
 	services := security["service"].([]map[string]interface{})
 	if len(services) != 1 {
@@ -167,15 +176,21 @@ func TestCapabilityBuilder_SecuritySection(t *testing.T) {
 	if codings[0]["code"] != "SMART-on-FHIR" {
 		t.Errorf("expected SMART-on-FHIR, got %s", codings[0]["code"])
 	}
-	if codings[0]["system"] != "http://hl7.org/fhir/restful-security-service" {
+	if codings[0]["system"] != "http://terminology.hl7.org/CodeSystem/restful-security-service" {
 		t.Errorf("unexpected system: %s", codings[0]["system"])
 	}
-
-	// Check OAuth extension
-	extensions := security["extension"].([]map[string]interface{})
-	if len(extensions) != 1 {
-		t.Fatalf("expected 1 extension, got %d", len(extensions))
+	if codings[0]["display"] != "SMART on FHIR" {
+		t.Errorf("expected display 'SMART on FHIR', got %s", codings[0]["display"])
 	}
+
+	// Check extensions: first should be OAuth URIs, then 8 SMART capabilities
+	extensions := security["extension"].([]map[string]interface{})
+	// 1 OAuth URIs extension + 8 SMART capability extensions = 9 total
+	if len(extensions) != 9 {
+		t.Fatalf("expected 9 extensions (1 OAuth + 8 SMART capabilities), got %d", len(extensions))
+	}
+
+	// First extension: OAuth URIs
 	if extensions[0]["url"] != "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris" {
 		t.Errorf("unexpected extension URL: %s", extensions[0]["url"])
 	}
@@ -197,6 +212,27 @@ func TestCapabilityBuilder_SecuritySection(t *testing.T) {
 	if oauthExts[1]["valueUri"] != "http://keycloak:8080/realms/ehr/protocol/openid-connect/token" {
 		t.Errorf("unexpected token URI: %s", oauthExts[1]["valueUri"])
 	}
+
+	// Remaining extensions: SMART capabilities
+	expectedCaps := []string{
+		"launch-ehr",
+		"launch-standalone",
+		"client-public",
+		"client-confidential-symmetric",
+		"sso-openid-connect",
+		"permission-patient",
+		"permission-user",
+		"context-ehr-patient",
+	}
+	for i, expected := range expectedCaps {
+		ext := extensions[i+1] // offset by 1 for the OAuth URIs extension
+		if ext["url"] != "http://fhir-registry.smarthealthit.org/StructureDefinition/capabilities" {
+			t.Errorf("SMART cap [%d]: unexpected URL %v", i, ext["url"])
+		}
+		if ext["valueCode"] != expected {
+			t.Errorf("SMART cap [%d]: expected %s, got %v", i, expected, ext["valueCode"])
+		}
+	}
 }
 
 func TestCapabilityBuilder_NoOAuthURIs(t *testing.T) {
@@ -208,9 +244,20 @@ func TestCapabilityBuilder_NoOAuthURIs(t *testing.T) {
 	rest := cs["rest"].([]map[string]interface{})
 	security := rest[0]["security"].(map[string]interface{})
 
-	// Should still have service but no OAuth extension
-	if _, hasExt := security["extension"]; hasExt {
-		t.Error("expected no extension when OAuth URIs are not set")
+	// Should still have SMART capability extensions even without OAuth URIs
+	extensions := security["extension"].([]map[string]interface{})
+	// 8 SMART capability extensions (no OAuth URIs extension)
+	if len(extensions) != 8 {
+		t.Fatalf("expected 8 SMART capability extensions when OAuth URIs are not set, got %d", len(extensions))
+	}
+	// All should be SMART capabilities, not oauth-uris
+	for _, ext := range extensions {
+		if ext["url"] == "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris" {
+			t.Error("should not have OAuth URIs extension when URIs are not set")
+		}
+		if ext["url"] != "http://fhir-registry.smarthealthit.org/StructureDefinition/capabilities" {
+			t.Errorf("unexpected extension URL: %v", ext["url"])
+		}
 	}
 }
 
@@ -517,9 +564,11 @@ func TestCapabilityBuilder_SetOAuthURIs_OnlyAuthorize(t *testing.T) {
 	security := rest[0]["security"].(map[string]interface{})
 
 	extensions := security["extension"].([]map[string]interface{})
-	if len(extensions) != 1 {
-		t.Fatalf("expected 1 extension, got %d", len(extensions))
+	// 1 OAuth URIs extension + 8 SMART capabilities = 9
+	if len(extensions) != 9 {
+		t.Fatalf("expected 9 extensions, got %d", len(extensions))
 	}
+	// First extension is OAuth URIs with only authorize
 	oauthExts := extensions[0]["extension"].([]map[string]string)
 	if len(oauthExts) != 1 {
 		t.Fatalf("expected 1 OAuth extension entry (authorize only), got %d", len(oauthExts))
@@ -539,9 +588,11 @@ func TestCapabilityBuilder_SetOAuthURIs_OnlyToken(t *testing.T) {
 	security := rest[0]["security"].(map[string]interface{})
 
 	extensions := security["extension"].([]map[string]interface{})
-	if len(extensions) != 1 {
-		t.Fatalf("expected 1 extension, got %d", len(extensions))
+	// 1 OAuth URIs extension + 8 SMART capabilities = 9
+	if len(extensions) != 9 {
+		t.Fatalf("expected 9 extensions, got %d", len(extensions))
 	}
+	// First extension is OAuth URIs with only token
 	oauthExts := extensions[0]["extension"].([]map[string]string)
 	if len(oauthExts) != 1 {
 		t.Fatalf("expected 1 OAuth extension entry (token only), got %d", len(oauthExts))
@@ -849,6 +900,34 @@ func TestCapabilityBuilder_Build_HasSecurity(t *testing.T) {
 	codings := services[0]["coding"].([]map[string]string)
 	if codings[0]["code"] != "SMART-on-FHIR" {
 		t.Errorf("expected SMART-on-FHIR, got %s", codings[0]["code"])
+	}
+	if codings[0]["system"] != "http://terminology.hl7.org/CodeSystem/restful-security-service" {
+		t.Errorf("expected terminology.hl7.org system, got %s", codings[0]["system"])
+	}
+	if codings[0]["display"] != "SMART on FHIR" {
+		t.Errorf("expected display 'SMART on FHIR', got %s", codings[0]["display"])
+	}
+
+	// Check description
+	if security["description"] != "OAuth2 using SMART on FHIR profile (see http://docs.smarthealthit.org)" {
+		t.Errorf("unexpected security description: %v", security["description"])
+	}
+
+	// Check CORS
+	if security["cors"] != true {
+		t.Error("expected cors to be true")
+	}
+
+	// Check SMART capabilities are present in extensions
+	extensions := security["extension"].([]map[string]interface{})
+	capCount := 0
+	for _, ext := range extensions {
+		if ext["url"] == "http://fhir-registry.smarthealthit.org/StructureDefinition/capabilities" {
+			capCount++
+		}
+	}
+	if capCount != 8 {
+		t.Errorf("expected 8 SMART capability extensions, got %d", capCount)
 	}
 }
 
