@@ -417,11 +417,22 @@ func runServer() error {
 	if randomKeyEarly {
 		logger.Warn().Msg("SMART_SIGNING_KEY not set; using random key (tokens will not survive restart)")
 	}
+	smartRSAKey, randomRSA, rsaKeyErr := authpkg.ResolveSmartRSAKey(os.Getenv("SMART_RSA_KEY"))
+	if rsaKeyErr != nil {
+		logger.Fatal().Err(rsaKeyErr).Msg("SMART RSA key error")
+	}
+	if randomRSA {
+		logger.Warn().Msg("SMART_RSA_KEY not set; generating ephemeral RSA key (JWTs will not survive restart)")
+	}
 	smartIssuerEarly := "http://localhost:" + cfg.Port
 	if issuer := os.Getenv("SMART_ISSUER"); issuer != "" {
 		smartIssuerEarly = issuer
 	}
-	smartServer := authpkg.NewSMARTServer(smartIssuerEarly, smartSigningKeyEarly)
+	smartServer := authpkg.NewSMARTServer(smartIssuerEarly, smartSigningKeyEarly, smartRSAKey)
+	if randomRSA {
+		logger.Info().Str("SMART_RSA_KEY", authpkg.EncodeRSAKeyPEMBase64(smartServer.RSAKey())).
+			Msg("copy this value into SMART_RSA_KEY to persist tokens across restarts")
+	}
 	smartCleanupCtx, smartCleanupCancel := context.WithCancel(context.Background())
 	defer smartCleanupCancel()
 	smartServer.StartCleanup(smartCleanupCtx)
@@ -1842,7 +1853,7 @@ func runServer() error {
 	deviceRepo := device.NewDeviceRepoPG(pool)
 	devSvc := device.NewService(deviceRepo)
 	devSvc.SetVersionTracker(versionTracker)
-	devHandler := device.NewHandler(devSvc)
+	devHandler := device.NewHandler(devSvc, pool)
 	devHandler.RegisterRoutes(apiV1, fhirGroup)
 
 	// Subscription domain

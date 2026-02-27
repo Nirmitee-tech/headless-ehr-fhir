@@ -22,7 +22,7 @@ import (
 var smartTestKey = []byte("test-smart-signing-key-for-tests-only")
 
 func newTestSMARTServer() *SMARTServer {
-	return NewSMARTServer("https://ehr.example.com", smartTestKey)
+	return NewSMARTServer("https://ehr.example.com", smartTestKey, nil)
 }
 
 func registerTestClient(t *testing.T, s *SMARTServer, public bool) *SMARTClient {
@@ -1660,7 +1660,7 @@ func TestSMARTServer_IntrospectToken_InvalidSignature(t *testing.T) {
 	s := newTestSMARTServer()
 
 	// Create a token with a different key
-	otherServer := NewSMARTServer("https://other.example.com", []byte("different-key"))
+	otherServer := NewSMARTServer("https://other.example.com", []byte("different-key"), nil)
 	claims := map[string]interface{}{
 		"iss": "https://other.example.com",
 		"sub": "user-other",
@@ -1822,5 +1822,80 @@ func TestSMARTHandler_Introspect_EmptyToken(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &claims)
 	if claims.Active {
 		t.Error("expected active=false for empty token")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ResolveSmartRSAKey + EncodeRSAKeyPEMBase64 tests
+// ---------------------------------------------------------------------------
+
+func TestResolveSmartRSAKey_Empty(t *testing.T) {
+	key, random, err := ResolveSmartRSAKey("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != nil {
+		t.Error("expected nil key for empty input")
+	}
+	if !random {
+		t.Error("expected random=true for empty input")
+	}
+}
+
+func TestResolveSmartRSAKey_InvalidBase64(t *testing.T) {
+	_, _, err := ResolveSmartRSAKey("not-valid-base64!!!")
+	if err == nil {
+		t.Error("expected error for invalid base64")
+	}
+}
+
+func TestResolveSmartRSAKey_InvalidPEM(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("not a PEM block"))
+	_, _, err := ResolveSmartRSAKey(encoded)
+	if err == nil {
+		t.Error("expected error for invalid PEM")
+	}
+}
+
+func TestResolveSmartRSAKey_RoundTrip(t *testing.T) {
+	// Generate a key, encode it, then resolve it back
+	s := newTestSMARTServer()
+	original := s.RSAKey()
+
+	encoded := EncodeRSAKeyPEMBase64(original)
+	if encoded == "" {
+		t.Fatal("EncodeRSAKeyPEMBase64 returned empty string")
+	}
+
+	resolved, random, err := ResolveSmartRSAKey(encoded)
+	if err != nil {
+		t.Fatalf("ResolveSmartRSAKey failed: %v", err)
+	}
+	if random {
+		t.Error("expected random=false for valid key")
+	}
+	if resolved == nil {
+		t.Fatal("expected non-nil key")
+	}
+	if original.N.Cmp(resolved.N) != 0 {
+		t.Error("resolved key does not match original")
+	}
+}
+
+func TestNewSMARTServer_WithExternalKey(t *testing.T) {
+	// Generate a key and pass it in
+	s1 := newTestSMARTServer()
+	original := s1.RSAKey()
+
+	s2 := NewSMARTServer("https://test.example.com", smartTestKey, original)
+	if s2.RSAKey().N.Cmp(original.N) != 0 {
+		t.Error("server should use the provided RSA key")
+	}
+}
+
+func TestNewSMARTServer_NilKeyGeneratesNew(t *testing.T) {
+	s := NewSMARTServer("https://test.example.com", smartTestKey, nil)
+	if s.RSAKey() == nil {
+		t.Error("server should generate a key when nil is passed")
 	}
 }

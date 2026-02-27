@@ -61,7 +61,7 @@ func (d *Device) ToFHIR() map[string]interface{} {
 		"meta": fhir.Meta{
 			VersionID:   fmt.Sprintf("%d", d.VersionID),
 			LastUpdated: d.UpdatedAt,
-			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Device"},
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-implantable-device"},
 		},
 	}
 	if d.StatusReason != nil {

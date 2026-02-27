@@ -7,9 +7,11 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -155,12 +157,15 @@ type SMARTServer struct {
 }
 
 // NewSMARTServer creates a new SMART authorization server.
-// It generates an RSA-2048 key pair for RS256 JWT signing.
-func NewSMARTServer(issuer string, signingKey []byte) *SMARTServer {
-	// Generate RSA key for RS256 signing (used for ID tokens and JWKS).
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic("failed to generate RSA key: " + err.Error())
+// If rsaKey is non-nil it is used for RS256 JWT signing; otherwise one is
+// generated at startup (tokens will not survive restart).
+func NewSMARTServer(issuer string, signingKey []byte, rsaKey *rsa.PrivateKey) *SMARTServer {
+	if rsaKey == nil {
+		var err error
+		rsaKey, err = rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			panic("failed to generate RSA key: " + err.Error())
+		}
 	}
 	// Derive a stable key ID from the public key modulus.
 	kidHash := sha256.Sum256(rsaKey.PublicKey.N.Bytes())
@@ -181,6 +186,45 @@ func NewSMARTServer(issuer string, signingKey []byte) *SMARTServer {
 	}
 }
 
+// ResolveSmartRSAKey decodes a base64-encoded PEM RSA private key from envValue.
+// If envValue is empty it returns (nil, true, nil) indicating a random key should
+// be generated. The second return value is true when no key was provided.
+func ResolveSmartRSAKey(envValue string) (*rsa.PrivateKey, bool, error) {
+	if envValue == "" {
+		return nil, true, nil
+	}
+	derBytes, err := base64.StdEncoding.DecodeString(envValue)
+	if err != nil {
+		return nil, false, fmt.Errorf("SMART_RSA_KEY: invalid base64: %w", err)
+	}
+	block, _ := pem.Decode(derBytes)
+	if block == nil {
+		return nil, false, fmt.Errorf("SMART_RSA_KEY: no PEM block found")
+	}
+	// Try PKCS#8 first, then PKCS#1.
+	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+		if rsaKey, ok := key.(*rsa.PrivateKey); ok {
+			return rsaKey, false, nil
+		}
+		return nil, false, fmt.Errorf("SMART_RSA_KEY: PKCS#8 key is not RSA")
+	}
+	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return key, false, nil
+	}
+	return nil, false, fmt.Errorf("SMART_RSA_KEY: unable to parse as PKCS#8 or PKCS#1 private key")
+}
+
+// EncodeRSAKeyPEMBase64 encodes an RSA private key as a base64-encoded PEM string
+// suitable for the SMART_RSA_KEY environment variable.
+func EncodeRSAKeyPEMBase64(key *rsa.PrivateKey) string {
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return ""
+	}
+	pemBlock := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	return base64.StdEncoding.EncodeToString(pemBlock)
+}
+
 // SetDefaultPatientID sets the default patient FHIR ID used when a standalone
 // launch requests the launch/patient scope without an EHR launch context.
 func (s *SMARTServer) SetDefaultPatientID(id string) {
@@ -188,6 +232,9 @@ func (s *SMARTServer) SetDefaultPatientID(id string) {
 	s.defaultPatientID = id
 	s.mu.Unlock()
 }
+
+// RSAKey returns the RSA private key used for JWT signing.
+func (s *SMARTServer) RSAKey() *rsa.PrivateKey { return s.rsaKey }
 
 // RegisterClient registers a SMART application.
 func (s *SMARTServer) RegisterClient(client *SMARTClient) error {

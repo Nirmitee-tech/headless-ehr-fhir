@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
-# inferno-test.sh — Automated Inferno g(10) SMART Standalone Patient App test runner
+# inferno-test.sh — Automated Inferno g(10) test runner
 #
 # Usage:
-#   ./scripts/inferno-test.sh              # Run once
-#   ./scripts/inferno-test.sh --loop 300   # Run every 300 seconds (5 min)
-#   ./scripts/inferno-test.sh --ci         # CI mode: exit 1 on any non-TLS failure
+#   ./scripts/inferno-test.sh                       # SMART Standalone Patient App
+#   ./scripts/inferno-test.sh --single-patient-api   # Run SMART + Single Patient API
+#   ./scripts/inferno-test.sh --loop 300             # Run every 300 seconds (5 min)
+#   ./scripts/inferno-test.sh --ci                   # CI mode: exit 1 on any non-TLS failure
 #
 set -euo pipefail
 
@@ -26,7 +27,9 @@ CLIENT_ID="test-client"
 CLIENT_SECRET="test-secret"
 SCOPES="launch/patient openid fhirUser offline_access patient/*.read"
 
-TEST_GROUP="g10_certification-g10_smart_standalone_patient_app"
+SMART_TEST_GROUP="g10_certification-g10_smart_standalone_patient_app"
+SINGLE_PATIENT_API_GROUP="g10_certification-g10_smart_single_patient_api"
+RUN_SINGLE_PATIENT_API=0
 
 # Colors
 RED='\033[0;31m'
@@ -119,7 +122,7 @@ inputs = [
 ]
 print(json.dumps({
     'test_session_id': '${SESSION}',
-    'test_group_id': '${TEST_GROUP}',
+    'test_group_id': '${SMART_TEST_GROUP}',
     'inputs': inputs
 }))
 ")
@@ -281,11 +284,131 @@ print(f'SUMMARY:{functional_pass}:{len(fails)}:{len(tls_fails)}:{skips}:{errors}
     echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
     echo ""
 
+    # Optionally run Single Patient API tests in the same session
+    if [ "$RUN_SINGLE_PATIENT_API" = "1" ] && [ "$func_fail" -eq 0 ]; then
+        run_single_patient_api "$SESSION"
+    fi
+
     # Return exit code for CI mode
     if [ "${CI_MODE:-0}" = "1" ] && [ "$func_fail" -gt 0 ]; then
         return 1
     fi
     return 0
+}
+
+# ---------------------------------------------------------------------------
+# Run Single Patient API tests (group 2) in an existing session
+# ---------------------------------------------------------------------------
+run_single_patient_api() {
+    local session_id="$1"
+    local start_time=$(date +%s)
+    log "${BOLD}Starting Inferno US Core Single Patient API tests${NC}"
+
+    # Group 2 uses the token from the SMART test (same session).
+    # We only need to pass the test_session_id and test_group_id.
+    local run_payload
+    run_payload=$(python3 -c "
+import json
+print(json.dumps({
+    'test_session_id': '${session_id}',
+    'test_group_id': '${SINGLE_PATIENT_API_GROUP}',
+    'inputs': [
+        {'name': 'url', 'value': '${FHIR_URL}'}
+    ]
+}))
+")
+
+    local run_id
+    run_id=$(curl -sf -X POST "${INFERNO_URL}/api/test_runs" \
+        -H 'Content-Type: application/json' \
+        -d "$run_payload" \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+    log "Single Patient API Run: ${run_id}"
+
+    # Wait for tests to complete
+    log "Waiting for Single Patient API tests..."
+    local status="unknown"
+    for i in $(seq 1 180); do
+        sleep 2
+        status=$(curl -sf "${INFERNO_URL}/api/test_runs/${run_id}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "unknown")
+        if [ "$status" = "done" ] || [ "$status" = "error" ]; then
+            break
+        fi
+    done
+
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+
+    echo ""
+    echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  US Core Single Patient API — $(date '+%Y-%m-%d %H:%M:%S')${NC}"
+    echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+
+    local result
+    result=$(curl -sf "${INFERNO_URL}/api/test_sessions/${session_id}/results" | python3 -c "
+import sys, json
+
+d = json.load(sys.stdin)
+passes = []
+fails = []
+skips = 0
+errors = 0
+
+# Filter to only Single Patient API results (group 2)
+for r in d:
+    gid = r.get('test_group_id', '') or ''
+    tid = r.get('test_id', '') or ''
+    # Only include results from the single patient API group
+    if 'single_patient_api' not in gid and 'single_patient_api' not in tid:
+        continue
+    st = r.get('result', '')
+    short_id = tid.split('-')[-1] if tid else ''
+    msg = r.get('result_message', '')
+
+    if st == 'pass':
+        passes.append(short_id)
+    elif st == 'fail':
+        if not short_id:
+            continue
+        fails.append(f'{short_id}: {msg[:100]}')
+    elif st == 'skip':
+        skips += 1
+    elif st == 'error':
+        errors += 1
+
+total = len(passes) + len(fails)
+
+for t in passes:
+    print(f'PASS:{t}')
+for t in fails:
+    print(f'FAIL:{t}')
+print(f'SUMMARY:{len(passes)}:{len(fails)}:0:{skips}:{errors}:{total}:{total}')
+")
+
+    local func_pass=0 func_fail=0
+    while IFS= read -r line; do
+        case "$line" in
+            PASS:*)   pass "${line#PASS:}" ;;
+            FAIL:*)   fail "${line#FAIL:}" ;;
+            SUMMARY:*)
+                IFS=: read -r _ func_pass func_fail _ skips errors total func_total <<< "$line"
+                ;;
+        esac
+    done <<< "$result"
+
+    echo ""
+    echo -e "${BOLD}───────────────────────────────────────────────────────────${NC}"
+
+    if [ "$func_fail" -eq 0 ]; then
+        echo -e "  ${GREEN}${BOLD}ALL SINGLE PATIENT API TESTS PASSING${NC}  (${func_pass}/${func_total:-$func_pass})"
+    else
+        echo -e "  ${RED}${BOLD}${func_fail} SINGLE PATIENT API TEST(S) FAILING${NC}  (${func_pass}/${func_total:-0})"
+    fi
+
+    echo -e "  Duration: ${duration}s | Session: ${session_id}"
+    echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
 }
 
 # ---------------------------------------------------------------------------
@@ -304,13 +427,18 @@ while [[ $# -gt 0 ]]; do
             CI_MODE=1
             shift
             ;;
+        --single-patient-api)
+            RUN_SINGLE_PATIENT_API=1
+            shift
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --loop SECONDS   Run tests every N seconds (default: 300)"
-            echo "  --ci             CI mode: exit 1 on any non-TLS failure"
-            echo "  --help           Show this help"
+            echo "  --single-patient-api  Also run US Core Single Patient API tests after SMART"
+            echo "  --loop SECONDS        Run tests every N seconds (default: 300)"
+            echo "  --ci                  CI mode: exit 1 on any non-TLS failure"
+            echo "  --help                Show this help"
             exit 0
             ;;
         *)

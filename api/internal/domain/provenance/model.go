@@ -41,7 +41,7 @@ func (p *Provenance) ToFHIR() map[string]interface{} {
 		"meta":     fhir.Meta{
 			VersionID:   fmt.Sprintf("%d", p.VersionID),
 			LastUpdated: p.UpdatedAt,
-			Profile:     []string{"http://hl7.org/fhir/StructureDefinition/Provenance"},
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-provenance"},
 		},
 	}
 	if p.ActivityCode != nil {

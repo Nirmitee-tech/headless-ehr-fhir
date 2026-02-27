@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 
 	"github.com/ehr/ehr/internal/platform/auth"
@@ -15,11 +16,12 @@ import (
 )
 
 type Handler struct {
-	svc *Service
+	svc  *Service
+	pool *pgxpool.Pool
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, pool *pgxpool.Pool) *Handler {
+	return &Handler{svc: svc, pool: pool}
 }
 
 func (h *Handler) RegisterRoutes(api *echo.Group, fhirGroup *echo.Group) {
@@ -135,7 +137,16 @@ func (h *Handler) SearchDevicesFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Device"))
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
+		BaseURL:       "/fhir/Device",
+		QueryStr:      c.QueryString(),
+		Count:         pg.Limit,
+		Offset:        pg.Offset,
+		Total:         total,
+	})
+	fhir.HandleProvenanceRevInclude(bundle, c, h.pool)
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetDeviceFHIR(c echo.Context) error {

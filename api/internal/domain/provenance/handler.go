@@ -122,7 +122,15 @@ func (h *Handler) SearchFHIR(c echo.Context) error {
 	for i, item := range items {
 		resources[i] = item.ToFHIR()
 	}
-	return c.JSON(http.StatusOK, fhir.NewSearchBundle(resources, total, "/fhir/Provenance"))
+	bundle := fhir.NewSearchBundleWithLinks(resources, fhir.SearchBundleParams{
+		ServerBaseURL: fhir.ServerBaseURLFromRequest(c),
+		BaseURL:       "/fhir/Provenance",
+		QueryStr:      c.QueryString(),
+		Count:         pg.Limit,
+		Offset:        pg.Offset,
+		Total:         total,
+	})
+	return c.JSON(http.StatusOK, bundle)
 }
 
 func (h *Handler) GetFHIR(c echo.Context) error {
