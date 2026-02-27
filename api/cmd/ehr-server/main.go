@@ -503,14 +503,20 @@ func runServer() error {
 
 	// Configure SMART on FHIR OAuth URIs
 	if authMode == "standalone" {
-		capBuilder.SetOAuthURIs(
+		capBuilder.SetOAuthAllURIs(
 			smartIssuerEarly+"/auth/authorize",
 			smartIssuerEarly+"/auth/token",
+			smartIssuerEarly+"/auth/introspect",
+			smartIssuerEarly+"/auth/manage",
+			"", // no revoke endpoint yet
 		)
 	} else if cfg.AuthIssuer != "" {
-		capBuilder.SetOAuthURIs(
+		capBuilder.SetOAuthAllURIs(
 			cfg.AuthIssuer+"/protocol/openid-connect/auth",
 			cfg.AuthIssuer+"/protocol/openid-connect/token",
+			cfg.AuthIssuer+"/protocol/openid-connect/token/introspect",
+			"", // manage
+			"", // revoke
 		)
 	}
 
@@ -4443,8 +4449,9 @@ func runServer() error {
 	sandboxHandler.RegisterRoutes(apiV1)
 
 	// Detailed CapabilityStatement (extended metadata endpoints)
-	capabilityDetailed := fhir.DefaultCapabilityBuilder()
-	capabilityHandler := fhir.NewCapabilityHandler(capabilityDetailed)
+	// Use the main capBuilder (which has OAuth URIs configured) rather than
+	// DefaultCapabilityBuilder() to ensure /metadata includes SMART extensions.
+	capabilityHandler := fhir.NewCapabilityHandler(capBuilder)
 	capabilityHandler.RegisterRoutes(fhirGroup)
 
 	// Suppress unused variable warnings for optional components

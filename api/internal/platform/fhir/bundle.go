@@ -293,12 +293,77 @@ type CSSearchParam struct {
 }
 
 type CSSecurity struct {
-	CORS    bool             `json:"cors"`
-	Service []CodeableConcept `json:"service,omitempty"`
+	Extension []CSExtension     `json:"extension,omitempty"`
+	CORS      bool              `json:"cors"`
+	Service   []CodeableConcept `json:"service,omitempty"`
+}
+
+// CSExtension represents a FHIR extension in the CapabilityStatement.
+type CSExtension struct {
+	URL       string        `json:"url"`
+	Extension []CSExtension `json:"extension,omitempty"`
+	ValueURI  string        `json:"valueUri,omitempty"`
+}
+
+// SMARTEndpoints holds the OAuth2 endpoint URLs for the SMART security extension.
+type SMARTEndpoints struct {
+	AuthorizeURL string
+	TokenURL     string
+	IntrospectURL string
+	ManageURL    string
+	RegisterURL  string
+	RevokeURL    string
 }
 
 // NewCapabilityStatement creates the server's capability statement.
-func NewCapabilityStatement(baseURL string, resources []CSResource) *CapabilityStatement {
+func NewCapabilityStatement(baseURL string, resources []CSResource, smartEndpoints *SMARTEndpoints) *CapabilityStatement {
+	security := &CSSecurity{
+		CORS: true,
+		Service: []CodeableConcept{
+			{
+				Coding: []Coding{
+					{
+						System:  "http://terminology.hl7.org/CodeSystem/restful-security-service",
+						Code:    "SMART-on-FHIR",
+						Display: "SMART on FHIR",
+					},
+				},
+				Text: "OAuth2 using SMART on FHIR profile",
+			},
+		},
+	}
+
+	// Add SMART oauth-uris extension if endpoints are provided.
+	if smartEndpoints != nil {
+		var oauthExts []CSExtension
+		if smartEndpoints.AuthorizeURL != "" {
+			oauthExts = append(oauthExts, CSExtension{URL: "authorize", ValueURI: smartEndpoints.AuthorizeURL})
+		}
+		if smartEndpoints.TokenURL != "" {
+			oauthExts = append(oauthExts, CSExtension{URL: "token", ValueURI: smartEndpoints.TokenURL})
+		}
+		if smartEndpoints.IntrospectURL != "" {
+			oauthExts = append(oauthExts, CSExtension{URL: "introspect", ValueURI: smartEndpoints.IntrospectURL})
+		}
+		if smartEndpoints.ManageURL != "" {
+			oauthExts = append(oauthExts, CSExtension{URL: "manage", ValueURI: smartEndpoints.ManageURL})
+		}
+		if smartEndpoints.RegisterURL != "" {
+			oauthExts = append(oauthExts, CSExtension{URL: "register", ValueURI: smartEndpoints.RegisterURL})
+		}
+		if smartEndpoints.RevokeURL != "" {
+			oauthExts = append(oauthExts, CSExtension{URL: "revoke", ValueURI: smartEndpoints.RevokeURL})
+		}
+		if len(oauthExts) > 0 {
+			security.Extension = []CSExtension{
+				{
+					URL:       "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris",
+					Extension: oauthExts,
+				},
+			}
+		}
+	}
+
 	return &CapabilityStatement{
 		ResourceType: "CapabilityStatement",
 		Status:       "active",
@@ -314,21 +379,7 @@ func NewCapabilityStatement(baseURL string, resources []CSResource) *CapabilityS
 			{
 				Mode:     "server",
 				Resource: resources,
-				Security: &CSSecurity{
-					CORS: true,
-					Service: []CodeableConcept{
-						{
-							Coding: []Coding{
-								{
-									System:  "http://terminology.hl7.org/CodeSystem/restful-security-service",
-									Code:    "SMART-on-FHIR",
-									Display: "SMART on FHIR",
-								},
-							},
-							Text: "OAuth2 using SMART on FHIR profile",
-						},
-					},
-				},
+				Security: security,
 			},
 		},
 	}

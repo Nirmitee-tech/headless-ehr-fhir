@@ -488,6 +488,8 @@ func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 			},
 			CodeChallengeMethodsSupported: []string{"S256"},
 		}
+		// SMART configuration is NOT a FHIR resource — must be application/json.
+		c.Response().Header().Set("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, cfg)
 	}
 }

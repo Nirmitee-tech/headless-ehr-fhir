@@ -571,7 +571,7 @@ func TestNewCapabilityStatement(t *testing.T) {
 		}),
 	}
 
-	cs := NewCapabilityStatement("http://localhost:8000/fhir", resources)
+	cs := NewCapabilityStatement("http://localhost:8000/fhir", resources, nil)
 
 	if cs.ResourceType != "CapabilityStatement" {
 		t.Errorf("expected CapabilityStatement, got %s", cs.ResourceType)

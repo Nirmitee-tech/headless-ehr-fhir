@@ -111,10 +111,13 @@ type CapabilityBuilder struct {
 	resources map[string]*resourceEntry
 
 	// Server metadata
-	ServerVersion string
-	BaseURL       string
-	AuthorizeURL  string
-	TokenURL      string
+	ServerVersion  string
+	BaseURL        string
+	AuthorizeURL   string
+	TokenURL       string
+	IntrospectURL  string
+	ManageURL      string
+	RevokeURL      string
 
 	// Extended config (set via NewCapabilityBuilderFromConfig)
 	config CapabilityConfig
@@ -183,6 +186,18 @@ func (b *CapabilityBuilder) SetOAuthURIs(authorizeURL, tokenURL string) {
 	defer b.mu.Unlock()
 	b.AuthorizeURL = authorizeURL
 	b.TokenURL = tokenURL
+}
+
+// SetOAuthAllURIs configures all SMART on FHIR OAuth URIs (authorize, token,
+// introspect, manage, revoke) in the CapabilityStatement security section.
+func (b *CapabilityBuilder) SetOAuthAllURIs(authorizeURL, tokenURL, introspectURL, manageURL, revokeURL string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.AuthorizeURL = authorizeURL
+	b.TokenURL = tokenURL
+	b.IntrospectURL = introspectURL
+	b.ManageURL = manageURL
+	b.RevokeURL = revokeURL
 }
 
 // ---------------------------------------------------------------------------
@@ -607,8 +622,8 @@ func (b *CapabilityBuilder) buildSecurity() map[string]interface{} {
 	var extensions []map[string]interface{}
 
 	// Add SMART on FHIR OAuth URI extension if URIs are configured
-	if b.AuthorizeURL != "" || b.TokenURL != "" {
-		oauthExtensions := make([]map[string]string, 0, 2)
+	if b.AuthorizeURL != "" || b.TokenURL != "" || b.IntrospectURL != "" || b.ManageURL != "" || b.RevokeURL != "" {
+		oauthExtensions := make([]map[string]string, 0, 5)
 		if b.AuthorizeURL != "" {
 			oauthExtensions = append(oauthExtensions, map[string]string{
 				"url":      "authorize",
@@ -619,6 +634,24 @@ func (b *CapabilityBuilder) buildSecurity() map[string]interface{} {
 			oauthExtensions = append(oauthExtensions, map[string]string{
 				"url":      "token",
 				"valueUri": b.TokenURL,
+			})
+		}
+		if b.IntrospectURL != "" {
+			oauthExtensions = append(oauthExtensions, map[string]string{
+				"url":      "introspect",
+				"valueUri": b.IntrospectURL,
+			})
+		}
+		if b.ManageURL != "" {
+			oauthExtensions = append(oauthExtensions, map[string]string{
+				"url":      "manage",
+				"valueUri": b.ManageURL,
+			})
+		}
+		if b.RevokeURL != "" {
+			oauthExtensions = append(oauthExtensions, map[string]string{
+				"url":      "revoke",
+				"valueUri": b.RevokeURL,
 			})
 		}
 

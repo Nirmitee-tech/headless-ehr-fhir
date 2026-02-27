@@ -151,12 +151,17 @@ func RegisterDefaultSMARTClient(server *SMARTServer) {
 		log.Printf("SMART: default inferno client already registered: %v", err)
 	}
 
-	// Generic test client — confidential client for development
+	// Generic test client — confidential client for development + Inferno tests
 	testClient := &SMARTClient{
 		ClientID:     "test-client",
 		ClientSecret: "test-secret",
-		RedirectURIs: []string{"http://localhost:3000/callback", "http://localhost:8080/callback"},
-		Scope:        "launch launch/patient openid fhirUser offline_access user/*.*",
+		RedirectURIs: []string{
+			"http://localhost:3000/callback",
+			"http://localhost:8080/callback",
+			"http://localhost:4567/custom/smart/redirect",
+			"http://localhost:4567/inferno/oauth2/static/redirect",
+		},
+		Scope:        "launch launch/patient openid fhirUser offline_access user/*.* patient/*.read",
 		Name:         "Test Client",
 		IsPublic:     false,
 	}

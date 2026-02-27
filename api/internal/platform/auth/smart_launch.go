@@ -2,14 +2,16 @@ package auth
 
 import (
 	"context"
-	"crypto/hmac"
+	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
@@ -142,7 +144,9 @@ type SMARTServer struct {
 	authCodes        map[string]*AuthorizationCode
 	launchContexts   map[string]*SMARTLaunchContext
 	refreshTokens    map[string]*RefreshTokenData
-	signingKey       []byte
+	signingKey       []byte       // HMAC key (kept for backward compat)
+	rsaKey           *rsa.PrivateKey // RSA key for RS256 signing
+	rsaKID           string         // Key ID for JWKS
 	issuer           string
 	defaultPatientID string // used for standalone launch with launch/patient scope
 	codeExpiry       time.Duration
@@ -151,13 +155,25 @@ type SMARTServer struct {
 }
 
 // NewSMARTServer creates a new SMART authorization server.
+// It generates an RSA-2048 key pair for RS256 JWT signing.
 func NewSMARTServer(issuer string, signingKey []byte) *SMARTServer {
+	// Generate RSA key for RS256 signing (used for ID tokens and JWKS).
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic("failed to generate RSA key: " + err.Error())
+	}
+	// Derive a stable key ID from the public key modulus.
+	kidHash := sha256.Sum256(rsaKey.PublicKey.N.Bytes())
+	kid := base64.RawURLEncoding.EncodeToString(kidHash[:8])
+
 	return &SMARTServer{
 		clients:        make(map[string]*SMARTClient),
 		authCodes:      make(map[string]*AuthorizationCode),
 		launchContexts: make(map[string]*SMARTLaunchContext),
 		refreshTokens:  make(map[string]*RefreshTokenData),
 		signingKey:     signingKey,
+		rsaKey:         rsaKey,
+		rsaKID:         kid,
 		issuer:         issuer,
 		codeExpiry:     5 * time.Minute,
 		tokenExpiry:    1 * time.Hour,
@@ -274,6 +290,11 @@ func (s *SMARTServer) Authorize(req *AuthorizationRequest) (*AuthorizationRespon
 		// Standalone launch with launch/patient scope: provide a default
 		// patient context matching the seed data so Inferno tests can proceed.
 		ac.PatientID = s.defaultPatientID
+	}
+
+	// Set a default user for fhirUser scope in standalone mode
+	if ac.UserID == "" && containsScope(negotiatedScope, "fhirUser") {
+		ac.UserID = "dev-practitioner"
 	}
 
 	s.mu.Lock()
@@ -602,11 +623,12 @@ func (s *SMARTServer) cleanup() {
 // JWT Helpers
 // ---------------------------------------------------------------------------
 
-// signJWT creates a JWT signed with HMAC-SHA256.
+// signJWT creates a JWT signed with RS256 (RSA-PKCS1v15-SHA256).
 func (s *SMARTServer) signJWT(claims map[string]interface{}) (string, error) {
 	header := map[string]string{
-		"alg": "HS256",
+		"alg": "RS256",
 		"typ": "JWT",
+		"kid": s.rsaKID,
 	}
 
 	headerJSON, err := json.Marshal(header)
@@ -624,35 +646,35 @@ func (s *SMARTServer) signJWT(claims map[string]interface{}) (string, error) {
 
 	signingInput := headerB64 + "." + payloadB64
 
-	mac := hmac.New(sha256.New, s.signingKey)
-	mac.Write([]byte(signingInput))
-	signature := mac.Sum(nil)
+	hash := sha256.Sum256([]byte(signingInput))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, s.rsaKey, crypto.SHA256, hash[:])
+	if err != nil {
+		return "", fmt.Errorf("RSA signing: %w", err)
+	}
 
 	signatureB64 := base64.RawURLEncoding.EncodeToString(signature)
 
 	return signingInput + "." + signatureB64, nil
 }
 
-// parseJWT parses and verifies a JWT signed with HMAC-SHA256.
+// parseJWT parses and verifies a JWT signed with RS256.
 func (s *SMARTServer) parseJWT(tokenStr string) (map[string]interface{}, error) {
 	parts := strings.SplitN(tokenStr, ".", 3)
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid JWT format")
 	}
 
-	// Verify signature
+	// Verify RS256 signature
 	signingInput := parts[0] + "." + parts[1]
-	mac := hmac.New(sha256.New, s.signingKey)
-	mac.Write([]byte(signingInput))
-	expectedSig := mac.Sum(nil)
+	hash := sha256.Sum256([]byte(signingInput))
 
 	actualSig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return nil, fmt.Errorf("decoding signature: %w", err)
 	}
 
-	if !hmac.Equal(expectedSig, actualSig) {
-		return nil, fmt.Errorf("invalid signature")
+	if err := rsa.VerifyPKCS1v15(&s.rsaKey.PublicKey, crypto.SHA256, hash[:], actualSig); err != nil {
+		return nil, fmt.Errorf("invalid signature: %w", err)
 	}
 
 	// Decode payload
@@ -667,6 +689,42 @@ func (s *SMARTServer) parseJWT(tokenStr string) (map[string]interface{}, error) 
 	}
 
 	return claims, nil
+}
+
+// JWKS returns the JSON Web Key Set containing the public RSA key.
+func (s *SMARTServer) JWKS() map[string]interface{} {
+	pub := &s.rsaKey.PublicKey
+	return map[string]interface{}{
+		"keys": []map[string]interface{}{
+			{
+				"kty": "RSA",
+				"use": "sig",
+				"alg": "RS256",
+				"kid": s.rsaKID,
+				"n":   base64.RawURLEncoding.EncodeToString(pub.N.Bytes()),
+				"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes()),
+			},
+		},
+	}
+}
+
+// OpenIDConfiguration returns the OpenID Connect discovery document.
+func (s *SMARTServer) OpenIDConfiguration() map[string]interface{} {
+	return map[string]interface{}{
+		"issuer":                                s.issuer,
+		"authorization_endpoint":                s.issuer + "/auth/authorize",
+		"token_endpoint":                        s.issuer + "/auth/token",
+		"jwks_uri":                              s.issuer + "/auth/jwks",
+		"userinfo_endpoint":                     s.issuer + "/auth/userinfo",
+		"introspection_endpoint":                s.issuer + "/auth/introspect",
+		"response_types_supported":              []string{"code"},
+		"subject_types_supported":               []string{"public"},
+		"id_token_signing_alg_values_supported": []string{"RS256"},
+		"scopes_supported":                      []string{"openid", "fhirUser", "launch", "launch/patient", "offline_access", "patient/*.read", "user/*.read"},
+		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic"},
+		"claims_supported":                      []string{"sub", "iss", "fhirUser", "patient"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -809,6 +867,8 @@ func (h *SMARTHandler) RegisterRoutes(e *echo.Echo) {
 	e.POST("/auth/register", h.handleRegister)
 	e.POST("/auth/launch", h.handleLaunch)
 	e.POST("/auth/introspect", h.handleIntrospect)
+	e.GET("/auth/jwks", h.handleJWKS)
+	e.GET("/.well-known/openid-configuration", h.handleOpenIDConfiguration)
 }
 
 // handleAuthorize handles GET /auth/authorize.
@@ -883,6 +943,10 @@ func (h *SMARTHandler) redirectWithError(c echo.Context, redirectURI, errCode, e
 
 // handleToken handles POST /auth/token.
 func (h *SMARTHandler) handleToken(c echo.Context) error {
+	// RFC 6749 Section 5.1: token responses must include these cache headers
+	c.Response().Header().Set("Cache-Control", "no-store")
+	c.Response().Header().Set("Pragma", "no-cache")
+
 	grantType := c.FormValue("grant_type")
 
 	switch grantType {
@@ -1082,4 +1146,15 @@ func (h *SMARTHandler) handleIntrospect(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, claims)
+}
+
+// handleJWKS returns the JSON Web Key Set for token signature verification.
+func (h *SMARTHandler) handleJWKS(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "public, max-age=3600")
+	return c.JSON(http.StatusOK, h.server.JWKS())
+}
+
+// handleOpenIDConfiguration returns the OpenID Connect discovery document.
+func (h *SMARTHandler) handleOpenIDConfiguration(c echo.Context) error {
+	return c.JSON(http.StatusOK, h.server.OpenIDConfiguration())
 }

@@ -12,12 +12,14 @@ var publicPaths = map[string]bool{
 	"/health/db":                              true,
 	"/metrics":                                true,
 	"/.well-known/smart-configuration":        true,
+	"/.well-known/openid-configuration":       true,
 	"/fhir/.well-known/smart-configuration":   true,
 	"/fhir/metadata":                          true,
 	"/auth/authorize":                         true,
 	"/auth/token":                             true,
 	"/auth/introspect":                        true,
 	"/auth/register":                          true,
+	"/auth/jwks":                              true,
 }
 
 // AuthSkipper returns true for requests whose path should skip authentication.
