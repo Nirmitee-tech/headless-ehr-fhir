@@ -5,17 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 )
+
+// Querier is satisfied by *pgxpool.Pool, *pgxpool.Conn, and pgx.Tx.
+type Querier interface {
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
+}
 
 // ProvenanceRevIncludeProvider implements RevIncludeProvider by querying the provenance table.
 type ProvenanceRevIncludeProvider struct {
-	pool *pgxpool.Pool
+	q Querier
 }
 
 // NewProvenanceRevIncludeProvider creates a new ProvenanceRevIncludeProvider.
-func NewProvenanceRevIncludeProvider(pool *pgxpool.Pool) *ProvenanceRevIncludeProvider {
-	return &ProvenanceRevIncludeProvider{pool: pool}
+func NewProvenanceRevIncludeProvider(q Querier) *ProvenanceRevIncludeProvider {
+	return &ProvenanceRevIncludeProvider{q: q}
 }
 
 // FindByTargets returns Provenance resources whose target references match the given refs.
@@ -35,7 +40,7 @@ func (p *ProvenanceRevIncludeProvider) FindByTargets(ctx context.Context, target
 		ORDER BY p.recorded DESC
 	`
 
-	rows, err := p.pool.Query(ctx, query, targetRefs)
+	rows, err := p.q.Query(ctx, query, targetRefs)
 	if err != nil {
 		return nil, fmt.Errorf("provenance revinclude query: %w", err)
 	}
@@ -116,7 +121,7 @@ func (p *ProvenanceRevIncludeProvider) loadAgents(ctx context.Context, provenanc
 		WHERE provenance_id = ANY($1)
 		ORDER BY provenance_id
 	`
-	rows, err := p.pool.Query(ctx, query, provenanceIDs)
+	rows, err := p.q.Query(ctx, query, provenanceIDs)
 	if err != nil {
 		return result
 	}

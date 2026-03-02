@@ -70,6 +70,8 @@ func ApplyRevInclude(bundle *Bundle, ctx context.Context, provider RevIncludePro
 
 // HandleProvenanceRevInclude checks the request for _revinclude=Provenance:target
 // and, if present, appends matching Provenance resources to the bundle.
+// It uses the tenant-scoped database connection from the request context when
+// available, falling back to the raw pool.
 // Errors are logged but do not fail the search.
 func HandleProvenanceRevInclude(bundle *Bundle, c echo.Context, pool *pgxpool.Pool) {
 	if pool == nil {
@@ -78,7 +80,12 @@ func HandleProvenanceRevInclude(bundle *Bundle, c echo.Context, pool *pgxpool.Po
 	revIncludes := ExtractRevIncludes(c)
 	for _, ri := range revIncludes {
 		if ri == "Provenance:target" {
-			provider := NewProvenanceRevIncludeProvider(pool)
+			// Prefer the tenant-scoped connection (has search_path set).
+			var q Querier = pool
+			if conn, ok := c.Get("db").(*pgxpool.Conn); ok && conn != nil {
+				q = conn
+			}
+			provider := NewProvenanceRevIncludeProvider(q)
 			if err := ApplyRevInclude(bundle, c.Request().Context(), provider); err != nil {
 				c.Logger().Warnf("revinclude Provenance failed: %v", err)
 			}
