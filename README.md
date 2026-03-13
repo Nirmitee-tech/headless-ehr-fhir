@@ -1,4 +1,4 @@
-# OpenEHR — Open Source Electronic Health Record
+# Headless EHR — Open Source Electronic Health Record
 
 An open-source, headless EHR system designed for modern healthcare. API-first architecture supporting any frontend (web, mobile, voice).
 
@@ -95,3 +95,4 @@ Please ensure all tests pass and follow the existing code style.
 ## License
 
 This project is open source. See the [LICENSE](LICENSE) file for details.
+
