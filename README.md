@@ -2,17 +2,13 @@
 
 An open-source, headless EHR system designed for modern healthcare. API-first architecture supporting any frontend (web, mobile, voice).
 
-## 🏥 ONC Inferno Conformance — 44/45 functional tests passing
+## 🏥 ONC Inferno Conformance — 47/47 tests passing
 
 This server is tested against the **ONC Certification (g)(10) Standardized API Test Kit** (Inferno) — the same test suite used to certify US EHRs — on the **SMART App Launch (STU2) — Standalone Patient App** scenario.
 
-**Latest run (June 11, 2026): 44 of 45 functional tests passing.**
+**Latest run (June 11, 2026): all 47 tests passing — zero failures, zero skips.**
 
-| | Count | Notes |
-|---|---|---|
-| ✅ Passing | 44 | Full OAuth 2.0 + PKCE standalone launch, OpenID Connect, token refresh, SMART v1 & v2 scopes, patient context, `fhirUser` resolution |
-| ❌ Failing (functional) | 1 | `client-confidential-asymmetric` (private_key_jwt client auth) — not yet implemented; on the roadmap. We don't declare capabilities we don't support. |
-| ⚠️ Failing (TLS-only) | 2 | TLS version checks — expected when running over HTTP in local development; pass behind any TLS-terminating proxy |
+The run was executed over HTTPS (TLS-terminating proxy in front of the server) with the client authenticating via **asymmetric `private_key_jwt` (RS384 client assertions)** — so the `client-confidential-asymmetric` capability is exercised end-to-end, not just declared. Coverage includes: full OAuth 2.0 + PKCE standalone launch (GET and POST authorize), OpenID Connect (ID token, JWKS, `fhirUser` resolution), token refresh, SMART v1 **and** v2 scope grammars, patient context, and TLS verification.
 
 📋 **[Full test-by-test results →](api/inferno-results/2026-06-11/results.md)**
 

@@ -3,17 +3,17 @@
 Suite: **SMART App Launch — Standalone Patient App** (ONC Certification (g)(10) Standardized API Test Kit)
 Server: headless-ehr-fhir, built-in SMART on FHIR server (standalone mode)
 
-## Summary: 44/47 passing (1 functional failures, 2 TLS-only failures expected in HTTP dev mode)
+## Summary: 47/47 passing — all tests green
 
 | Test | Result | Notes |
 |------|--------|-------|
 | well_known_endpoint | ✅ pass |  |
 | well_known_capabilities_stu2 | ✅ pass |  |
-| g10_smart_well_known_capabilities | ❌ fail | The following capabilities required for this scenario are missing: client-confidential-asymmetric |
-| standalone_auth_tls | ⚠️ fail (TLS-only) | Server did not support any allowed TLS versions. |
+| g10_smart_well_known_capabilities | ✅ pass |  |
+| standalone_auth_tls | ✅ pass |  |
 | smart_app_redirect_stu2 | ✅ pass |  |
 | smart_code_received | ✅ pass |  |
-| standalone_token_tls | ⚠️ fail (TLS-only) | Server did not support any allowed TLS versions. |
+| standalone_token_tls | ✅ pass |  |
 | smart_token_exchange | ✅ pass |  |
 | smart_token_response_body | ✅ pass |  |
 | smart_token_response_headers | ✅ pass |  |
@@ -55,4 +55,4 @@ Server: headless-ehr-fhir, built-in SMART on FHIR server (standalone mode)
 | g10_auth_incorrectly_permitted_tls_versions_messages_setup | ✅ pass |  |
 | g10_token_incorrectly_permitted_tls_versions_messages_setup | ✅ pass |  |
 
-Session ID: `h5GbI589F4z` — reproduce by running Inferno against this repo (see README).
+Session ID: `l73LUqftiC2` — reproduce by running Inferno against this repo (see README).

@@ -36,6 +36,10 @@ type SMARTClient struct {
 	Name         string   `json:"client_name"`
 	LaunchURL    string   `json:"launch_url,omitempty"`
 	IsPublic     bool     `json:"is_public"`
+	// JWKS holds the client's public key set (raw JWKS JSON) for SMART
+	// asymmetric (private_key_jwt) authentication. Non-empty JWKS marks the
+	// client as confidential-asymmetric.
+	JWKS string `json:"jwks,omitempty"`
 }
 
 // AuthorizationCode is a short-lived code exchanged for tokens.
@@ -116,6 +120,9 @@ type TokenRequest struct {
 	ClientSecret string
 	CodeVerifier string
 	RefreshToken string
+	// AssertionVerified is set by the handler after a private_key_jwt
+	// client_assertion has been cryptographically verified.
+	AssertionVerified bool
 }
 
 // TokenClaims represents the claims extracted from an introspected token.
@@ -402,9 +409,10 @@ func (s *SMARTServer) ExchangeCode(req *TokenRequest) (*TokenResponse, error) {
 			return nil, &OAuthError{Code: "invalid_request", Description: "PKCE is required for public clients"}
 		}
 	} else {
-		// Confidential clients must provide a valid client_secret
-		if !timingSafeEqual(req.ClientSecret, client.ClientSecret) {
-			return nil, &OAuthError{Code: "invalid_client", Description: "invalid client_secret"}
+		// Confidential clients authenticate with either a verified
+		// private_key_jwt assertion (SMART asymmetric) or a client_secret.
+		if !req.AssertionVerified && !timingSafeEqual(req.ClientSecret, client.ClientSecret) {
+			return nil, &OAuthError{Code: "invalid_client", Description: "invalid client authentication"}
 		}
 	}
 
@@ -1023,13 +1031,25 @@ func (h *SMARTHandler) handleToken(c echo.Context) error {
 func (h *SMARTHandler) handleTokenAuthorizationCode(c echo.Context) error {
 	clientID, clientSecret := h.extractClientCredentials(c)
 
+	// SMART asymmetric (private_key_jwt) client authentication
+	assertionVerified := false
+	if assertion := c.FormValue("client_assertion"); assertion != "" {
+		verifiedID, oauthErr := h.server.VerifyClientAssertion(c.FormValue("client_assertion_type"), assertion)
+		if oauthErr != nil {
+			return c.JSON(http.StatusUnauthorized, oauthErr)
+		}
+		clientID = verifiedID
+		assertionVerified = true
+	}
+
 	req := &TokenRequest{
-		GrantType:    "authorization_code",
-		Code:         c.FormValue("code"),
-		RedirectURI:  c.FormValue("redirect_uri"),
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		CodeVerifier: c.FormValue("code_verifier"),
+		GrantType:         "authorization_code",
+		Code:              c.FormValue("code"),
+		RedirectURI:       c.FormValue("redirect_uri"),
+		ClientID:          clientID,
+		ClientSecret:      clientSecret,
+		CodeVerifier:      c.FormValue("code_verifier"),
+		AssertionVerified: assertionVerified,
 	}
 
 	resp, err := h.server.ExchangeCode(req)
@@ -1054,6 +1074,15 @@ func (h *SMARTHandler) handleTokenAuthorizationCode(c echo.Context) error {
 // handleTokenRefresh handles the refresh_token grant type.
 func (h *SMARTHandler) handleTokenRefresh(c echo.Context) error {
 	clientID, _ := h.extractClientCredentials(c)
+
+	// SMART asymmetric (private_key_jwt) client authentication
+	if assertion := c.FormValue("client_assertion"); assertion != "" {
+		verifiedID, oauthErr := h.server.VerifyClientAssertion(c.FormValue("client_assertion_type"), assertion)
+		if oauthErr != nil {
+			return c.JSON(http.StatusUnauthorized, oauthErr)
+		}
+		clientID = verifiedID
+	}
 
 	refreshToken := c.FormValue("refresh_token")
 	if refreshToken == "" {

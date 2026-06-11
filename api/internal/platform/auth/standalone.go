@@ -173,7 +173,32 @@ func RegisterDefaultSMARTClient(server *SMARTServer) {
 	if err := server.RegisterClient(testClient); err != nil {
 		log.Printf("SMART: default test client already registered: %v", err)
 	}
+
+	// Asymmetric confidential client (SMART private_key_jwt) — registered with
+	// the Inferno test framework's published public JWKS so the ONC g10 kit's
+	// asymmetric scenarios can authenticate. Production deployments register
+	// their own clients with their own key sets.
+	asymmetricClient := &SMARTClient{
+		ClientID: "test-client-asymmetric",
+		RedirectURIs: []string{
+			"http://localhost:4567/custom/smart/redirect",
+			"http://localhost:4567/inferno/oauth2/static/redirect",
+			"http://localhost/custom/smart/redirect",
+			"http://localhost/inferno/oauth2/static/redirect",
+		},
+		Scope:    "launch launch/patient openid fhirUser offline_access patient/*.read patient/*.rs user/*.read user/*.rs",
+		Name:     "Asymmetric Test Client (private_key_jwt)",
+		IsPublic: false,
+		JWKS:     infernoPublicJWKS,
+	}
+	if err := server.RegisterClient(asymmetricClient); err != nil {
+		log.Printf("SMART: asymmetric test client already registered: %v", err)
+	}
 }
+
+// infernoPublicJWKS is the Inferno test framework's published public key set
+// (RS384 + ES384), used by its SMART asymmetric-auth test clients.
+const infernoPublicJWKS = `{"keys": [{"kty": "EC", "crv": "P-384", "x": "JQKTsV6PT5Szf4QtDA1qrs0EJ1pbimQmM2SKvzOlIAqlph3h1OHmZ2i7MXahIF2C", "y": "bRWWQRJBgDa6CTgwofYrHjVGcO-A7WNEnu4oJA5OUJPPPpczgx1g2NsfinK-D2Rw", "use": "sig", "key_ops": ["verify"], "ext": true, "kid": "4b49a739d1eb115b3225f4cf9beb6d1b", "alg": "ES384"}, {"kty": "RSA", "alg": "RS384", "n": "vjbIzTqiY8K8zApeNng5ekNNIxJfXAue9BjoMrZ9Qy9m7yIA-tf6muEupEXWhq70tC7vIGLqJJ4O8m7yiH8H2qklX2mCAMg3xG3nbykY2X7JXtW9P8VIdG0sAMt5aZQnUGCgSS3n0qaooGn2LUlTGIR88Qi-4Nrao9_3Ki3UCiICeCiAE224jGCg0OlQU6qj2gEB3o-DWJFlG_dz1y-Mxo5ivaeM0vWuodjDrp-aiabJcSF_dx26sdC9dZdBKXFDq0t19I9S9AyGpGDJwzGRtWHY6LsskNHLvo8Zb5AsJ9eRZKpnh30SYBZI9WHtzU85M9WQqdScR69Vyp-6Uhfbvw", "e": "AQAB", "use": "sig", "key_ops": ["verify"], "ext": true, "kid": "b41528b6f37a9500edb8a905a595bdd7"}]}`
 
 // PrintStandaloneAuthInfo logs the standalone auth configuration for developer reference.
 func PrintStandaloneAuthInfo(issuer, port string) {
@@ -214,7 +239,8 @@ func SmartWellKnownJSON(issuer string) []byte {
 		"introspection_endpoint":                issuer + "/auth/introspect",
 		"management_endpoint":                   issuer + "/auth/manage",
 		"jwks_uri":                              issuer + "/auth/jwks",
-		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic"},
+		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic", "private_key_jwt"},
+		"token_endpoint_auth_signing_alg_values_supported": []string{"RS384", "ES384"},
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
 		"scopes_supported": []string{
 			"openid", "fhirUser", "launch", "launch/patient",
@@ -225,7 +251,7 @@ func SmartWellKnownJSON(issuer string) []byte {
 			"patient/*.rs", "patient/*.cruds", "user/*.rs", "user/*.cruds",
 		},
 		"response_types_supported":                   []string{"code"},
-		"capabilities":                               []string{"launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "sso-openid-connect", "authorize-post", "context-ehr-patient", "context-standalone-patient", "permission-offline", "permission-patient", "permission-user", "permission-v1", "permission-v2"},
+		"capabilities":                               []string{"launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "client-confidential-asymmetric", "sso-openid-connect", "authorize-post", "context-ehr-patient", "context-standalone-patient", "permission-offline", "permission-patient", "permission-user", "permission-v1", "permission-v2"},
 		"code_challenge_methods_supported":            []string{"S256"},
 	}
 

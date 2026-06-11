@@ -23,6 +23,7 @@ type SMARTConfiguration struct {
 	ManagementEndpoint            string   `json:"management_endpoint,omitempty"`
 	JWKSURI                       string   `json:"jwks_uri,omitempty"`
 	TokenEndpointAuthMethods      []string `json:"token_endpoint_auth_methods_supported"`
+	TokenEndpointAuthSigningAlgs  []string `json:"token_endpoint_auth_signing_alg_values_supported,omitempty"`
 	GrantTypes                    []string `json:"grant_types_supported"`
 	Scopes                        []string `json:"scopes_supported"`
 	ResponseTypes                 []string `json:"response_types_supported"`
@@ -503,7 +504,8 @@ func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 			IntrospectionEndpoint: introspectEndpoint,
 			ManagementEndpoint:    issuer + "/auth/manage",
 			JWKSURI:               issuer + "/auth/jwks",
-			TokenEndpointAuthMethods: []string{"client_secret_basic", "client_secret_post", "none"},
+			TokenEndpointAuthMethods:     []string{"client_secret_basic", "client_secret_post", "private_key_jwt", "none"},
+			TokenEndpointAuthSigningAlgs: []string{"RS384", "ES384"},
 			GrantTypes:               []string{"authorization_code", "refresh_token"},
 			Scopes: []string{
 				"openid", "profile", "fhirUser", "launch", "launch/patient",
@@ -517,6 +519,7 @@ func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 			Capabilities: []string{
 				"launch-ehr", "launch-standalone",
 				"client-public", "client-confidential-symmetric",
+				"client-confidential-asymmetric",
 				"sso-openid-connect", "authorize-post",
 				"context-ehr-patient", "context-standalone-patient",
 				"permission-offline", "permission-patient", "permission-user",
