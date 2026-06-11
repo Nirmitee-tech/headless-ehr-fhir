@@ -1340,6 +1340,12 @@ func runServer() error {
 	includeRegistry.RegisterReference("CoverageEligibilityRequest", "insurer", "Organization")
 	includeRegistry.RegisterReference("CoverageEligibilityResponse", "insurer", "Organization")
 	includeRegistry.RegisterReference("CoverageEligibilityResponse", "request", "CoverageEligibilityRequest")
+	// US Core MedicationRequest uses medicationReference; _include must return
+	// the referenced Medication so clients can resolve the drug.
+	includeRegistry.RegisterReference("MedicationRequest", "medication", "Medication")
+	includeRegistry.RegisterReference("MedicationStatement", "medication", "Medication")
+	includeRegistry.RegisterReference("MedicationAdministration", "medication", "Medication")
+	includeRegistry.RegisterReference("MedicationDispense", "medication", "Medication")
 	includeRegistry.RegisterReference("MedicationKnowledge", "manufacturer", "Organization")
 	includeRegistry.RegisterReference("OrganizationAffiliation", "organization", "Organization")
 	includeRegistry.RegisterReference("OrganizationAffiliation", "participating-organization", "Organization")
@@ -2516,6 +2522,13 @@ func runServer() error {
 			return nil, err
 		}
 		return mr.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Medication", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		m, err := medSvc.GetMedicationByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return m.ToFHIR(), nil
 	})
 	includeRegistry.RegisterFetcher("MedicationAdministration", func(ctx context.Context, id string) (map[string]interface{}, error) {
 		ma, err := medSvc.GetMedicationAdministrationByFHIRID(ctx, id)
