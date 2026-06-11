@@ -103,19 +103,40 @@ func (q *SearchQuery) ApplyParam(config SearchParamConfig, value string) {
 	case SearchParamDate:
 		q.AddDate(config.Column, value)
 	case SearchParamToken:
+		// A FHIR token parameter value may be a comma-separated list, which
+		// means logical OR (e.g. intent=order,proposal). Split and match any.
+		values := strings.Split(value, ",")
 		if config.SysColumn != "" {
-			q.AddToken(config.SysColumn, config.Column, value)
+			// One TokenSearchClause per value, OR-combined.
+			var ors []string
+			for _, val := range values {
+				clause, args, nextIdx := TokenSearchClause(config.SysColumn, config.Column, val, q.idx)
+				ors = append(ors, clause)
+				q.args = append(q.args, args...)
+				q.idx = nextIdx
+			}
+			if len(ors) == 1 {
+				q.where += " AND " + ors[0]
+			} else if len(ors) > 1 {
+				q.where += " AND (" + strings.Join(ors, " OR ") + ")"
+			}
 		} else {
-			// Token without a stored system column. A FHIR token value may be
-			// "system|code", "|code", "system|", or bare "code". Since we only
-			// store the code, match on the code component; a "system|" form (no
-			// code) cannot be filtered without a system column, so it matches
-			// all (no clause added).
-			code := tokenCode(value)
-			if code != "" {
-				q.where += fmt.Sprintf(" AND %s = $%d", config.Column, q.idx)
-				q.args = append(q.args, code)
-				q.idx++
+			// Token without a stored system column. Each value may be
+			// "system|code", "|code", "system|", or bare "code". We only store
+			// the code, so match the code component; collect the non-empty
+			// codes and match any of them (a "system|" form yields no code and
+			// is skipped).
+			var placeholders []string
+			for _, val := range values {
+				code := tokenCode(val)
+				if code != "" {
+					placeholders = append(placeholders, fmt.Sprintf("$%d", q.idx))
+					q.args = append(q.args, code)
+					q.idx++
+				}
+			}
+			if len(placeholders) > 0 {
+				q.where += fmt.Sprintf(" AND %s IN (%s)", config.Column, strings.Join(placeholders, ", "))
 			}
 		}
 	case SearchParamString:
