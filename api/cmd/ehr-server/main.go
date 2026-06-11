@@ -5,6 +5,7 @@ import (
 	crypto_rand "crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"net/http"
 	"os"
 	"os/signal"
@@ -140,6 +141,9 @@ import (
 	"github.com/ehr/ehr/internal/platform/webhook"
 	"github.com/ehr/ehr/internal/platform/websocket"
 )
+
+// validTableName guards the interpolated table identifier in referenceLookup.
+var validTableName = regexp.MustCompile(`^[a-z][a-z_]*$`)
 
 // ConsentRepoAdapter adapts a documents.ConsentRepository to the
 // auth.ConsentChecker interface, avoiding circular imports between the
@@ -1364,6 +1368,42 @@ func runServer() error {
 	fhirGroup.Use(fhir.IncludeMiddleware(includeRegistry))
 	fhirGroup.Use(fhir.SearchMiddleware())
 	fhirGroup.Use(fhir.PreferMiddleware())
+
+	// Rewrite internal-UUID references to external fhir_id references on the way
+	// out (see internal/platform/fhir/reference_resolver.go). The lookup uses
+	// the request's tenant-scoped connection, so resolution runs in the correct
+	// schema; a fresh resolver per request bounds its cache to that response.
+	referenceLookup := func(ctx context.Context, table string, ids []string) (map[string]string, error) {
+		// Defense in depth: the table name is interpolated (Postgres cannot
+		// parameterize identifiers), so reject anything that is not a plain
+		// lower-snake-case identifier. Callers only ever pass values from the
+		// resolver's fixed allowlist, but we never trust an interpolated name.
+		if !validTableName.MatchString(table) {
+			return nil, fmt.Errorf("reference lookup: invalid table name %q", table)
+		}
+		conn := db.ConnFromContext(ctx)
+		if conn == nil {
+			return nil, fmt.Errorf("reference lookup: no tenant connection in context")
+		}
+		rows, err := conn.Query(ctx,
+			"SELECT id::text, fhir_id FROM "+table+" WHERE id = ANY($1::uuid[])", ids)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		out := make(map[string]string, len(ids))
+		for rows.Next() {
+			var id, fhirID string
+			if err := rows.Scan(&id, &fhirID); err != nil {
+				return nil, err
+			}
+			out[id] = fhirID
+		}
+		return out, rows.Err()
+	}
+	fhirGroup.Use(fhir.ReferenceResolutionMiddleware(func() *fhir.ReferenceResolver {
+		return fhir.NewReferenceResolver(referenceLookup)
+	}))
 
 	// FHIR metadata (dynamic CapabilityStatement)
 	fhirGroup.GET("/metadata", func(c echo.Context) error {
