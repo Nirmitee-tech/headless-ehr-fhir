@@ -1364,6 +1364,11 @@ func runServer() error {
 	// Fetchers are registered below after services are initialized; since
 	// the middleware holds a pointer to the registry, late registration works.
 	fhirGroup.Use(fhir.ContentNegotiationMiddleware())
+	// POST /{Resource}/_search sends parameters as a form body; merge them into
+	// the query string so search handlers (which read query params) treat POST
+	// and GET search identically, as required by FHIR + US Core conformance.
+	// Must run before search/include/pagination middleware that read the query.
+	fhirGroup.Use(fhir.SearchPostMiddleware())
 	fhirGroup.Use(fhir.ConditionalReadMiddleware())
 	fhirGroup.Use(fhir.IncludeMiddleware(includeRegistry))
 	fhirGroup.Use(fhir.SearchMiddleware())
