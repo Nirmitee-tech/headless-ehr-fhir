@@ -2,7 +2,7 @@
 
 ## Summary
 Starting point: **40 functional tests passing.** After this session's fixes:
-**86/94 functional tests passing** (measured, stable across runs), via 5 verified code fixes.
+**89/94 functional tests passing** (measured, stable across runs), via 5 verified code fixes.
 The remaining gap is NOT in this server — see "Known remaining gaps" below; every
 resource this server emits validates clean when sent to the HL7 validator directly.
 
