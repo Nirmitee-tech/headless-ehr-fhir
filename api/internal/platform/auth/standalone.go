@@ -142,8 +142,11 @@ func RegisterDefaultSMARTClient(server *SMARTServer) {
 			"http://localhost:4567/inferno/callback",
 			"http://localhost:4567/custom/smart/redirect",
 			"http://localhost:4567/inferno/oauth2/static/redirect",
+			"http://localhost/inferno/callback",
+			"http://localhost/custom/smart/redirect",
+			"http://localhost/inferno/oauth2/static/redirect",
 		},
-		Scope:        "launch launch/patient openid fhirUser offline_access patient/*.read user/*.read user/*.write",
+		Scope:        "launch launch/patient openid fhirUser offline_access patient/*.read patient/*.rs user/*.read user/*.write user/*.rs",
 		Name:         "Inferno Test Client",
 		IsPublic:     true,
 	}
@@ -160,8 +163,10 @@ func RegisterDefaultSMARTClient(server *SMARTServer) {
 			"http://localhost:8080/callback",
 			"http://localhost:4567/custom/smart/redirect",
 			"http://localhost:4567/inferno/oauth2/static/redirect",
+			"http://localhost/custom/smart/redirect",
+			"http://localhost/inferno/oauth2/static/redirect",
 		},
-		Scope:        "launch launch/patient openid fhirUser offline_access user/*.* patient/*.read",
+		Scope:        "launch launch/patient openid fhirUser offline_access user/*.* patient/*.read patient/*.rs user/*.rs",
 		Name:         "Test Client",
 		IsPublic:     false,
 	}
@@ -208,6 +213,7 @@ func SmartWellKnownJSON(issuer string) []byte {
 		"token_endpoint":                        issuer + "/auth/token",
 		"introspection_endpoint":                issuer + "/auth/introspect",
 		"management_endpoint":                   issuer + "/auth/manage",
+		"jwks_uri":                              issuer + "/auth/jwks",
 		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic"},
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
 		"scopes_supported": []string{
@@ -216,9 +222,10 @@ func SmartWellKnownJSON(issuer string) []byte {
 			"patient/*.read", "patient/*.write", "patient/*.*",
 			"user/*.read", "user/*.write", "user/*.*",
 			"system/*.read", "system/*.write", "system/*.*",
+			"patient/*.rs", "patient/*.cruds", "user/*.rs", "user/*.cruds",
 		},
 		"response_types_supported":                   []string{"code"},
-		"capabilities":                               []string{"launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "sso-openid-connect", "context-ehr-patient", "context-standalone-patient", "permission-offline", "permission-patient", "permission-user"},
+		"capabilities":                               []string{"launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "sso-openid-connect", "authorize-post", "context-ehr-patient", "context-standalone-patient", "permission-offline", "permission-patient", "permission-user", "permission-v1", "permission-v2"},
 		"code_challenge_methods_supported":            []string{"S256"},
 	}
 

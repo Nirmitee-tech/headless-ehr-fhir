@@ -21,6 +21,7 @@ type SMARTConfiguration struct {
 	TokenEndpoint                 string   `json:"token_endpoint"`
 	IntrospectionEndpoint         string   `json:"introspection_endpoint,omitempty"`
 	ManagementEndpoint            string   `json:"management_endpoint,omitempty"`
+	JWKSURI                       string   `json:"jwks_uri,omitempty"`
 	TokenEndpointAuthMethods      []string `json:"token_endpoint_auth_methods_supported"`
 	GrantTypes                    []string `json:"grant_types_supported"`
 	Scopes                        []string `json:"scopes_supported"`
@@ -266,8 +267,8 @@ func ParseSMARTScope(scope string) (*SMARTScope, error) {
 	if resourceType == "" {
 		return nil, fmt.Errorf("invalid scope %q: empty resource type", scope)
 	}
-	if operation != "read" && operation != "write" && operation != "*" {
-		return nil, fmt.Errorf("invalid operation %q: must be read, write, or *", operation)
+	if operation != "read" && operation != "write" && operation != "*" && !isValidV2Operation(operation) {
+		return nil, fmt.Errorf("invalid operation %q: must be read, write, *, or SMART v2 grammar (c?r?u?d?s?)", operation)
 	}
 
 	return &SMARTScope{
@@ -315,8 +316,40 @@ func resourceMatches(granted, requested string) bool {
 }
 
 // operationMatches checks if a granted operation covers the requested one.
+// Supports both SMART v1 (read/write/*) and v2 (c?r?u?d?s?) scope grammars.
 func operationMatches(granted, requested string) bool {
-	return granted == "*" || granted == requested
+	if granted == "*" || granted == requested {
+		return true
+	}
+	// SMART v2 grammar: r (read) and s (search) grant read access;
+	// c (create), u (update), d (delete) grant write access.
+	if isValidV2Operation(granted) {
+		switch requested {
+		case "read":
+			return strings.ContainsAny(granted, "rs")
+		case "write":
+			return strings.ContainsAny(granted, "cud")
+		}
+	}
+	return false
+}
+
+// isValidV2Operation reports whether op is a valid SMART v2 scope operation:
+// a non-empty, ordered subset of "cruds" (e.g. "rs", "cruds", "r", "us").
+func isValidV2Operation(op string) bool {
+	if op == "" {
+		return false
+	}
+	const order = "cruds"
+	idx := 0
+	for _, ch := range op {
+		pos := strings.IndexRune(order[idx:], ch)
+		if pos < 0 {
+			return false
+		}
+		idx += pos + 1
+	}
+	return true
 }
 
 // httpMethodToOperation maps an HTTP method to a SMART scope operation.
@@ -469,6 +502,7 @@ func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 			TokenEndpoint:         tokenEndpoint,
 			IntrospectionEndpoint: introspectEndpoint,
 			ManagementEndpoint:    issuer + "/auth/manage",
+			JWKSURI:               issuer + "/auth/jwks",
 			TokenEndpointAuthMethods: []string{"client_secret_basic", "client_secret_post", "none"},
 			GrantTypes:               []string{"authorization_code", "refresh_token"},
 			Scopes: []string{
@@ -477,14 +511,16 @@ func smartConfigurationHandler(issuer string) echo.HandlerFunc {
 				"patient/*.read", "patient/*.write", "patient/*.*",
 				"user/*.read", "user/*.write", "user/*.*",
 				"system/*.read", "system/*.write", "system/*.*",
+				"patient/*.rs", "patient/*.cruds", "user/*.rs", "user/*.cruds",
 			},
 			ResponseTypes: []string{"code"},
 			Capabilities: []string{
 				"launch-ehr", "launch-standalone",
 				"client-public", "client-confidential-symmetric",
-				"sso-openid-connect",
+				"sso-openid-connect", "authorize-post",
 				"context-ehr-patient", "context-standalone-patient",
 				"permission-offline", "permission-patient", "permission-user",
+				"permission-v1", "permission-v2",
 			},
 			CodeChallengeMethodsSupported: []string{"S256"},
 		}

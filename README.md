@@ -2,6 +2,42 @@
 
 An open-source, headless EHR system designed for modern healthcare. API-first architecture supporting any frontend (web, mobile, voice).
 
+## 🏥 ONC Inferno Conformance — 44/45 functional tests passing
+
+This server is tested against the **ONC Certification (g)(10) Standardized API Test Kit** (Inferno) — the same test suite used to certify US EHRs — on the **SMART App Launch (STU2) — Standalone Patient App** scenario.
+
+**Latest run (June 11, 2026): 44 of 45 functional tests passing.**
+
+| | Count | Notes |
+|---|---|---|
+| ✅ Passing | 44 | Full OAuth 2.0 + PKCE standalone launch, OpenID Connect, token refresh, SMART v1 & v2 scopes, patient context, `fhirUser` resolution |
+| ❌ Failing (functional) | 1 | `client-confidential-asymmetric` (private_key_jwt client auth) — not yet implemented; on the roadmap. We don't declare capabilities we don't support. |
+| ⚠️ Failing (TLS-only) | 2 | TLS version checks — expected when running over HTTP in local development; pass behind any TLS-terminating proxy |
+
+📋 **[Full test-by-test results →](api/inferno-results/2026-06-11/results.md)**
+
+### Reproduce it yourself
+
+```bash
+# 1. This server
+cd api && docker compose up -d postgres redis
+go run ./cmd/ehr-server migrate up && make seed
+# load Inferno test fixtures
+(echo "SET search_path TO tenant_default, public;"; cat scripts/seed_inferno.sql) | \
+  docker exec -i api-postgres-1 psql -U ehr -d ehr
+go build -o bin/ehr-server ./cmd/ehr-server
+SMART_ISSUER=http://host.docker.internal:8000 AUTH_MODE=standalone ./bin/ehr-server serve
+
+# 2. Inferno (ONC g10 kit)
+git clone https://github.com/onc-healthit/onc-certification-g10-test-kit
+cd onc-certification-g10-test-kit && docker compose run --rm inferno bundle exec inferno migrate && docker compose up -d
+
+# 3. Run the SMART Standalone Patient App suite against http://host.docker.internal:8000/fhir
+./api/scripts/inferno-test.sh
+```
+
+Don't take our word for it — run the tests.
+
 ## Architecture
 
 ```

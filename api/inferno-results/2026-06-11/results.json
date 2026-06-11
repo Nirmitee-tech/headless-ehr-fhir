@@ -1,0 +1,2256 @@
+{
+  "session": "h5GbI589F4z",
+  "date": "2026-06-11",
+  "summary": {
+    "pass": 44,
+    "functional_fail": 1,
+    "tls_only_fail": 2,
+    "skip": 0,
+    "functional_total": 45
+  },
+  "results": [
+    {
+      "id": "4d9c2177-ee64-42f6-80ca-4453f6938b5b",
+      "created_at": "2026-06-11T06:24:15.847+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "well_known_introspection_url",
+          "type": "text",
+          "value": "http://host.docker.internal:8000/auth/introspect"
+        },
+        {
+          "name": "well_known_configuration",
+          "type": "text",
+          "value": "{\"issuer\":\"http://host.docker.internal:8000\",\"authorization_endpoint\":\"http://host.docker.internal:8000/auth/authorize\",\"token_endpoint\":\"http://host.docker.internal:8000/auth/token\",\"introspection_endpoint\":\"http://host.docker.internal:8000/auth/introspect\",\"management_endpoint\":\"http://host.docker.internal:8000/auth/manage\",\"jwks_uri\":\"http://host.docker.internal:8000/auth/jwks\",\"token_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"none\"],\"grant_types_supported\":[\"authorization_code\",\"refresh_token\"],\"scopes_supported\":[\"openid\",\"profile\",\"fhirUser\",\"launch\",\"launch/patient\",\"offline_access\",\"patient/*.read\",\"patient/*.write\",\"patient/*.*\",\"user/*.read\",\"user/*.write\",\"user/*.*\",\"system/*.read\",\"system/*.write\",\"system/*.*\",\"patient/*.rs\",\"patient/*.cruds\",\"user/*.rs\",\"user/*.cruds\"],\"response_types_supported\":[\"code\"],\"capabilities\":[\"launch-ehr\",\"launch-standalone\",\"client-public\",\"client-confidential-symmetric\",\"sso-openid-connect\",\"authorize-post\",\"context-ehr-patient\",\"context-standalone-patient\",\"permission-offline\",\"permission-patient\",\"permission-user\",\"permission-v1\",\"permission-v2\"],\"code_challenge_methods_supported\":[\"S256\"]}\n"
+        },
+        {
+          "name": "smart_authorization_url",
+          "type": "text",
+          "value": "http://host.docker.internal:8000/auth/authorize"
+        },
+        {
+          "name": "well_known_management_url",
+          "type": "text",
+          "value": "http://host.docker.internal:8000/auth/manage"
+        },
+        {
+          "name": "well_known_registration_url",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "name": "well_known_revocation_url",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "name": "smart_token_url",
+          "type": "text",
+          "value": "http://host.docker.internal:8000/auth/token"
+        }
+      ],
+      "requests": [
+        {
+          "id": "470add3e-047d-47f8-b564-718859a6e483",
+          "direction": "outgoing",
+          "index": 32,
+          "result_id": "4d9c2177-ee64-42f6-80ca-4453f6938b5b",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:15.853+00:00",
+          "url": "http://host.docker.internal:8000/fhir/.well-known/smart-configuration",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_discovery_stu2-well_known_endpoint",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:15.847+00:00"
+    },
+    {
+      "id": "27c3a968-3232-4332-9454-9d8de72d79ef",
+      "created_at": "2026-06-11T06:24:15.890+00:00",
+      "inputs": [
+        {
+          "name": "well_known_configuration",
+          "value": "{\"issuer\":\"http://host.docker.internal:8000\",\"authorization_endpoint\":\"http://host.docker.internal:8000/auth/authorize\",\"token_endpoint\":\"http://host.docker.internal:8000/auth/token\",\"introspection_endpoint\":\"http://host.docker.internal:8000/auth/introspect\",\"management_endpoint\":\"http://host.docker.internal:8000/auth/manage\",\"jwks_uri\":\"http://host.docker.internal:8000/auth/jwks\",\"token_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"none\"],\"grant_types_supported\":[\"authorization_code\",\"refresh_token\"],\"scopes_supported\":[\"openid\",\"profile\",\"fhirUser\",\"launch\",\"launch/patient\",\"offline_access\",\"patient/*.read\",\"patient/*.write\",\"patient/*.*\",\"user/*.read\",\"user/*.write\",\"user/*.*\",\"system/*.read\",\"system/*.write\",\"system/*.*\",\"patient/*.rs\",\"patient/*.cruds\",\"user/*.rs\",\"user/*.cruds\"],\"response_types_supported\":[\"code\"],\"capabilities\":[\"launch-ehr\",\"launch-standalone\",\"client-public\",\"client-confidential-symmetric\",\"sso-openid-connect\",\"authorize-post\",\"context-ehr-patient\",\"context-standalone-patient\",\"permission-offline\",\"permission-patient\",\"permission-user\",\"permission-v1\",\"permission-v2\"],\"code_challenge_methods_supported\":[\"S256\"]}\n",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_discovery_stu2-well_known_capabilities_stu2",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:15.890+00:00"
+    },
+    {
+      "id": "a8b718b2-cae2-44d8-9547-200faad9210a",
+      "created_at": "2026-06-11T06:24:15.896+00:00",
+      "inputs": [
+        {
+          "name": "well_known_configuration",
+          "value": "{\"issuer\":\"http://host.docker.internal:8000\",\"authorization_endpoint\":\"http://host.docker.internal:8000/auth/authorize\",\"token_endpoint\":\"http://host.docker.internal:8000/auth/token\",\"introspection_endpoint\":\"http://host.docker.internal:8000/auth/introspect\",\"management_endpoint\":\"http://host.docker.internal:8000/auth/manage\",\"jwks_uri\":\"http://host.docker.internal:8000/auth/jwks\",\"token_endpoint_auth_methods_supported\":[\"client_secret_basic\",\"client_secret_post\",\"none\"],\"grant_types_supported\":[\"authorization_code\",\"refresh_token\"],\"scopes_supported\":[\"openid\",\"profile\",\"fhirUser\",\"launch\",\"launch/patient\",\"offline_access\",\"patient/*.read\",\"patient/*.write\",\"patient/*.*\",\"user/*.read\",\"user/*.write\",\"user/*.*\",\"system/*.read\",\"system/*.write\",\"system/*.*\",\"patient/*.rs\",\"patient/*.cruds\",\"user/*.rs\",\"user/*.cruds\"],\"response_types_supported\":[\"code\"],\"capabilities\":[\"launch-ehr\",\"launch-standalone\",\"client-public\",\"client-confidential-symmetric\",\"sso-openid-connect\",\"authorize-post\",\"context-ehr-patient\",\"context-standalone-patient\",\"permission-offline\",\"permission-patient\",\"permission-user\",\"permission-v1\",\"permission-v2\"],\"code_challenge_methods_supported\":[\"S256\"]}\n",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "fail",
+      "result_message": "The following capabilities required for this scenario are missing: client-confidential-asymmetric",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_discovery_stu2-g10_smart_well_known_capabilities",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:15.896+00:00"
+    },
+    {
+      "id": "9577eef2-aad3-421c-9688-33a0dc2665d0",
+      "created_at": "2026-06-11T06:24:15.928+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "messages": [
+        {
+          "message": "http://host.docker.internal:8000/auth/authorize correctly denied SSL 2.0 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/authorize correctly denied SSL 3.0 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/authorize correctly denied TLS 1.0 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/authorize correctly denied TLS 1.1 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/authorize denied TLS 1.2 connection.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/authorize denied TLS 1.3 connection.",
+          "type": "info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "fail",
+      "result_message": "Server did not support any allowed TLS versions.",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-standalone_auth_tls",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:15.928+00:00"
+    },
+    {
+      "id": "4da2b920-8c93-4b97-9539-74fff25548d6",
+      "created_at": "2026-06-11T06:24:15.953+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "messages": [
+        {
+          "message": "Inferno redirecting browser to http://localhost/custom/smart_stu2/post_auth?response_type=code&client_id=test-client&redirect_uri=http%3A%2F%2Flocalhost%2Fcustom%2Fsmart%2Fredirect&scope=launch%2Fpatient+openid+fhirUser+offline_access+patient%2F*.rs&state=7cee934e-06c3-4e32-aee8-5325e4fa1714&aud=http%3A%2F%2Fhost.docker.internal%3A8000%2Ffhir&code_challenge=EH1p2am6JQpz6fqEh9GIssKdbPJSmzC5quQfRx5dOR8&code_challenge_method=S256&auth_url=http%3A%2F%2Fhost.docker.internal%3A8000%2Fauth%2Fauthorize.",
+          "type": "info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "standalone_state",
+          "type": "text",
+          "value": "7cee934e-06c3-4e32-aee8-5325e4fa1714"
+        },
+        {
+          "name": "pkce_code_verifier",
+          "type": "text",
+          "value": "4f41b3dc-7479-4f04-971c-c9cf8aff980e-3020a652-b5fc-46e9-8684-14f67e716079"
+        },
+        {
+          "name": "pkce_code_challenge",
+          "type": "text",
+          "value": "EH1p2am6JQpz6fqEh9GIssKdbPJSmzC5quQfRx5dOR8"
+        },
+        {
+          "name": "authorization_url",
+          "type": "text",
+          "value": "http://localhost/custom/smart_stu2/post_auth?response_type=code&client_id=test-client&redirect_uri=http%3A%2F%2Flocalhost%2Fcustom%2Fsmart%2Fredirect&scope=launch%2Fpatient+openid+fhirUser+offline_access+patient%2F*.rs&state=7cee934e-06c3-4e32-aee8-5325e4fa1714&aud=http%3A%2F%2Fhost.docker.internal%3A8000%2Ffhir&code_challenge=EH1p2am6JQpz6fqEh9GIssKdbPJSmzC5quQfRx5dOR8&code_challenge_method=S256&auth_url=http%3A%2F%2Fhost.docker.internal%3A8000%2Fauth%2Fauthorize"
+        }
+      ],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-smart_app_redirect_stu2",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.757+00:00"
+    },
+    {
+      "id": "4458f225-cac1-4b71-8a77-ce890f3da349",
+      "created_at": "2026-06-11T06:24:17.802+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "label": "FHIR Endpoint",
+          "description": "URL of the FHIR endpoint used by SMART applications",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "label": "Standalone Launch Credentials",
+          "description": null,
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "fail",
+      "test_group_id": "g10_certification-g10_smart_standalone_patient_app-smart_discovery_stu2",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.802+00:00"
+    },
+    {
+      "id": "494afe08-d69b-413e-a1af-ac3bebb7dcd8",
+      "created_at": "2026-06-11T06:24:17.814+00:00",
+      "inputs": [],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "standalone_code",
+          "type": "text",
+          "value": "817c336dd253e4d0b94bc3812c1a1a14a316dc7515685592ad407bbc370a32c2"
+        }
+      ],
+      "requests": [
+        {
+          "id": "71129861-5718-4b90-b2ff-ba511213e64a",
+          "direction": "incoming",
+          "index": 33,
+          "result_id": "4da2b920-8c93-4b97-9539-74fff25548d6",
+          "status": null,
+          "timestamp": "2026-06-11T06:24:17.760+00:00",
+          "url": "http://localhost:4567/custom/smart/redirect?code=817c336dd253e4d0b94bc3812c1a1a14a316dc7515685592ad407bbc370a32c2&state=7cee934e-06c3-4e32-aee8-5325e4fa1714",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-smart_code_received",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.814+00:00"
+    },
+    {
+      "id": "23c5359d-701f-4afa-81ad-5fa2b7e785e7",
+      "created_at": "2026-06-11T06:24:17.840+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "messages": [
+        {
+          "message": "http://host.docker.internal:8000/auth/token correctly denied SSL 2.0 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/token correctly denied SSL 3.0 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/token correctly denied TLS 1.0 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/token correctly denied TLS 1.1 connection as required.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/token denied TLS 1.2 connection.",
+          "type": "info"
+        },
+        {
+          "message": "http://host.docker.internal:8000/auth/token denied TLS 1.3 connection.",
+          "type": "info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "fail",
+      "result_message": "Server did not support any allowed TLS versions.",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-standalone_token_tls",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.840+00:00"
+    },
+    {
+      "id": "b85c74dd-1bd5-42f8-ba82-ce3a64782e82",
+      "created_at": "2026-06-11T06:24:17.883+00:00",
+      "inputs": [
+        {
+          "name": "standalone_code",
+          "value": "817c336dd253e4d0b94bc3812c1a1a14a316dc7515685592ad407bbc370a32c2",
+          "type": "text"
+        },
+        {
+          "name": "pkce_code_verifier",
+          "value": "4f41b3dc-7479-4f04-971c-c9cf8aff980e-3020a652-b5fc-46e9-8684-14f67e716079",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "standalone_smart_credentials",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        },
+        {
+          "name": "standalone_token_retrieval_time",
+          "type": "text",
+          "value": "2026-06-11T06:24:17+00:00"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        }
+      ],
+      "requests": [
+        {
+          "id": "71129861-5718-4b90-b2ff-ba511213e64a",
+          "direction": "incoming",
+          "index": 33,
+          "result_id": "4da2b920-8c93-4b97-9539-74fff25548d6",
+          "status": null,
+          "timestamp": "2026-06-11T06:24:17.760+00:00",
+          "url": "http://localhost:4567/custom/smart/redirect?code=817c336dd253e4d0b94bc3812c1a1a14a316dc7515685592ad407bbc370a32c2&state=7cee934e-06c3-4e32-aee8-5325e4fa1714",
+          "verb": "get"
+        },
+        {
+          "id": "856e9d3d-ad7b-4118-9829-321526b41f52",
+          "direction": "outgoing",
+          "index": 34,
+          "result_id": "b85c74dd-1bd5-42f8-ba82-ce3a64782e82",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:17.889+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-smart_token_exchange",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.883+00:00"
+    },
+    {
+      "id": "a7b70dd5-92d3-46e1-8c6e-add1ec9a777d",
+      "created_at": "2026-06-11T06:24:17.943+00:00",
+      "inputs": [
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "standalone_id_token",
+          "type": "text",
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJ0ZXN0LWNsaWVudCIsImV4cCI6MTc4MTE2MjY1NywiZmhpclVzZXIiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyL1ByYWN0aXRpb25lci9wcmFjdGl0aW9uZXItZHItc21pdGgiLCJpYXQiOjE3ODExNTkwNTcsImlzcyI6Imh0dHA6Ly9ob3N0LmRvY2tlci5pbnRlcm5hbDo4MDAwIiwicGF0aWVudCI6InBhdGllbnQtam9obi1zbWl0aCIsInN1YiI6InByYWN0aXRpb25lci1kci1zbWl0aCJ9.IZuL6ZAnRcO96md8h35AEIlggsoTi7qH0vKjqh4t12VQ0rI804OaLu40vimqKpoXqOPEcAni4irkB5349KD1Cn5Aqn5XYx6Uh4RiDLkk1enIbggJEU67esi9ZyAGTRR9pfs8oAqIZELaxlmbkShYwoWHdbN69GeJDCi5UM8hnm9yzadYt_rJA4repIU4Kn7eKyk8ONfeDg6RzUY0EjwpRy2ltj5kIBjHuVdLgspzPNbKROA8B_WbavkP7CT-aeD1RWtFluYbSy1haFkxJSUHdVFOxMTpdOJKg1IDtSTOWnqQfBuLOfYV4RQ57C7erdSOQbVxKF2LREk7inZPJMMSgw"
+        },
+        {
+          "name": "standalone_refresh_token",
+          "type": "text",
+          "value": "3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4"
+        },
+        {
+          "name": "standalone_access_token",
+          "type": "text",
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA"
+        },
+        {
+          "name": "standalone_expires_in",
+          "type": "text",
+          "value": "3600"
+        },
+        {
+          "name": "standalone_patient_id",
+          "type": "text",
+          "value": "patient-john-smith"
+        },
+        {
+          "name": "standalone_encounter_id",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "name": "standalone_received_scopes",
+          "type": "text",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs"
+        },
+        {
+          "name": "standalone_intent",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        }
+      ],
+      "requests": [
+        {
+          "id": "856e9d3d-ad7b-4118-9829-321526b41f52",
+          "direction": "outgoing",
+          "index": 34,
+          "result_id": "b85c74dd-1bd5-42f8-ba82-ce3a64782e82",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:17.889+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-smart_token_response_body",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.943+00:00"
+    },
+    {
+      "id": "581432ed-2f56-45ed-8829-04a93ed31195",
+      "created_at": "2026-06-11T06:24:17.948+00:00",
+      "inputs": [],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "856e9d3d-ad7b-4118-9829-321526b41f52",
+          "direction": "outgoing",
+          "index": 34,
+          "result_id": "b85c74dd-1bd5-42f8-ba82-ce3a64782e82",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:17.889+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-smart_token_response_headers",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.948+00:00"
+    },
+    {
+      "id": "e173cc08-0a9a-4772-87d4-834028642abf",
+      "created_at": "2026-06-11T06:24:17.957+00:00",
+      "inputs": [
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "856e9d3d-ad7b-4118-9829-321526b41f52",
+          "direction": "outgoing",
+          "index": 34,
+          "result_id": "b85c74dd-1bd5-42f8-ba82-ce3a64782e82",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:17.889+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-g10_smart_scopes",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.957+00:00"
+    },
+    {
+      "id": "e65fdc18-2c4d-4f02-8c00-3634fa6c5fc2",
+      "created_at": "2026-06-11T06:24:17.993+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "856e9d3d-ad7b-4118-9829-321526b41f52",
+          "direction": "outgoing",
+          "index": 34,
+          "result_id": "b85c74dd-1bd5-42f8-ba82-ce3a64782e82",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:17.889+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        },
+        {
+          "id": "344e36f5-d5a3-4e2d-bed7-6fe71e611e8c",
+          "direction": "outgoing",
+          "index": 35,
+          "result_id": "e65fdc18-2c4d-4f02-8c00-3634fa6c5fc2",
+          "status": 401,
+          "timestamp": "2026-06-11T06:24:17.998+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Patient/patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-g10_unauthorized_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:17.993+00:00"
+    },
+    {
+      "id": "2e9c40ac-0827-4e3b-bd05-8a55cd244185",
+      "created_at": "2026-06-11T06:24:18.084+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "ecc217cd-8575-4f7f-8a95-0252fdd14367",
+          "direction": "outgoing",
+          "index": 36,
+          "result_id": "2e9c40ac-0827-4e3b-bd05-8a55cd244185",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.087+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Patient/patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2-g10_patient_context",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.084+00:00"
+    },
+    {
+      "id": "2b45a694-101a-46aa-9480-28777002bb4f",
+      "created_at": "2026-06-11T06:24:18.130+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "label": "Standalone FHIR Endpoint",
+          "description": "URL of the FHIR endpoint used by standalone applications",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "label": "Standalone Launch Credentials",
+          "description": null,
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "fail",
+      "test_group_id": "g10_certification-g10_smart_standalone_patient_app-smart_standalone_launch_stu2",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.130+00:00"
+    },
+    {
+      "id": "a9f5fbaf-665d-46f4-8e68-a0f2eeeaf3b6",
+      "created_at": "2026-06-11T06:24:18.139+00:00",
+      "inputs": [
+        {
+          "name": "standalone_id_token",
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJ0ZXN0LWNsaWVudCIsImV4cCI6MTc4MTE2MjY1NywiZmhpclVzZXIiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyL1ByYWN0aXRpb25lci9wcmFjdGl0aW9uZXItZHItc21pdGgiLCJpYXQiOjE3ODExNTkwNTcsImlzcyI6Imh0dHA6Ly9ob3N0LmRvY2tlci5pbnRlcm5hbDo4MDAwIiwicGF0aWVudCI6InBhdGllbnQtam9obi1zbWl0aCIsInN1YiI6InByYWN0aXRpb25lci1kci1zbWl0aCJ9.IZuL6ZAnRcO96md8h35AEIlggsoTi7qH0vKjqh4t12VQ0rI804OaLu40vimqKpoXqOPEcAni4irkB5349KD1Cn5Aqn5XYx6Uh4RiDLkk1enIbggJEU67esi9ZyAGTRR9pfs8oAqIZELaxlmbkShYwoWHdbN69GeJDCi5UM8hnm9yzadYt_rJA4repIU4Kn7eKyk8ONfeDg6RzUY0EjwpRy2ltj5kIBjHuVdLgspzPNbKROA8B_WbavkP7CT-aeD1RWtFluYbSy1haFkxJSUHdVFOxMTpdOJKg1IDtSTOWnqQfBuLOfYV4RQ57C7erdSOQbVxKF2LREk7inZPJMMSgw",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "id_token_payload_json",
+          "type": "text",
+          "value": "{\"aud\":\"test-client\",\"exp\":1781162657,\"fhirUser\":\"http://host.docker.internal:8000/fhir/Practitioner/practitioner-dr-smith\",\"iat\":1781159057,\"iss\":\"http://host.docker.internal:8000\",\"patient\":\"patient-john-smith\",\"sub\":\"practitioner-dr-smith\"}"
+        },
+        {
+          "name": "id_token_header_json",
+          "type": "text",
+          "value": "{\"alg\":\"RS256\",\"kid\":\"KY2yDzjHjsg\",\"typ\":\"JWT\"}"
+        }
+      ],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_decode_id_token",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.139+00:00"
+    },
+    {
+      "id": "c9536153-8785-4f02-9e80-1770cb04e9da",
+      "created_at": "2026-06-11T06:24:18.149+00:00",
+      "inputs": [
+        {
+          "name": "id_token_payload_json",
+          "value": "{\"aud\":\"test-client\",\"exp\":1781162657,\"fhirUser\":\"http://host.docker.internal:8000/fhir/Practitioner/practitioner-dr-smith\",\"iat\":1781159057,\"iss\":\"http://host.docker.internal:8000\",\"patient\":\"patient-john-smith\",\"sub\":\"practitioner-dr-smith\"}",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "openid_configuration_json",
+          "type": "text",
+          "value": "{\"authorization_endpoint\":\"http://host.docker.internal:8000/auth/authorize\",\"claims_supported\":[\"sub\",\"iss\",\"fhirUser\",\"patient\"],\"grant_types_supported\":[\"authorization_code\",\"refresh_token\"],\"id_token_signing_alg_values_supported\":[\"RS256\"],\"introspection_endpoint\":\"http://host.docker.internal:8000/auth/introspect\",\"issuer\":\"http://host.docker.internal:8000\",\"jwks_uri\":\"http://host.docker.internal:8000/auth/jwks\",\"response_types_supported\":[\"code\"],\"scopes_supported\":[\"openid\",\"fhirUser\",\"launch\",\"launch/patient\",\"offline_access\",\"patient/*.read\",\"user/*.read\"],\"subject_types_supported\":[\"public\"],\"token_endpoint\":\"http://host.docker.internal:8000/auth/token\",\"token_endpoint_auth_methods_supported\":[\"client_secret_post\",\"client_secret_basic\"],\"userinfo_endpoint\":\"http://host.docker.internal:8000/auth/userinfo\"}\n"
+        },
+        {
+          "name": "openid_issuer",
+          "type": "text",
+          "value": "http://host.docker.internal:8000"
+        }
+      ],
+      "requests": [
+        {
+          "id": "030c5309-01aa-4bad-9565-8021117fe4b5",
+          "direction": "outgoing",
+          "index": 37,
+          "result_id": "c9536153-8785-4f02-9e80-1770cb04e9da",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.151+00:00",
+          "url": "http://host.docker.internal:8000/.well-known/openid-configuration",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_retrieve_configuration",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.149+00:00"
+    },
+    {
+      "id": "f2dbd325-d2de-467f-a190-3b28f5cba7e2",
+      "created_at": "2026-06-11T06:24:18.328+00:00",
+      "inputs": [
+        {
+          "name": "openid_configuration_json",
+          "value": "{\"authorization_endpoint\":\"http://host.docker.internal:8000/auth/authorize\",\"claims_supported\":[\"sub\",\"iss\",\"fhirUser\",\"patient\"],\"grant_types_supported\":[\"authorization_code\",\"refresh_token\"],\"id_token_signing_alg_values_supported\":[\"RS256\"],\"introspection_endpoint\":\"http://host.docker.internal:8000/auth/introspect\",\"issuer\":\"http://host.docker.internal:8000\",\"jwks_uri\":\"http://host.docker.internal:8000/auth/jwks\",\"response_types_supported\":[\"code\"],\"scopes_supported\":[\"openid\",\"fhirUser\",\"launch\",\"launch/patient\",\"offline_access\",\"patient/*.read\",\"user/*.read\"],\"subject_types_supported\":[\"public\"],\"token_endpoint\":\"http://host.docker.internal:8000/auth/token\",\"token_endpoint_auth_methods_supported\":[\"client_secret_post\",\"client_secret_basic\"],\"userinfo_endpoint\":\"http://host.docker.internal:8000/auth/userinfo\"}\n",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "openid_jwks_uri",
+          "type": "text",
+          "value": "http://host.docker.internal:8000/auth/jwks"
+        }
+      ],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_required_configuration_fields",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.328+00:00"
+    },
+    {
+      "id": "1fa486d9-8b2b-45ab-8b20-b9182830dde2",
+      "created_at": "2026-06-11T06:24:18.342+00:00",
+      "inputs": [
+        {
+          "name": "openid_jwks_uri",
+          "value": "http://host.docker.internal:8000/auth/jwks",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "openid_jwks_json",
+          "type": "text",
+          "value": "{\"keys\":[{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"KY2yDzjHjsg\",\"kty\":\"RSA\",\"n\":\"sseg9wEHhegCOSS5hZ912Ap4LZ-nUzrSREfvphdgKwROUEY0TWzphc2L1kjY7bTzq0XPiLajse2IaAEOyxplttRIp4tcYORUlSdwNZBk1tx5YGOfY-ULWrOvR4tYlkDzsksMEbM6oGi7WCMreW15lRheIQzrZF0tXtFIuxXiKmYJCtPyv6Xn5EQ8sXIkKUZQBy5BHQGo8MGXOovVqAig0fhZc6Y-vJAdyajYTlt261744cXHqkt8EKYfZ7ZgYkCWyc4kW_DNmfmEalP9V4enhCc2X8PXail1z2XKFaej8pYNifgmcFI7qZbM128lG5FWtEHFaA6azOuBklWwGgEZ3w\",\"use\":\"sig\"}]}\n"
+        },
+        {
+          "name": "openid_rsa_keys_json",
+          "type": "text",
+          "value": "[{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"KY2yDzjHjsg\",\"kty\":\"RSA\",\"n\":\"sseg9wEHhegCOSS5hZ912Ap4LZ-nUzrSREfvphdgKwROUEY0TWzphc2L1kjY7bTzq0XPiLajse2IaAEOyxplttRIp4tcYORUlSdwNZBk1tx5YGOfY-ULWrOvR4tYlkDzsksMEbM6oGi7WCMreW15lRheIQzrZF0tXtFIuxXiKmYJCtPyv6Xn5EQ8sXIkKUZQBy5BHQGo8MGXOovVqAig0fhZc6Y-vJAdyajYTlt261744cXHqkt8EKYfZ7ZgYkCWyc4kW_DNmfmEalP9V4enhCc2X8PXail1z2XKFaej8pYNifgmcFI7qZbM128lG5FWtEHFaA6azOuBklWwGgEZ3w\",\"use\":\"sig\"}]"
+        }
+      ],
+      "requests": [
+        {
+          "id": "61662515-4b53-4dad-b796-33bb02234361",
+          "direction": "outgoing",
+          "index": 38,
+          "result_id": "1fa486d9-8b2b-45ab-8b20-b9182830dde2",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.350+00:00",
+          "url": "http://host.docker.internal:8000/auth/jwks",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_retrieve_jwks",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.342+00:00"
+    },
+    {
+      "id": "75348a39-0b4a-4bea-a978-453605b1c6ec",
+      "created_at": "2026-06-11T06:24:18.446+00:00",
+      "inputs": [
+        {
+          "name": "id_token_header_json",
+          "value": "{\"alg\":\"RS256\",\"kid\":\"KY2yDzjHjsg\",\"typ\":\"JWT\"}",
+          "type": "text"
+        },
+        {
+          "name": "openid_rsa_keys_json",
+          "value": "[{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"KY2yDzjHjsg\",\"kty\":\"RSA\",\"n\":\"sseg9wEHhegCOSS5hZ912Ap4LZ-nUzrSREfvphdgKwROUEY0TWzphc2L1kjY7bTzq0XPiLajse2IaAEOyxplttRIp4tcYORUlSdwNZBk1tx5YGOfY-ULWrOvR4tYlkDzsksMEbM6oGi7WCMreW15lRheIQzrZF0tXtFIuxXiKmYJCtPyv6Xn5EQ8sXIkKUZQBy5BHQGo8MGXOovVqAig0fhZc6Y-vJAdyajYTlt261744cXHqkt8EKYfZ7ZgYkCWyc4kW_DNmfmEalP9V4enhCc2X8PXail1z2XKFaej8pYNifgmcFI7qZbM128lG5FWtEHFaA6azOuBklWwGgEZ3w\",\"use\":\"sig\"}]",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "id_token_jwk_json",
+          "type": "text",
+          "value": "{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"KY2yDzjHjsg\",\"kty\":\"RSA\",\"n\":\"sseg9wEHhegCOSS5hZ912Ap4LZ-nUzrSREfvphdgKwROUEY0TWzphc2L1kjY7bTzq0XPiLajse2IaAEOyxplttRIp4tcYORUlSdwNZBk1tx5YGOfY-ULWrOvR4tYlkDzsksMEbM6oGi7WCMreW15lRheIQzrZF0tXtFIuxXiKmYJCtPyv6Xn5EQ8sXIkKUZQBy5BHQGo8MGXOovVqAig0fhZc6Y-vJAdyajYTlt261744cXHqkt8EKYfZ7ZgYkCWyc4kW_DNmfmEalP9V4enhCc2X8PXail1z2XKFaej8pYNifgmcFI7qZbM128lG5FWtEHFaA6azOuBklWwGgEZ3w\",\"use\":\"sig\"}"
+        }
+      ],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_token_header",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.446+00:00"
+    },
+    {
+      "id": "a2e92f0c-8662-46e2-875f-df198cd36b31",
+      "created_at": "2026-06-11T06:24:18.490+00:00",
+      "inputs": [
+        {
+          "name": "standalone_id_token",
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJ0ZXN0LWNsaWVudCIsImV4cCI6MTc4MTE2MjY1NywiZmhpclVzZXIiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyL1ByYWN0aXRpb25lci9wcmFjdGl0aW9uZXItZHItc21pdGgiLCJpYXQiOjE3ODExNTkwNTcsImlzcyI6Imh0dHA6Ly9ob3N0LmRvY2tlci5pbnRlcm5hbDo4MDAwIiwicGF0aWVudCI6InBhdGllbnQtam9obi1zbWl0aCIsInN1YiI6InByYWN0aXRpb25lci1kci1zbWl0aCJ9.IZuL6ZAnRcO96md8h35AEIlggsoTi7qH0vKjqh4t12VQ0rI804OaLu40vimqKpoXqOPEcAni4irkB5349KD1Cn5Aqn5XYx6Uh4RiDLkk1enIbggJEU67esi9ZyAGTRR9pfs8oAqIZELaxlmbkShYwoWHdbN69GeJDCi5UM8hnm9yzadYt_rJA4repIU4Kn7eKyk8ONfeDg6RzUY0EjwpRy2ltj5kIBjHuVdLgspzPNbKROA8B_WbavkP7CT-aeD1RWtFluYbSy1haFkxJSUHdVFOxMTpdOJKg1IDtSTOWnqQfBuLOfYV4RQ57C7erdSOQbVxKF2LREk7inZPJMMSgw",
+          "type": "text"
+        },
+        {
+          "name": "openid_configuration_json",
+          "value": "{\"authorization_endpoint\":\"http://host.docker.internal:8000/auth/authorize\",\"claims_supported\":[\"sub\",\"iss\",\"fhirUser\",\"patient\"],\"grant_types_supported\":[\"authorization_code\",\"refresh_token\"],\"id_token_signing_alg_values_supported\":[\"RS256\"],\"introspection_endpoint\":\"http://host.docker.internal:8000/auth/introspect\",\"issuer\":\"http://host.docker.internal:8000\",\"jwks_uri\":\"http://host.docker.internal:8000/auth/jwks\",\"response_types_supported\":[\"code\"],\"scopes_supported\":[\"openid\",\"fhirUser\",\"launch\",\"launch/patient\",\"offline_access\",\"patient/*.read\",\"user/*.read\"],\"subject_types_supported\":[\"public\"],\"token_endpoint\":\"http://host.docker.internal:8000/auth/token\",\"token_endpoint_auth_methods_supported\":[\"client_secret_post\",\"client_secret_basic\"],\"userinfo_endpoint\":\"http://host.docker.internal:8000/auth/userinfo\"}\n",
+          "type": "text"
+        },
+        {
+          "name": "id_token_jwk_json",
+          "value": "{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"KY2yDzjHjsg\",\"kty\":\"RSA\",\"n\":\"sseg9wEHhegCOSS5hZ912Ap4LZ-nUzrSREfvphdgKwROUEY0TWzphc2L1kjY7bTzq0XPiLajse2IaAEOyxplttRIp4tcYORUlSdwNZBk1tx5YGOfY-ULWrOvR4tYlkDzsksMEbM6oGi7WCMreW15lRheIQzrZF0tXtFIuxXiKmYJCtPyv6Xn5EQ8sXIkKUZQBy5BHQGo8MGXOovVqAig0fhZc6Y-vJAdyajYTlt261744cXHqkt8EKYfZ7ZgYkCWyc4kW_DNmfmEalP9V4enhCc2X8PXail1z2XKFaej8pYNifgmcFI7qZbM128lG5FWtEHFaA6azOuBklWwGgEZ3w\",\"use\":\"sig\"}",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_token_payload",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.490+00:00"
+    },
+    {
+      "id": "d0a0e00e-b9ce-49b8-babe-d81202c19550",
+      "created_at": "2026-06-11T06:24:18.523+00:00",
+      "inputs": [
+        {
+          "name": "id_token_payload_json",
+          "value": "{\"aud\":\"test-client\",\"exp\":1781162657,\"fhirUser\":\"http://host.docker.internal:8000/fhir/Practitioner/practitioner-dr-smith\",\"iat\":1781159057,\"iss\":\"http://host.docker.internal:8000\",\"patient\":\"patient-john-smith\",\"sub\":\"practitioner-dr-smith\"}",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "id_token_fhir_user",
+          "type": "text",
+          "value": "http://host.docker.internal:8000/fhir/Practitioner/practitioner-dr-smith"
+        }
+      ],
+      "requests": [
+        {
+          "id": "3c795f6d-3bcf-4fd6-8966-c06534ae8a0e",
+          "direction": "outgoing",
+          "index": 39,
+          "result_id": "d0a0e00e-b9ce-49b8-babe-d81202c19550",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.525+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Practitioner/practitioner-dr-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2-smart_openid_fhir_user_claim",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.523+00:00"
+    },
+    {
+      "id": "8bb301cc-07c0-4bab-8cae-6728b0d60fb4",
+      "created_at": "2026-06-11T06:24:18.664+00:00",
+      "inputs": [
+        {
+          "name": "standalone_id_token",
+          "label": null,
+          "description": null,
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJ0ZXN0LWNsaWVudCIsImV4cCI6MTc4MTE2MjY1NywiZmhpclVzZXIiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyL1ByYWN0aXRpb25lci9wcmFjdGl0aW9uZXItZHItc21pdGgiLCJpYXQiOjE3ODExNTkwNTcsImlzcyI6Imh0dHA6Ly9ob3N0LmRvY2tlci5pbnRlcm5hbDo4MDAwIiwicGF0aWVudCI6InBhdGllbnQtam9obi1zbWl0aCIsInN1YiI6InByYWN0aXRpb25lci1kci1zbWl0aCJ9.IZuL6ZAnRcO96md8h35AEIlggsoTi7qH0vKjqh4t12VQ0rI804OaLu40vimqKpoXqOPEcAni4irkB5349KD1Cn5Aqn5XYx6Uh4RiDLkk1enIbggJEU67esi9ZyAGTRR9pfs8oAqIZELaxlmbkShYwoWHdbN69GeJDCi5UM8hnm9yzadYt_rJA4repIU4Kn7eKyk8ONfeDg6RzUY0EjwpRy2ltj5kIBjHuVdLgspzPNbKROA8B_WbavkP7CT-aeD1RWtFluYbSy1haFkxJSUHdVFOxMTpdOJKg1IDtSTOWnqQfBuLOfYV4RQ57C7erdSOQbVxKF2LREk7inZPJMMSgw",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "label": "Standalone Launch Credentials",
+          "description": null,
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        },
+        {
+          "name": "url",
+          "label": null,
+          "description": null,
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_group_id": "g10_certification-g10_smart_standalone_patient_app-smart_openid_connect_stu2",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.664+00:00"
+    },
+    {
+      "id": "b3add68f-fc25-4623-a926-65edccb2863f",
+      "created_at": "2026-06-11T06:24:18.697+00:00",
+      "inputs": [
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "smart_credentials",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiJiZjJkMjg0MGU1OWYzYjY5MDkwNTVlMDNjMjk4MzhkNCIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.RiQBtjQIn4cBI8oEG5t59shmZyAdCZE9b0OoqyuA308slAA0Wm9exy63hOR5Il1J3htb7FSBH8QPXrV2nCZss_cYU0sCLJtl_CrTf0TXLReREVAmhamBzCuE-W42WmJWiX_ttuygipabImy73CuC0j8xToa-CRId75j2hUi2umzQHzCy2YjbjzAe21g2mmsL-ngBYXXoqZgUTXG2CckDVRGGcvEhh4sFVAYsQYpjl19G-yrxk4i1EFoI0br13hGCc4FCqQRTJ8cQYq3jZIu-xspHyaMnWVAgvFA_J-WHpuZmAUHi-P3Kfj098PW5VB8Jc-GTMCENhVz-5meDnlBHxw\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        },
+        {
+          "name": "standalone_token_retrieval_time",
+          "type": "text",
+          "value": "2026-06-11T06:24:18+00:00"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiJiZjJkMjg0MGU1OWYzYjY5MDkwNTVlMDNjMjk4MzhkNCIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.RiQBtjQIn4cBI8oEG5t59shmZyAdCZE9b0OoqyuA308slAA0Wm9exy63hOR5Il1J3htb7FSBH8QPXrV2nCZss_cYU0sCLJtl_CrTf0TXLReREVAmhamBzCuE-W42WmJWiX_ttuygipabImy73CuC0j8xToa-CRId75j2hUi2umzQHzCy2YjbjzAe21g2mmsL-ngBYXXoqZgUTXG2CckDVRGGcvEhh4sFVAYsQYpjl19G-yrxk4i1EFoI0br13hGCc4FCqQRTJ8cQYq3jZIu-xspHyaMnWVAgvFA_J-WHpuZmAUHi-P3Kfj098PW5VB8Jc-GTMCENhVz-5meDnlBHxw\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        }
+      ],
+      "requests": [
+        {
+          "id": "9f915852-a6c1-4629-a8a4-0d4e7d8efcb1",
+          "direction": "outgoing",
+          "index": 40,
+          "result_id": "b3add68f-fc25-4623-a926-65edccb2863f",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.699+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh-g10_token_refresh_without_scopes",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.697+00:00"
+    },
+    {
+      "id": "35fc9da2-5f2d-4c24-8900-72ea81ee4721",
+      "created_at": "2026-06-11T06:24:18.769+00:00",
+      "inputs": [
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiJiZjJkMjg0MGU1OWYzYjY5MDkwNTVlMDNjMjk4MzhkNCIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.RiQBtjQIn4cBI8oEG5t59shmZyAdCZE9b0OoqyuA308slAA0Wm9exy63hOR5Il1J3htb7FSBH8QPXrV2nCZss_cYU0sCLJtl_CrTf0TXLReREVAmhamBzCuE-W42WmJWiX_ttuygipabImy73CuC0j8xToa-CRId75j2hUi2umzQHzCy2YjbjzAe21g2mmsL-ngBYXXoqZgUTXG2CckDVRGGcvEhh4sFVAYsQYpjl19G-yrxk4i1EFoI0br13hGCc4FCqQRTJ8cQYq3jZIu-xspHyaMnWVAgvFA_J-WHpuZmAUHi-P3Kfj098PW5VB8Jc-GTMCENhVz-5meDnlBHxw\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "standalone_refresh_token",
+          "type": "text",
+          "value": "3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4"
+        },
+        {
+          "name": "standalone_access_token",
+          "type": "text",
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiJiZjJkMjg0MGU1OWYzYjY5MDkwNTVlMDNjMjk4MzhkNCIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.RiQBtjQIn4cBI8oEG5t59shmZyAdCZE9b0OoqyuA308slAA0Wm9exy63hOR5Il1J3htb7FSBH8QPXrV2nCZss_cYU0sCLJtl_CrTf0TXLReREVAmhamBzCuE-W42WmJWiX_ttuygipabImy73CuC0j8xToa-CRId75j2hUi2umzQHzCy2YjbjzAe21g2mmsL-ngBYXXoqZgUTXG2CckDVRGGcvEhh4sFVAYsQYpjl19G-yrxk4i1EFoI0br13hGCc4FCqQRTJ8cQYq3jZIu-xspHyaMnWVAgvFA_J-WHpuZmAUHi-P3Kfj098PW5VB8Jc-GTMCENhVz-5meDnlBHxw"
+        },
+        {
+          "name": "standalone_token_retrieval_time",
+          "type": "text",
+          "value": "2026-06-11T06:24:18+00:00"
+        },
+        {
+          "name": "standalone_expires_in",
+          "type": "text",
+          "value": "3600"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "type": "text",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiJiZjJkMjg0MGU1OWYzYjY5MDkwNTVlMDNjMjk4MzhkNCIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.RiQBtjQIn4cBI8oEG5t59shmZyAdCZE9b0OoqyuA308slAA0Wm9exy63hOR5Il1J3htb7FSBH8QPXrV2nCZss_cYU0sCLJtl_CrTf0TXLReREVAmhamBzCuE-W42WmJWiX_ttuygipabImy73CuC0j8xToa-CRId75j2hUi2umzQHzCy2YjbjzAe21g2mmsL-ngBYXXoqZgUTXG2CckDVRGGcvEhh4sFVAYsQYpjl19G-yrxk4i1EFoI0br13hGCc4FCqQRTJ8cQYq3jZIu-xspHyaMnWVAgvFA_J-WHpuZmAUHi-P3Kfj098PW5VB8Jc-GTMCENhVz-5meDnlBHxw\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        }
+      ],
+      "requests": [
+        {
+          "id": "9f915852-a6c1-4629-a8a4-0d4e7d8efcb1",
+          "direction": "outgoing",
+          "index": 40,
+          "result_id": "b3add68f-fc25-4623-a926-65edccb2863f",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.699+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh-g10_token_refresh_body_without_scopes",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.769+00:00"
+    },
+    {
+      "id": "15f696cd-5004-4d1e-bbdc-e9900810bdd4",
+      "created_at": "2026-06-11T06:24:18.802+00:00",
+      "inputs": [
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiJiZjJkMjg0MGU1OWYzYjY5MDkwNTVlMDNjMjk4MzhkNCIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.RiQBtjQIn4cBI8oEG5t59shmZyAdCZE9b0OoqyuA308slAA0Wm9exy63hOR5Il1J3htb7FSBH8QPXrV2nCZss_cYU0sCLJtl_CrTf0TXLReREVAmhamBzCuE-W42WmJWiX_ttuygipabImy73CuC0j8xToa-CRId75j2hUi2umzQHzCy2YjbjzAe21g2mmsL-ngBYXXoqZgUTXG2CckDVRGGcvEhh4sFVAYsQYpjl19G-yrxk4i1EFoI0br13hGCc4FCqQRTJ8cQYq3jZIu-xspHyaMnWVAgvFA_J-WHpuZmAUHi-P3Kfj098PW5VB8Jc-GTMCENhVz-5meDnlBHxw\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "smart_credentials",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        },
+        {
+          "name": "standalone_token_retrieval_time",
+          "type": "text",
+          "value": "2026-06-11T06:24:18+00:00"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        }
+      ],
+      "requests": [
+        {
+          "id": "317e9a39-dec4-4e21-af40-45e9314779d2",
+          "direction": "outgoing",
+          "index": 41,
+          "result_id": "15f696cd-5004-4d1e-bbdc-e9900810bdd4",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.836+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh-g10_token_refresh_with_scopes",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.802+00:00"
+    },
+    {
+      "id": "fad4ca55-c947-40d3-9b68-7ee750484640",
+      "created_at": "2026-06-11T06:24:18.878+00:00",
+      "inputs": [
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "standalone_refresh_token",
+          "type": "text",
+          "value": "3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4"
+        },
+        {
+          "name": "standalone_access_token",
+          "type": "text",
+          "value": "eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg"
+        },
+        {
+          "name": "standalone_token_retrieval_time",
+          "type": "text",
+          "value": "2026-06-11T06:24:18+00:00"
+        },
+        {
+          "name": "standalone_expires_in",
+          "type": "text",
+          "value": "3600"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "type": "text",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        }
+      ],
+      "requests": [
+        {
+          "id": "317e9a39-dec4-4e21-af40-45e9314779d2",
+          "direction": "outgoing",
+          "index": 41,
+          "result_id": "15f696cd-5004-4d1e-bbdc-e9900810bdd4",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.836+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh-g10_token_refresh_body_with_scopes",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.878+00:00"
+    },
+    {
+      "id": "c01fbdac-41e2-49fd-b070-b92453853dbb",
+      "created_at": "2026-06-11T06:24:18.891+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "317e9a39-dec4-4e21-af40-45e9314779d2",
+          "direction": "outgoing",
+          "index": 41,
+          "result_id": "15f696cd-5004-4d1e-bbdc-e9900810bdd4",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.836+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        },
+        {
+          "id": "5a8db9ff-5a0e-4c39-97a8-2a6ebadd1699",
+          "direction": "outgoing",
+          "index": 42,
+          "result_id": "c01fbdac-41e2-49fd-b070-b92453853dbb",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.894+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Patient/patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh-g10_patient_context",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.891+00:00"
+    },
+    {
+      "id": "35757b07-81ca-4572-a5a3-5c86c65fd04b",
+      "created_at": "2026-06-11T06:24:18.932+00:00",
+      "inputs": [
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "3f60ec84-163a-4f52-ba78-5a5cea7f721e",
+          "direction": "outgoing",
+          "index": 43,
+          "result_id": "35757b07-81ca-4572-a5a3-5c86c65fd04b",
+          "status": 400,
+          "timestamp": "2026-06-11T06:24:18.934+00:00",
+          "url": "http://host.docker.internal:8000/auth/token",
+          "verb": "post"
+        }
+      ],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh-g10_invalid_token_refresh",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.932+00:00"
+    },
+    {
+      "id": "f87488eb-b682-4a19-8364-f51d33ba2a15",
+      "created_at": "2026-06-11T06:24:18.958+00:00",
+      "inputs": [
+        {
+          "name": "standalone_received_scopes",
+          "label": null,
+          "description": null,
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "label": "Standalone Launch Credentials",
+          "description": null,
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTcsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1NywiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4NmVhYTg0OWM0MDQ5NGQ0ZWRkMzBlYTJiMjA1NTNiYiIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.Prqj8O1MxvCvB3A92JNVlvGt3BkCJflDHfrwwFDF55rLpucQ_SXFhBmng1yL-EGpHZ9NfvCx4U9oKCvAE7IStlx61Wou8QoZxAHyrS69HPKUZbh3NyrGQpgS-Nsj7EQPb2O3piGUJT9GSlaAZHqgv4rMJYX02OfgjgNQVZgUktBJPyE1XLP7-yOD0ZFJxrMHXdes1nklDGI05an4H6DXMY0wY7_Cnz30HzjPm0sNFB91F-LTjkyxzaqnWnkOVy8wEHPxoR3bwgIl8OWaSZli887rTizEMXTuvBrB-Y5Sr9IXsAptCof5xnwlX6K5mjfoDOlabMC6DqrxJnhsOHsztA\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:17+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        },
+        {
+          "name": "standalone_patient_id",
+          "label": null,
+          "description": null,
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "label": null,
+          "description": null,
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_group_id": "g10_certification-g10_smart_standalone_patient_app-g10_smart_standalone_token_refresh",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.958+00:00"
+    },
+    {
+      "id": "0872b441-766d-4ede-b655-6ebe566c8834",
+      "created_at": "2026-06-11T06:24:18.971+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "result_message": "Scopes received indicate access to all necessary resources.",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-Test01",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.971+00:00"
+    },
+    {
+      "id": "7e7cbb41-7422-4f73-9e48-62a3734f486d",
+      "created_at": "2026-06-11T06:24:18.990+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "b01bcd19-1957-461a-be53-9c910cb8a6a3",
+          "direction": "outgoing",
+          "index": 44,
+          "result_id": "7e7cbb41-7422-4f73-9e48-62a3734f486d",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:18.992+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Patient?_id=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_patient_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:18.990+00:00"
+    },
+    {
+      "id": "e123931e-2c61-452c-824d-e3c438c2a3cb",
+      "created_at": "2026-06-11T06:24:19.035+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "b7225d9c-e7e3-4648-85b7-0a2146634645",
+          "direction": "outgoing",
+          "index": 45,
+          "result_id": "e123931e-2c61-452c-824d-e3c438c2a3cb",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.037+00:00",
+          "url": "http://host.docker.internal:8000/fhir/AllergyIntolerance?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_allergy_intolerance_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.035+00:00"
+    },
+    {
+      "id": "92212240-ff96-4a48-ab45-d19d32f302d5",
+      "created_at": "2026-06-11T06:24:19.079+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "c840f1ed-fa13-4496-8ed7-8e49f553496f",
+          "direction": "outgoing",
+          "index": 46,
+          "result_id": "92212240-ff96-4a48-ab45-d19d32f302d5",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.081+00:00",
+          "url": "http://host.docker.internal:8000/fhir/CarePlan?category=assess-plan&patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_care_plan_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.079+00:00"
+    },
+    {
+      "id": "726d9490-6925-49fc-8d6e-071b759613f9",
+      "created_at": "2026-06-11T06:24:19.178+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "34dd534b-4c7e-46f2-ae1a-f0a06ff3bb4e",
+          "direction": "outgoing",
+          "index": 47,
+          "result_id": "726d9490-6925-49fc-8d6e-071b759613f9",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.183+00:00",
+          "url": "http://host.docker.internal:8000/fhir/CareTeam?patient=patient-john-smith&status=proposed",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_care_team_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.178+00:00"
+    },
+    {
+      "id": "3adf74c9-5128-49a3-827d-3c5bf1f81a5d",
+      "created_at": "2026-06-11T06:24:19.232+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "1067f2bd-00b7-417e-b79a-fefe8d120563",
+          "direction": "outgoing",
+          "index": 48,
+          "result_id": "3adf74c9-5128-49a3-827d-3c5bf1f81a5d",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.235+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Condition?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_condition_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.232+00:00"
+    },
+    {
+      "id": "8d8b7bdd-ad30-4e03-a5a3-58b8a460fa02",
+      "created_at": "2026-06-11T06:24:19.291+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "f005baff-cc73-4bd7-9e11-0ea05b6c2a13",
+          "direction": "outgoing",
+          "index": 49,
+          "result_id": "8d8b7bdd-ad30-4e03-a5a3-58b8a460fa02",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.293+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Device?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_device_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.291+00:00"
+    },
+    {
+      "id": "c7ef354f-e71b-4e95-98dd-2c5fab26ba34",
+      "created_at": "2026-06-11T06:24:19.340+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "993991ea-60ac-421d-a742-1d33d80a6c35",
+          "direction": "outgoing",
+          "index": 50,
+          "result_id": "c7ef354f-e71b-4e95-98dd-2c5fab26ba34",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.343+00:00",
+          "url": "http://host.docker.internal:8000/fhir/DiagnosticReport?category=LAB&patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_diagnostic_report_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.340+00:00"
+    },
+    {
+      "id": "4892fb08-ec49-462e-a7f8-9dfea1c15b11",
+      "created_at": "2026-06-11T06:24:19.403+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "c2352d4b-7f71-44c5-ac68-eb6ce82be6d1",
+          "direction": "outgoing",
+          "index": 51,
+          "result_id": "4892fb08-ec49-462e-a7f8-9dfea1c15b11",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.406+00:00",
+          "url": "http://host.docker.internal:8000/fhir/DocumentReference?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_document_reference_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.403+00:00"
+    },
+    {
+      "id": "2363b76f-e27e-4e55-a7d0-2124a97f1b6a",
+      "created_at": "2026-06-11T06:24:19.463+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "b41ef313-ab46-4cb3-99e1-b270a6a33105",
+          "direction": "outgoing",
+          "index": 52,
+          "result_id": "2363b76f-e27e-4e55-a7d0-2124a97f1b6a",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.466+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Goal?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_goal_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.463+00:00"
+    },
+    {
+      "id": "b290e98a-35a5-4257-b551-8c36ad0813a3",
+      "created_at": "2026-06-11T06:24:19.522+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "544e957d-a911-4882-89ee-8c8c03d29404",
+          "direction": "outgoing",
+          "index": 53,
+          "result_id": "b290e98a-35a5-4257-b551-8c36ad0813a3",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.525+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Immunization?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_immunization_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.522+00:00"
+    },
+    {
+      "id": "d8a600a1-02ec-48cd-944c-f65cffd1fa9d",
+      "created_at": "2026-06-11T06:24:19.573+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "9f4d3279-b029-4ad8-ae07-cb8191579a61",
+          "direction": "outgoing",
+          "index": 54,
+          "result_id": "d8a600a1-02ec-48cd-944c-f65cffd1fa9d",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.575+00:00",
+          "url": "http://host.docker.internal:8000/fhir/MedicationRequest?intent=proposal&patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_medication_request_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.573+00:00"
+    },
+    {
+      "id": "c335a949-de5d-46dd-ab30-696fd7369f4a",
+      "created_at": "2026-06-11T06:24:19.641+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "67c0903e-ec48-42b0-a25f-618fcf743348",
+          "direction": "outgoing",
+          "index": 55,
+          "result_id": "c335a949-de5d-46dd-ab30-696fd7369f4a",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.642+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Observation?code=2708-6&patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_observation_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.641+00:00"
+    },
+    {
+      "id": "3ac9e94b-d438-401e-8a5e-0b9e25c364fe",
+      "created_at": "2026-06-11T06:24:19.682+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "67324422-bef3-4ee8-92d9-ba1ab276e305",
+          "direction": "outgoing",
+          "index": 56,
+          "result_id": "3ac9e94b-d438-401e-8a5e-0b9e25c364fe",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.684+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Procedure?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_procedure_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.682+00:00"
+    },
+    {
+      "id": "04d606da-729b-4918-a106-d9ac744b3c44",
+      "created_at": "2026-06-11T06:24:19.731+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "4c3af49a-b408-45d9-9796-1401bc4ee5de",
+          "direction": "outgoing",
+          "index": 57,
+          "result_id": "04d606da-729b-4918-a106-d9ac744b3c44",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.733+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Encounter?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_us_core_6_encounter_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.731+00:00"
+    },
+    {
+      "id": "0c143e8d-6a95-4693-83a4-2a3e4bc455fa",
+      "created_at": "2026-06-11T06:24:19.779+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "d1c228b8-99de-4b30-b6c2-cda459ba0bff",
+          "direction": "outgoing",
+          "index": 58,
+          "result_id": "0c143e8d-6a95-4693-83a4-2a3e4bc455fa",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.781+00:00",
+          "url": "http://host.docker.internal:8000/fhir/ServiceRequest?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_us_core_6_service_request_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.779+00:00"
+    },
+    {
+      "id": "d70fef97-f03e-4d35-ae81-36d42fa5f8ef",
+      "created_at": "2026-06-11T06:24:19.823+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "86ec822e-a474-4f36-9587-73ec5fac770c",
+          "direction": "outgoing",
+          "index": 59,
+          "result_id": "d70fef97-f03e-4d35-ae81-36d42fa5f8ef",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.826+00:00",
+          "url": "http://host.docker.internal:8000/fhir/Coverage?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_us_core_6_coverage_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.823+00:00"
+    },
+    {
+      "id": "30485caf-878d-4d8a-9231-4b3327d554f2",
+      "created_at": "2026-06-11T06:24:19.866+00:00",
+      "inputs": [
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "url",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [
+        {
+          "id": "86e9b19e-d832-4901-8f31-29dde386695e",
+          "direction": "outgoing",
+          "index": 60,
+          "result_id": "30485caf-878d-4d8a-9231-4b3327d554f2",
+          "status": 200,
+          "timestamp": "2026-06-11T06:24:19.868+00:00",
+          "url": "http://host.docker.internal:8000/fhir/MedicationDispense?patient=patient-john-smith",
+          "verb": "get"
+        }
+      ],
+      "result": "pass",
+      "result_message": "Access expected to be granted and request properly returned 200",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access-g10_us_core_6_medication_dispense_unrestricted_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.866+00:00"
+    },
+    {
+      "id": "22cd4733-1ca7-4d37-97dc-14beb68073d9",
+      "created_at": "2026-06-11T06:24:19.896+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "label": null,
+          "description": null,
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_patient_id",
+          "label": null,
+          "description": null,
+          "value": "patient-john-smith",
+          "type": "text"
+        },
+        {
+          "name": "standalone_received_scopes",
+          "label": null,
+          "description": null,
+          "value": "launch/patient openid fhirUser offline_access patient/*.rs",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "label": "Standalone Launch Credentials",
+          "description": null,
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_group_id": "g10_certification-g10_smart_standalone_patient_app-g10_unrestricted_resource_type_access",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.896+00:00"
+    },
+    {
+      "id": "d8e9b746-bca3-4eb1-a481-7f4a049ce722",
+      "created_at": "2026-06-11T06:24:19.902+00:00",
+      "inputs": [
+        {
+          "name": "standalone_smart_auth_info",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        },
+        {
+          "name": "standalone_patient_id",
+          "value": "patient-john-smith",
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [
+        {
+          "name": "smart_auth_info",
+          "type": "text",
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"access_token\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6IktZMnlEempIanNnIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwOi8vaG9zdC5kb2NrZXIuaW50ZXJuYWw6ODAwMC9maGlyIiwiY2xpZW50X2lkIjoidGVzdC1jbGllbnQiLCJleHAiOjE3ODExNjI2NTgsImZoaXJVc2VyIjoiUHJhY3RpdGlvbmVyL3ByYWN0aXRpb25lci1kci1zbWl0aCIsImlhdCI6MTc4MTE1OTA1OCwiaXNzIjoiaHR0cDovL2hvc3QuZG9ja2VyLmludGVybmFsOjgwMDAiLCJqdGkiOiI4YTg3NzRiMWQwOWFiODM0MDJkOTYwNGY1OTkzMTFlMyIsInBhdGllbnQiOiJwYXRpZW50LWpvaG4tc21pdGgiLCJzY29wZSI6ImxhdW5jaC9wYXRpZW50IG9wZW5pZCBmaGlyVXNlciBvZmZsaW5lX2FjY2VzcyBwYXRpZW50LyoucnMiLCJzdWIiOiJwcmFjdGl0aW9uZXItZHItc21pdGgifQ.adYvF287rP6M0M29XgU0GQwUyOGk6-jhbC7-32mh-AKBdeWi_m8T5LZ7eJKdpHJLTIA7gaS3mrWUQDRQu1hgoeQIY2kQrgpZEDrrIbHI4WUCXHTmUrBoZNAOFubZ7Vmxqb4BW4WO_igFx8Jy6CpCFr2GNAl3SSR5W0K_Hz0APGGchNIDZZtdBlCcu4ib_mhSfBfKxjQjd3Oz9lTLn5_rGW2OixvyCHZ1REcitLKFs7_fhz4aj8vb4yN3FiSp-CnZI5kyd0vOllSNRcQCaBC8zr5P4HL9oSluMTADg4EtvUJq226O54fELc2AuLOS6cHZoDp3Ffhfam9Mtd6vM4O_mg\",\"refresh_token\":\"3010752ceb4e7f0223f9237c51248103b6202bb5bb36ad8984cd2f41a04fc7e4\",\"issue_time\":\"2026-06-11T06:24:18+00:00\",\"expires_in\":3600,\"name\":\"standalone_smart_auth_info\"}"
+        },
+        {
+          "name": "patient_id",
+          "type": "text",
+          "value": "patient-john-smith"
+        }
+      ],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_standalone_credentials_export",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.902+00:00"
+    },
+    {
+      "id": "707145a6-253d-4659-a9f4-06a556d70ec7",
+      "created_at": "2026-06-11T06:24:19.904+00:00",
+      "inputs": [
+        {
+          "name": "auth_incorrectly_permitted_tls_versions_messages",
+          "value": null,
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_auth_incorrectly_permitted_tls_versions_messages_setup",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.904+00:00"
+    },
+    {
+      "id": "aaacbe1b-3d98-477c-b2d8-8ff565e78356",
+      "created_at": "2026-06-11T06:24:19.907+00:00",
+      "inputs": [
+        {
+          "name": "token_incorrectly_permitted_tls_versions_messages",
+          "value": null,
+          "type": "text"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "pass",
+      "test_id": "g10_certification-g10_smart_standalone_patient_app-g10_token_incorrectly_permitted_tls_versions_messages_setup",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.907+00:00"
+    },
+    {
+      "id": "f1ad2799-ae03-40f8-80fa-d844fb39d301",
+      "created_at": "2026-06-11T06:24:19.908+00:00",
+      "inputs": [
+        {
+          "name": "url",
+          "label": "FHIR Endpoint",
+          "description": "URL of the FHIR endpoint used by SMART applications",
+          "value": "http://host.docker.internal:8000/fhir",
+          "type": "text"
+        },
+        {
+          "name": "standalone_smart_auth_info",
+          "label": "Standalone Launch Credentials",
+          "description": null,
+          "value": "{\"auth_type\":\"symmetric\",\"token_url\":\"http://host.docker.internal:8000/auth/token\",\"auth_url\":\"http://host.docker.internal:8000/auth/authorize\",\"requested_scopes\":\"launch/patient openid fhirUser offline_access patient/*.rs\",\"client_id\":\"test-client\",\"client_secret\":\"test-secret\",\"pkce_support\":\"enabled\",\"pkce_code_challenge_method\":\"S256\",\"name\":\"standalone_smart_auth_info\"}",
+          "type": "auth_info"
+        }
+      ],
+      "optional": false,
+      "outputs": [],
+      "requests": [],
+      "result": "fail",
+      "test_group_id": "g10_certification-g10_smart_standalone_patient_app",
+      "test_run_id": "73ce4a2b-b525-4b55-ae47-038ce7ee513f",
+      "test_session_id": "h5GbI589F4z",
+      "updated_at": "2026-06-11T06:24:19.908+00:00"
+    }
+  ]
+}

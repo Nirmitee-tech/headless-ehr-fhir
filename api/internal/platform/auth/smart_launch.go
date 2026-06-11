@@ -339,9 +339,11 @@ func (s *SMARTServer) Authorize(req *AuthorizationRequest) (*AuthorizationRespon
 		ac.PatientID = s.defaultPatientID
 	}
 
-	// Set a default user for fhirUser scope in standalone mode
+	// Set a default user for fhirUser scope in standalone mode.
+	// Must reference a practitioner that exists in seed data so the
+	// fhirUser claim URL is resolvable (Inferno fetches it).
 	if ac.UserID == "" && containsScope(negotiatedScope, "fhirUser") {
-		ac.UserID = "dev-practitioner"
+		ac.UserID = "practitioner-dr-smith"
 	}
 
 	s.mu.Lock()
@@ -910,6 +912,7 @@ func NewSMARTHandler(server *SMARTServer) *SMARTHandler {
 // RegisterRoutes registers SMART authorization endpoints on the echo instance.
 func (h *SMARTHandler) RegisterRoutes(e *echo.Echo) {
 	e.GET("/auth/authorize", h.handleAuthorize)
+	e.POST("/auth/authorize", h.handleAuthorize) // SMART STU2 authorize-post
 	e.POST("/auth/token", h.handleToken)
 	e.POST("/auth/register", h.handleRegister)
 	e.POST("/auth/launch", h.handleLaunch)
@@ -918,18 +921,25 @@ func (h *SMARTHandler) RegisterRoutes(e *echo.Echo) {
 	e.GET("/.well-known/openid-configuration", h.handleOpenIDConfiguration)
 }
 
-// handleAuthorize handles GET /auth/authorize.
+// handleAuthorize handles GET and POST /auth/authorize (SMART STU2 supports
+// both; POST sends parameters as application/x-www-form-urlencoded).
 func (h *SMARTHandler) handleAuthorize(c echo.Context) error {
+	param := func(name string) string {
+		if v := c.QueryParam(name); v != "" {
+			return v
+		}
+		return c.FormValue(name)
+	}
 	req := &AuthorizationRequest{
-		ResponseType:        c.QueryParam("response_type"),
-		ClientID:            c.QueryParam("client_id"),
-		RedirectURI:         c.QueryParam("redirect_uri"),
-		Scope:               c.QueryParam("scope"),
-		State:               c.QueryParam("state"),
-		Aud:                 c.QueryParam("aud"),
-		Launch:              c.QueryParam("launch"),
-		CodeChallenge:       c.QueryParam("code_challenge"),
-		CodeChallengeMethod: c.QueryParam("code_challenge_method"),
+		ResponseType:        param("response_type"),
+		ClientID:            param("client_id"),
+		RedirectURI:         param("redirect_uri"),
+		Scope:               param("scope"),
+		State:               param("state"),
+		Aud:                 param("aud"),
+		Launch:              param("launch"),
+		CodeChallenge:       param("code_challenge"),
+		CodeChallengeMethod: param("code_challenge_method"),
 	}
 
 	// Validate required parameters
