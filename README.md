@@ -12,6 +12,17 @@ The run was executed over HTTPS (TLS-terminating proxy in front of the server) w
 
 📋 **[Full test-by-test results →](api/inferno-results/2026-06-11/results.md)**
 
+### US Core Single Patient API (g10) — 86/94 functional tests passing
+
+Beyond SMART App Launch, the server is tested against the **US Core 3.1.1 Single
+Patient API** group: **86 of 94 functional tests pass** (up from 40), covering
+search by patient, token (`system|code`), GET/POST `_search` parity, `_include`,
+and reference integrity across all US Core resource types. Every resource the
+server emits validates clean when sent to the HL7 FHIR validator directly.
+The remaining items require a CI-grade HL7 validator (the local Docker validator
+cannot resolve US Core 3.1.1 profiles under an orchestrated run) plus HTTPS.
+📋 **[US Core status & details →](api/inferno-results/US-CORE-STATUS.md)**
+
 ### Reproduce it yourself
 
 ```bash

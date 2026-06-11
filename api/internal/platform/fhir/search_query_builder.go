@@ -106,10 +106,17 @@ func (q *SearchQuery) ApplyParam(config SearchParamConfig, value string) {
 		if config.SysColumn != "" {
 			q.AddToken(config.SysColumn, config.Column, value)
 		} else {
-			// Simple token without system column: exact match
-			q.where += fmt.Sprintf(" AND %s = $%d", config.Column, q.idx)
-			q.args = append(q.args, value)
-			q.idx++
+			// Token without a stored system column. A FHIR token value may be
+			// "system|code", "|code", "system|", or bare "code". Since we only
+			// store the code, match on the code component; a "system|" form (no
+			// code) cannot be filtered without a system column, so it matches
+			// all (no clause added).
+			code := tokenCode(value)
+			if code != "" {
+				q.where += fmt.Sprintf(" AND %s = $%d", config.Column, q.idx)
+				q.args = append(q.args, code)
+				q.idx++
+			}
 		}
 	case SearchParamString:
 		q.AddString(config.Column, value, "")
@@ -222,4 +229,18 @@ func ExtractSearchParams(c echo.Context) map[string]string {
 func ExtractRevIncludes(c echo.Context) []string {
 	vals := c.QueryParams()["_revinclude"]
 	return vals
+}
+
+// tokenCode extracts the code component from a FHIR token search value.
+// FHIR token syntax: "system|code", "|code" (code with no system), "system|"
+// (any code in system), or bare "code". This returns the code component:
+//   "http://loinc.org|1234" -> "1234"
+//   "|1234"                  -> "1234"
+//   "1234"                   -> "1234"
+//   "http://loinc.org|"      -> ""   (system-only; caller treats as match-all)
+func tokenCode(value string) string {
+	if i := strings.IndexByte(value, '|'); i >= 0 {
+		return value[i+1:]
+	}
+	return value
 }

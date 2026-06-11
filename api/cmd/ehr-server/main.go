@@ -5,6 +5,7 @@ import (
 	crypto_rand "crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"net/http"
 	"os"
 	"os/signal"
@@ -140,6 +141,9 @@ import (
 	"github.com/ehr/ehr/internal/platform/webhook"
 	"github.com/ehr/ehr/internal/platform/websocket"
 )
+
+// validTableName guards the interpolated table identifier in referenceLookup.
+var validTableName = regexp.MustCompile(`^[a-z][a-z_]*$`)
 
 // ConsentRepoAdapter adapts a documents.ConsentRepository to the
 // auth.ConsentChecker interface, avoiding circular imports between the
@@ -1336,6 +1340,12 @@ func runServer() error {
 	includeRegistry.RegisterReference("CoverageEligibilityRequest", "insurer", "Organization")
 	includeRegistry.RegisterReference("CoverageEligibilityResponse", "insurer", "Organization")
 	includeRegistry.RegisterReference("CoverageEligibilityResponse", "request", "CoverageEligibilityRequest")
+	// US Core MedicationRequest uses medicationReference; _include must return
+	// the referenced Medication so clients can resolve the drug.
+	includeRegistry.RegisterReference("MedicationRequest", "medication", "Medication")
+	includeRegistry.RegisterReference("MedicationStatement", "medication", "Medication")
+	includeRegistry.RegisterReference("MedicationAdministration", "medication", "Medication")
+	includeRegistry.RegisterReference("MedicationDispense", "medication", "Medication")
 	includeRegistry.RegisterReference("MedicationKnowledge", "manufacturer", "Organization")
 	includeRegistry.RegisterReference("OrganizationAffiliation", "organization", "Organization")
 	includeRegistry.RegisterReference("OrganizationAffiliation", "participating-organization", "Organization")
@@ -1360,10 +1370,51 @@ func runServer() error {
 	// Fetchers are registered below after services are initialized; since
 	// the middleware holds a pointer to the registry, late registration works.
 	fhirGroup.Use(fhir.ContentNegotiationMiddleware())
+	// POST /{Resource}/_search sends parameters as a form body; merge them into
+	// the query string so search handlers (which read query params) treat POST
+	// and GET search identically, as required by FHIR + US Core conformance.
+	// Must run before search/include/pagination middleware that read the query.
+	fhirGroup.Use(fhir.SearchPostMiddleware())
 	fhirGroup.Use(fhir.ConditionalReadMiddleware())
 	fhirGroup.Use(fhir.IncludeMiddleware(includeRegistry))
 	fhirGroup.Use(fhir.SearchMiddleware())
 	fhirGroup.Use(fhir.PreferMiddleware())
+
+	// Rewrite internal-UUID references to external fhir_id references on the way
+	// out (see internal/platform/fhir/reference_resolver.go). The lookup uses
+	// the request's tenant-scoped connection, so resolution runs in the correct
+	// schema; a fresh resolver per request bounds its cache to that response.
+	referenceLookup := func(ctx context.Context, table string, ids []string) (map[string]string, error) {
+		// Defense in depth: the table name is interpolated (Postgres cannot
+		// parameterize identifiers), so reject anything that is not a plain
+		// lower-snake-case identifier. Callers only ever pass values from the
+		// resolver's fixed allowlist, but we never trust an interpolated name.
+		if !validTableName.MatchString(table) {
+			return nil, fmt.Errorf("reference lookup: invalid table name %q", table)
+		}
+		conn := db.ConnFromContext(ctx)
+		if conn == nil {
+			return nil, fmt.Errorf("reference lookup: no tenant connection in context")
+		}
+		rows, err := conn.Query(ctx,
+			"SELECT id::text, fhir_id FROM "+table+" WHERE id = ANY($1::uuid[])", ids)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		out := make(map[string]string, len(ids))
+		for rows.Next() {
+			var id, fhirID string
+			if err := rows.Scan(&id, &fhirID); err != nil {
+				return nil, err
+			}
+			out[id] = fhirID
+		}
+		return out, rows.Err()
+	}
+	fhirGroup.Use(fhir.ReferenceResolutionMiddleware(func() *fhir.ReferenceResolver {
+		return fhir.NewReferenceResolver(referenceLookup)
+	}))
 
 	// FHIR metadata (dynamic CapabilityStatement)
 	fhirGroup.GET("/metadata", func(c echo.Context) error {
@@ -2471,6 +2522,13 @@ func runServer() error {
 			return nil, err
 		}
 		return mr.ToFHIR(), nil
+	})
+	includeRegistry.RegisterFetcher("Medication", func(ctx context.Context, id string) (map[string]interface{}, error) {
+		m, err := medSvc.GetMedicationByFHIRID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return m.ToFHIR(), nil
 	})
 	includeRegistry.RegisterFetcher("MedicationAdministration", func(ctx context.Context, id string) (map[string]interface{}, error) {
 		ma, err := medSvc.GetMedicationAdministrationByFHIRID(ctx, id)

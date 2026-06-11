@@ -43,6 +43,30 @@ type Medication struct {
 	UpdatedAt               time.Time  `db:"updated_at" json:"updated_at"`
 }
 
+// ToFHIR renders the Medication as a US Core Medication resource. Used by the
+// FHIR read/search handlers and by _include resolution (MedicationRequest:medication).
+func (m *Medication) ToFHIR() map[string]interface{} {
+	res := map[string]interface{}{
+		"resourceType": "Medication",
+		"id":           m.FHIRID,
+		"status":       m.Status,
+		"code": fhir.CodeableConcept{
+			Coding: []fhir.Coding{{System: strVal(m.CodeSystem), Code: m.CodeValue, Display: m.CodeDisplay}},
+		},
+		"meta": fhir.Meta{
+			VersionID:   "1",
+			LastUpdated: m.UpdatedAt,
+			Profile:     []string{"http://hl7.org/fhir/us/core/StructureDefinition/us-core-medication"},
+		},
+	}
+	if m.FormCode != nil {
+		res["form"] = fhir.CodeableConcept{
+			Coding: []fhir.Coding{{Code: *m.FormCode, Display: strVal(m.FormDisplay)}},
+		}
+	}
+	return res
+}
+
 // MedicationIngredient maps to the medication_ingredient table.
 type MedicationIngredient struct {
 	ID                      uuid.UUID `db:"id" json:"id"`

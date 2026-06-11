@@ -17,12 +17,20 @@ func SearchPostMiddleware() echo.MiddlewareFunc {
 			if c.Request().Method == "POST" {
 				contentType := c.Request().Header.Get("Content-Type")
 				if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
-					// Parse form body and merge into query params
+					// Parse the form body and merge its params into the query.
 					if err := c.Request().ParseForm(); err == nil {
+						// Update both the raw URL (for anything reading it fresh)
+						// and Echo's cached query map. echo.Context.QueryParams()
+						// memoizes url.Query() on first access, so an earlier
+						// middleware (e.g. content negotiation) may have already
+						// cached the pre-merge query; mutating the returned map in
+						// place keeps the cache and the URL consistent.
 						existingQuery := c.Request().URL.Query()
-						for k, v := range c.Request().PostForm {
-							for _, val := range v {
+						cachedQuery := c.QueryParams()
+						for k, vals := range c.Request().PostForm {
+							for _, val := range vals {
 								existingQuery.Add(k, val)
+								cachedQuery.Add(k, val)
 							}
 						}
 						c.Request().URL.RawQuery = existingQuery.Encode()

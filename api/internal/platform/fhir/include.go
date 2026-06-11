@@ -207,6 +207,7 @@ func searchParamToFields(param string) []string {
 		"practitioner": {"practitioner"},
 		"organization": {"managingOrganization", "organization"},
 		"location":    {"location"},
+		"medication":  {"medicationReference", "medication"},
 	}
 
 	if fields, ok := mappings[param]; ok {
