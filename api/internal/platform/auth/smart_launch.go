@@ -835,15 +835,19 @@ func negotiateScopes(requested, allowed string) (string, error) {
 		}
 	}
 
+	allowedList := strings.Fields(allowed)
 	allowedScopes := make(map[string]bool)
-	for _, s := range strings.Fields(allowed) {
+	for _, s := range allowedList {
 		allowedScopes[s] = true
 	}
 
-	// Negotiate: keep only scopes that are in the client's allowed set
+	// Negotiate: keep a scope when the client may use it exactly, or when one of
+	// the client's resource scopes covers it (patient/*.rs covers
+	// patient/Observation.rs). Exact matching alone dropped every per-resource
+	// scope the ONC g10 kit 8.0.7 requests.
 	var negotiated []string
 	for _, s := range requestedScopes {
-		if allowedScopes[s] {
+		if allowedScopes[s] || scopeCoveredByAny(s, allowedList) {
 			negotiated = append(negotiated, s)
 		}
 	}
@@ -853,6 +857,56 @@ func negotiateScopes(requested, allowed string) (string, error) {
 	}
 
 	return strings.Join(negotiated, " "), nil
+}
+
+// scopeCoveredByAny reports whether a requested resource scope is no wider than
+// one of the allowed resource scopes: same context, same or wildcard resource
+// type, and every permission it asks for is granted.
+func scopeCoveredByAny(requested string, allowed []string) bool {
+	req, err := ParseSMARTScope(requested)
+	if err != nil {
+		return false
+	}
+	need := scopePermissions(req.Operation)
+	for _, a := range allowed {
+		al, err := ParseSMARTScope(a)
+		if err != nil || al.Context != req.Context {
+			continue
+		}
+		if al.ResourceType != "*" && al.ResourceType != req.ResourceType {
+			continue
+		}
+		have := scopePermissions(al.Operation)
+		covered := true
+		for p := range need {
+			if !have[p] {
+				covered = false
+				break
+			}
+		}
+		if covered {
+			return true
+		}
+	}
+	return false
+}
+
+// scopePermissions maps a scope operation to SMART v2 permission letters.
+// v1 "read" is read and search, "write" is create, update and delete.
+func scopePermissions(op string) map[rune]bool {
+	switch op {
+	case "read":
+		op = "rs"
+	case "write":
+		op = "cud"
+	case "*":
+		op = "cruds"
+	}
+	perms := make(map[rune]bool, len(op))
+	for _, c := range op {
+		perms[c] = true
+	}
+	return perms
 }
 
 // containsScope checks if a space-separated scope string contains a specific scope.
