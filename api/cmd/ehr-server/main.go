@@ -1246,6 +1246,9 @@ func runServer() error {
 		{Name: "dose-status", Type: "token"},
 	})
 
+	// Declare US Core 6.1.0 (instantiates + supportedProfile); the (g)(10) kit needs both.
+	capBuilder.DeclareUSCoreServer()
+
 	// Set advanced capabilities for all registered resource types
 	defaultCaps := fhir.DefaultCapabilityOptions()
 	for _, rt := range []string{
