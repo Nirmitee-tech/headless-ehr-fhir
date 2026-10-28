@@ -1432,6 +1432,44 @@ func TestNegotiateScopes(t *testing.T) {
 			t.Error("expected error for empty scopes")
 		}
 	})
+
+	t.Run("wildcard scope covers per-resource scopes", func(t *testing.T) {
+		result, err := negotiateScopes(
+			"launch/patient openid patient/Observation.rs patient/Patient.r patient/Condition.read",
+			"launch/patient openid patient/*.rs")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		for _, want := range []string{"patient/Observation.rs", "patient/Patient.r", "patient/Condition.read"} {
+			if !containsScope(result, want) {
+				t.Errorf("expected %s in %q", want, result)
+			}
+		}
+	})
+
+	t.Run("wildcard does not widen permissions or context", func(t *testing.T) {
+		result, err := negotiateScopes(
+			"openid patient/Observation.cruds patient/Observation.write user/Observation.rs",
+			"openid patient/*.rs")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		for _, notWant := range []string{"patient/Observation.cruds", "patient/Observation.write", "user/Observation.rs"} {
+			if containsScope(result, notWant) {
+				t.Errorf("did not expect %s in %q", notWant, result)
+			}
+		}
+	})
+
+	t.Run("resource-specific allowed scope covers only that resource", func(t *testing.T) {
+		result, err := negotiateScopes("openid patient/Observation.rs patient/Condition.rs", "openid patient/Observation.rs")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if containsScope(result, "patient/Condition.rs") {
+			t.Errorf("did not expect patient/Condition.rs in %q", result)
+		}
+	})
 }
 
 func TestTimingSafeEqual(t *testing.T) {
