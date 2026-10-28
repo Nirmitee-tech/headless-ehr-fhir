@@ -130,6 +130,20 @@ type CapabilityBuilder struct {
 
 	// Custom search parameters keyed by resource type.
 	customSearchParams map[string][]CustomSearchParam
+
+	// declareUSCore adds the US Core server to instantiates and US Core
+	// supportedProfile entries for registered resource types (see DeclareUSCoreServer).
+	declareUSCore bool
+}
+
+// DeclareUSCoreServer makes Build list the US Core 6.1.0 server in instantiates and
+// add US Core supportedProfile entries to every registered resource type US Core covers.
+// Types that are not registered are not added, so the statement still lists only what
+// the server serves.
+func (b *CapabilityBuilder) DeclareUSCoreServer() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.declareUSCore = true
 }
 
 // NewCapabilityBuilder creates a new builder. The baseURL is the FHIR server
@@ -465,6 +479,11 @@ func (b *CapabilityBuilder) Build() map[string]interface{} {
 		fhirVersion = "4.0.1"
 	}
 
+	instantiates := []string{"http://hl7.org/fhir/uv/bulkdata/CapabilityStatement/bulk-data"}
+	if b.declareUSCore {
+		instantiates = append(instantiates, USCoreServerCapabilityURL)
+	}
+
 	cs := map[string]interface{}{
 		"resourceType": "CapabilityStatement",
 		"status":       "active",
@@ -472,9 +491,7 @@ func (b *CapabilityBuilder) Build() map[string]interface{} {
 		"kind":         "instance",
 		"fhirVersion":  fhirVersion,
 		"format":       formats,
-		"instantiates": []string{
-			"http://hl7.org/fhir/uv/bulkdata/CapabilityStatement/bulk-data",
-		},
+		"instantiates": instantiates,
 		"software": map[string]string{
 			"name":    serverName,
 			"version": b.config.ServerVersion,
@@ -575,9 +592,13 @@ func (b *CapabilityBuilder) buildResourceEntry(entry *resourceEntry, rt string) 
 		res["searchRevInclude"] = entry.searchRevInclude
 	}
 
-	// Supported profiles (legacy)
-	if len(entry.profiles) > 0 {
-		res["supportedProfile"] = entry.profiles
+	// Supported profiles: explicit ones first, then US Core ones when declared
+	profiles := entry.profiles
+	if b.declareUSCore {
+		profiles = mergeProfiles(profiles, usCoreSupportedProfiles[rt])
+	}
+	if len(profiles) > 0 {
+		res["supportedProfile"] = profiles
 	}
 
 	// Resource-level operations
@@ -1555,4 +1576,20 @@ func (h *CapabilityHandler) DeleteCustomSearchParam(c echo.Context) error {
 		})
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+// mergeProfiles returns base followed by any entries of extra not already in base.
+func mergeProfiles(base, extra []string) []string {
+	if len(extra) == 0 {
+		return base
+	}
+	out := make([]string, 0, len(base)+len(extra))
+	seen := make(map[string]bool, len(base)+len(extra))
+	for _, p := range append(append([]string{}, base...), extra...) {
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return out
 }
