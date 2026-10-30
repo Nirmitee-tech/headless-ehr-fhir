@@ -6,11 +6,11 @@ An open-source, headless EHR system designed for modern healthcare. API-first ar
 
 This server is tested against the **ONC Certification (g)(10) Standardized API Test Kit** (Inferno) — the same test suite used to certify US EHRs — on the **SMART App Launch (STU2) — Standalone Patient App** scenario.
 
-**Latest run (June 11, 2026): all 47 tests passing — zero failures, zero skips.**
+**Latest run (October 27, 2026, kit v8.0.7): all 47 tests passing, zero failures, zero skips.** Previous run: June 11, 2026, also 47/47.
 
 The run was executed over HTTPS (TLS-terminating proxy in front of the server) with the client authenticating via **asymmetric `private_key_jwt` (RS384 client assertions)** — so the `client-confidential-asymmetric` capability is exercised end-to-end, not just declared. Coverage includes: full OAuth 2.0 + PKCE standalone launch (GET and POST authorize), OpenID Connect (ID token, JWKS, `fhirUser` resolution), token refresh, SMART v1 **and** v2 scope grammars, patient context, and TLS verification.
 
-📋 **[Full test-by-test results →](api/inferno-results/2026-06-11/results.md)**
+📋 **[Full test-by-test results →](api/inferno-results/2026-10-27/results.md)** ([June 11 run](api/inferno-results/2026-06-11/results.md))
 
 ### US Core Single Patient API (g10) — 89/94 functional tests passing
 
